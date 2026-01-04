@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X, Plus, Tag } from 'lucide-react'
+import { useState, useMemo } from 'react'
+import { X, Plus, Tag, Search } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,6 +10,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useExpenseTags, useCreateExpenseTag } from '../hooks'
+import { ScrollArea } from '@/components/ui/scroll-area'
 
 interface TagSelectorProps {
   selectedTagIds: string[]
@@ -40,13 +41,27 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
   const [newTagName, setNewTagName] = useState('')
   const [newTagColor, setNewTagColor] = useState(DEFAULT_COLORS[0])
   const [popoverOpen, setPopoverOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   const { data: tagsData } = useExpenseTags()
   const createTag = useCreateExpenseTag()
 
   const tags = tagsData?.data ?? []
   const selectedTags = tags.filter((tag) => selectedTagIds.includes(tag.id))
-  const availableTags = tags.filter((tag) => !selectedTagIds.includes(tag.id))
+
+  // Фильтруем доступные метки по поисковому запросу
+  const filteredAvailableTags = useMemo(() => {
+    const available = tags.filter((tag) => !selectedTagIds.includes(tag.id))
+
+    if (!searchQuery.trim()) {
+      return available
+    }
+
+    const query = searchQuery.toLowerCase()
+    return available.filter((tag) =>
+      tag.name.toLowerCase().includes(query)
+    )
+  }, [tags, selectedTagIds, searchQuery])
 
   const handleToggleTag = (tagId: string) => {
     if (selectedTagIds.includes(tagId)) {
@@ -72,8 +87,17 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
       setNewTagName('')
       setNewTagColor(DEFAULT_COLORS[0])
       setIsCreating(false)
+      setSearchQuery('')
     } catch {
       // Ошибка обработана в хуке
+    }
+  }
+
+  const handleOpenChange = (open: boolean) => {
+    setPopoverOpen(open)
+    if (!open) {
+      setIsCreating(false)
+      setSearchQuery('')
     }
   }
 
@@ -106,7 +130,7 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
         ))}
 
         {/* Add tag button */}
-        <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+        <Popover open={popoverOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button
               type="button"
@@ -118,52 +142,71 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
               Добавить метку
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-72" align="start">
-            <div className="space-y-3">
+          <PopoverContent className="w-80 p-0" align="start">
+            <div className="flex flex-col">
               {!isCreating ? (
                 <>
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium">Выберите метку</p>
-                    <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
-                      {availableTags.length > 0 ? (
-                        availableTags.map((tag) => (
-                          <Badge
-                            key={tag.id}
-                            variant="outline"
-                            className="cursor-pointer hover:bg-accent"
-                            style={{
-                              borderColor: tag.color,
-                              color: tag.color,
-                            }}
-                            onClick={() => {
-                              handleToggleTag(tag.id)
-                              setPopoverOpen(false)
-                            }}
-                          >
-                            {tag.name}
-                          </Badge>
-                        ))
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Все метки уже выбраны
-                        </p>
-                      )}
+                  {/* Search */}
+                  <div className="p-3 border-b">
+                    <div className="relative">
+                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Поиск меток..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-8"
+                      />
                     </div>
                   </div>
 
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => setIsCreating(true)}
-                  >
-                    <Plus className="mr-2 h-4 w-4" />
-                    Создать новую метку
-                  </Button>
+                  {/* Tags list */}
+                  <ScrollArea className="h-64">
+                    <div className="p-3 space-y-1">
+                      {filteredAvailableTags.length > 0 ? (
+                        filteredAvailableTags.map((tag) => (
+                          <button
+                            key={tag.id}
+                            type="button"
+                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent text-left transition-colors"
+                            onClick={() => {
+                              handleToggleTag(tag.id)
+                              setSearchQuery('')
+                            }}
+                          >
+                            <div
+                              className="h-3 w-3 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: tag.color }}
+                            />
+                            <span className="text-sm flex-1 truncate">{tag.name}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="text-center py-8 text-sm text-muted-foreground">
+                          {searchQuery ? 'Метки не найдены' : 'Все метки уже выбраны'}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+
+                  {/* Create button */}
+                  <div className="p-2 border-t">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setIsCreating(true)
+                        setSearchQuery('')
+                      }}
+                    >
+                      <Plus className="mr-2 h-4 w-4" />
+                      Создать новую метку
+                    </Button>
+                  </div>
                 </>
               ) : (
-                <>
+                <div className="p-4 space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="tag-name">Название метки</Label>
                     <Input
@@ -177,6 +220,7 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
                           handleCreateTag()
                         }
                       }}
+                      autoFocus
                     />
                   </div>
 
@@ -223,7 +267,7 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
                       {createTag.isPending ? 'Создание...' : 'Создать'}
                     </Button>
                   </div>
-                </>
+                </div>
               )}
             </div>
           </PopoverContent>
