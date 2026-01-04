@@ -12,6 +12,7 @@ import {
   Sparkles,
   Receipt,
   Banknote,
+  FolderOpen,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -54,6 +55,11 @@ const navItems = [
     title: 'Доходы',
     icon: Banknote,
     href: '/incomes',
+  },
+  {
+    title: 'Категории',
+    icon: FolderOpen,
+    href: '/categories',
   },
   {
     title: 'Активы',
