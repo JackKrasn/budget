@@ -541,6 +541,7 @@ export interface CreateExpenseRequest {
   currency: string
   date: string
   description?: string
+  tagIds?: string[]
   fundAllocations?: FundAllocationRequest[]
 }
 

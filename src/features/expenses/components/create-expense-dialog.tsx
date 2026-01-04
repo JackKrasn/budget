@@ -57,6 +57,7 @@ import { Separator } from '@/components/ui/separator'
 import { useCreateExpense, useExpenseCategories } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 import { useFunds } from '@/features/funds'
+import { TagSelector } from './tag-selector'
 import {
   Wallet,
   Plus,
@@ -101,6 +102,7 @@ const formSchema = z.object({
   currency: z.string().min(1, 'Выберите валюту'),
   date: z.string().min(1, 'Введите дату'),
   description: z.string().optional(),
+  tagIds: z.array(z.string()).optional(),
   useFundAllocation: z.boolean(),
 })
 
@@ -140,6 +142,7 @@ export function CreateExpenseDialog({ children }: CreateExpenseDialogProps) {
       currency: 'RUB',
       date: new Date().toISOString().split('T')[0],
       description: '',
+      tagIds: [],
       useFundAllocation: false,
     },
   })
@@ -183,6 +186,7 @@ export function CreateExpenseDialog({ children }: CreateExpenseDialogProps) {
         currency: values.currency,
         date: values.date,
         description: values.description || undefined,
+        tagIds: values.tagIds && values.tagIds.length > 0 ? values.tagIds : undefined,
         fundAllocations:
           values.useFundAllocation && fundAllocations.length > 0
             ? fundAllocations.map((a) => ({
@@ -393,6 +397,23 @@ export function CreateExpenseDialog({ children }: CreateExpenseDialogProps) {
                       placeholder="Необязательное описание..."
                       className="resize-none"
                       {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Tags */}
+            <FormField
+              control={form.control}
+              name="tagIds"
+              render={({ field }) => (
+                <FormItem>
+                  <FormControl>
+                    <TagSelector
+                      selectedTagIds={field.value || []}
+                      onTagsChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />
