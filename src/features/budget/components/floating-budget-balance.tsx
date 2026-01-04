@@ -64,7 +64,7 @@ export function FloatingBudgetBalance({
                 <span
                   className={cn(
                     'text-sm font-bold tabular-nums leading-tight',
-                    isPlanningNegative ? 'text-destructive' : 'text-violet-500'
+                    isPlanningNegative ? 'text-destructive' : 'text-foreground'
                   )}
                 >
                   {isPlanningNegative ? '-' : ''}

@@ -576,7 +576,7 @@ export default function BudgetPage() {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">В фонды</p>
-                <p className="text-lg font-bold tabular-nums text-violet-500">
+                <p className="text-lg font-bold tabular-nums text-foreground">
                   {formatMoney(stats.expectedFundDistributions)} ₽
                 </p>
                 <p className="text-xs text-muted-foreground">
@@ -614,7 +614,7 @@ export default function BudgetPage() {
                 <p className="text-xs text-muted-foreground">Для планирования</p>
                 <p
                   className={`text-lg font-bold tabular-nums ${
-                    stats.availableForPlanning < 0 ? 'text-destructive' : 'text-violet-500'
+                    stats.availableForPlanning < 0 ? 'text-destructive' : 'text-foreground'
                   }`}
                 >
                   {formatMoney(stats.availableForPlanning)} ₽

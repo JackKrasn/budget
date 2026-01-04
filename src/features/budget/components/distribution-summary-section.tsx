@@ -1,10 +1,13 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock } from 'lucide-react'
+import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock, Settings } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { Button } from '@/components/ui/button'
 import { FundIcon } from '@/components/common/category-icon'
 import { cn } from '@/lib/utils'
 import type { DistributionSummary, FundDistributionSummary } from '@/lib/api/types'
+import { EditDistributionRulesDialog } from './edit-distribution-rules-dialog'
 
 interface DistributionSummarySectionProps {
   summary?: DistributionSummary
@@ -24,6 +27,8 @@ export function DistributionSummarySection({
   fundDistributions,
   totalIncome = 0,
 }: DistributionSummarySectionProps) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+
   if (!summary || summary.totalExpectedDistribution === 0) {
     return null
   }
@@ -46,6 +51,14 @@ export function DistributionSummarySection({
           <PiggyBank className="h-5 w-5 text-violet-500" />
           Распределение по фондам
         </h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setEditDialogOpen(true)}
+        >
+          <Settings className="mr-2 h-4 w-4" />
+          Настроить
+        </Button>
       </div>
 
       {/* Summary Cards */}
@@ -224,6 +237,14 @@ export function DistributionSummarySection({
           </CardContent>
         </Card>
       )}
+
+      {/* Edit Distribution Rules Dialog */}
+      <EditDistributionRulesDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        fundDistributions={fundDistributions || []}
+        totalIncome={totalIncome}
+      />
     </motion.div>
   )
 }
