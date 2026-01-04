@@ -39,28 +39,155 @@ import {
   Briefcase,
   Bus,
   TrendingUp,
+  Dumbbell,
+  Baby,
+  PersonStanding,
+  Dog,
+  Cat,
+  Pizza,
+  Cake,
+  Beer,
+  Wine,
+  Apple,
+  Fish,
+  Beef,
+  IceCream,
+  Bike,
+  Train,
+  Fuel,
+  Footprints,
+  Pill,
+  Stethoscope,
+  Hospital,
+  Scissors,
+  Watch,
+  Glasses,
+  Gem,
+  Crown,
+  Sparkles,
+  PartyPopper,
+  Music,
+  Camera,
+  Headphones,
+  Tv,
+  Laptop,
+  Monitor,
+  School,
+  BookOpen,
+  Pencil,
+  Calculator,
+  PawPrint,
+  Bone,
+  Bed,
+  Sofa,
+  Lamp,
+  Bath,
+  Wrench,
+  Flower2,
+  TreePine,
+  Flame,
+  Snowflake,
+  Sun,
+  Umbrella,
+  Cigarette,
 } from 'lucide-react'
 import type { ExpenseCategory } from '@/lib/api/types'
 
 const AVAILABLE_ICONS = [
+  // Основное
   { name: 'shopping-cart', icon: ShoppingCart, label: 'Продукты' },
+  { name: 'shopping-bag', icon: ShoppingBag, label: 'Покупки' },
   { name: 'home', icon: Home, label: 'Дом' },
   { name: 'car', icon: Car, label: 'Авто' },
-  { name: 'utensils', icon: Utensils, label: 'Еда' },
-  { name: 'plane', icon: Plane, label: 'Путешествия' },
-  { name: 'heart', icon: Heart, label: 'Здоровье' },
-  { name: 'gift', icon: Gift, label: 'Подарки' },
-  { name: 'graduation-cap', icon: GraduationCap, label: 'Образование' },
-  { name: 'smartphone', icon: Smartphone, label: 'Телефон' },
-  { name: 'zap', icon: Zap, label: 'Коммуналка' },
-  { name: 'coffee', icon: Coffee, label: 'Кафе' },
-  { name: 'film', icon: Film, label: 'Развлечения' },
-  { name: 'shopping-bag', icon: ShoppingBag, label: 'Покупки' },
   { name: 'wallet', icon: Wallet, label: 'Кошелёк' },
   { name: 'dollar-sign', icon: DollarSign, label: 'Деньги' },
+
+  // Еда и напитки
+  { name: 'utensils', icon: Utensils, label: 'Еда' },
+  { name: 'coffee', icon: Coffee, label: 'Кафе' },
+  { name: 'pizza', icon: Pizza, label: 'Пицца' },
+  { name: 'cake', icon: Cake, label: 'Торт' },
+  { name: 'beer', icon: Beer, label: 'Пиво' },
+  { name: 'wine', icon: Wine, label: 'Вино' },
+  { name: 'apple', icon: Apple, label: 'Фрукты' },
+  { name: 'fish', icon: Fish, label: 'Рыба' },
+  { name: 'beef', icon: Beef, label: 'Мясо' },
+  { name: 'ice-cream', icon: IceCream, label: 'Мороженое' },
+
+  // Транспорт
+  { name: 'bus', icon: Bus, label: 'Автобус' },
+  { name: 'bike', icon: Bike, label: 'Велосипед' },
+  { name: 'train', icon: Train, label: 'Поезд' },
+  { name: 'plane', icon: Plane, label: 'Самолёт' },
+  { name: 'fuel', icon: Fuel, label: 'Топливо' },
+  { name: 'footprints', icon: Footprints, label: 'Пешком' },
+
+  // Здоровье и спорт
+  { name: 'heart', icon: Heart, label: 'Здоровье' },
+  { name: 'dumbbell', icon: Dumbbell, label: 'Спорт' },
+  { name: 'pill', icon: Pill, label: 'Лекарства' },
+  { name: 'stethoscope', icon: Stethoscope, label: 'Врач' },
+  { name: 'hospital', icon: Hospital, label: 'Больница' },
+
+  // Семья и дети
+  { name: 'baby', icon: Baby, label: 'Младенец' },
+  { name: 'person-standing', icon: PersonStanding, label: 'Ребёнок' },
+
+  // Питомцы
+  { name: 'dog', icon: Dog, label: 'Собака' },
+  { name: 'cat', icon: Cat, label: 'Кошка' },
+  { name: 'paw-print', icon: PawPrint, label: 'Лапки' },
+  { name: 'bone', icon: Bone, label: 'Корм' },
+
+  // Личное
+  { name: 'scissors', icon: Scissors, label: 'Красота' },
+  { name: 'watch', icon: Watch, label: 'Часы' },
+  { name: 'glasses', icon: Glasses, label: 'Очки' },
+  { name: 'gem', icon: Gem, label: 'Украшения' },
+  { name: 'crown', icon: Crown, label: 'Роскошь' },
+  { name: 'sparkles', icon: Sparkles, label: 'Особое' },
+
+  // Развлечения
+  { name: 'film', icon: Film, label: 'Кино' },
+  { name: 'party-popper', icon: PartyPopper, label: 'Вечеринка' },
+  { name: 'music', icon: Music, label: 'Музыка' },
+  { name: 'camera', icon: Camera, label: 'Фото' },
+  { name: 'headphones', icon: Headphones, label: 'Аудио' },
+  { name: 'gift', icon: Gift, label: 'Подарки' },
+
+  // Техника
+  { name: 'smartphone', icon: Smartphone, label: 'Телефон' },
+  { name: 'tv', icon: Tv, label: 'ТВ' },
+  { name: 'laptop', icon: Laptop, label: 'Ноутбук' },
+  { name: 'monitor', icon: Monitor, label: 'Монитор' },
+
+  // Образование и работа
+  { name: 'graduation-cap', icon: GraduationCap, label: 'Образование' },
+  { name: 'school', icon: School, label: 'Школа' },
+  { name: 'book-open', icon: BookOpen, label: 'Книги' },
+  { name: 'pencil', icon: Pencil, label: 'Канцелярия' },
+  { name: 'calculator', icon: Calculator, label: 'Калькулятор' },
   { name: 'briefcase', icon: Briefcase, label: 'Работа' },
-  { name: 'bus', icon: Bus, label: 'Транспорт' },
+
+  // Дом
+  { name: 'bed', icon: Bed, label: 'Спальня' },
+  { name: 'sofa', icon: Sofa, label: 'Мебель' },
+  { name: 'lamp', icon: Lamp, label: 'Освещение' },
+  { name: 'bath', icon: Bath, label: 'Ванная' },
+  { name: 'wrench', icon: Wrench, label: 'Ремонт' },
+  { name: 'zap', icon: Zap, label: 'Электричество' },
+  { name: 'flame', icon: Flame, label: 'Отопление' },
+  { name: 'snowflake', icon: Snowflake, label: 'Охлаждение' },
+
+  // Инвестиции
   { name: 'trending-up', icon: TrendingUp, label: 'Инвестиции' },
+
+  // Природа и прочее
+  { name: 'flower2', icon: Flower2, label: 'Цветы' },
+  { name: 'tree-pine', icon: TreePine, label: 'Природа' },
+  { name: 'sun', icon: Sun, label: 'Лето' },
+  { name: 'umbrella', icon: Umbrella, label: 'Зонт' },
+  { name: 'cigarette', icon: Cigarette, label: 'Табак' },
 ]
 
 const DEFAULT_COLORS = [

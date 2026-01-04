@@ -258,6 +258,7 @@ export function BudgetTable({
                               <div className="flex items-center gap-2">
                                 <CategoryIcon
                                   code={row.categoryCode}
+                                  iconName={row.categoryIcon}
                                   color={row.categoryColor}
                                   size="sm"
                                 />
@@ -307,6 +308,7 @@ export function BudgetTable({
                   >
                     <CategoryIcon
                       code={row.categoryCode}
+                      iconName={row.categoryIcon}
                       color={row.categoryColor}
                       size="md"
                     />

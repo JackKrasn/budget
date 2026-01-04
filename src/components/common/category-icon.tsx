@@ -42,6 +42,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getIconByName } from '@/lib/icon-registry'
 
 // Маппинг кодов категорий на иконки Lucide
 const CATEGORY_ICONS: Record<string, LucideIcon> = {
@@ -152,6 +153,8 @@ const FUND_ICONS: Record<string, LucideIcon> = {
 interface CategoryIconProps {
   /** Код категории (например, 'food', 'transport') */
   code: string
+  /** Название иконки из реестра (опционально, приоритет над code) */
+  iconName?: string
   /** Цвет фона (hex или CSS color) */
   color?: string
   /** Размер контейнера */
@@ -168,11 +171,16 @@ const SIZE_CONFIG = {
 
 export function CategoryIcon({
   code,
+  iconName,
   color = '#6b7280',
   size = 'md',
   className,
 }: CategoryIconProps) {
-  const Icon = CATEGORY_ICONS[code.toLowerCase()] ?? HelpCircle
+  // Если передана iconName, используем её; иначе fallback на code
+  const Icon: LucideIcon = iconName
+    ? getIconByName(iconName)
+    : CATEGORY_ICONS[code.toLowerCase()] ?? HelpCircle
+
   const sizeConfig = SIZE_CONFIG[size]
 
   return (

@@ -56,6 +56,7 @@ export function CategoryFilter({
             <div className="flex items-center gap-2">
               <CategoryIcon
                 code={selectedCategory.code}
+                iconName={selectedCategory.icon}
                 color={selectedCategory.color}
                 size="sm"
               />
@@ -116,6 +117,7 @@ export function CategoryFilter({
                     </div>
                     <CategoryIcon
                       code={category.code}
+                      iconName={category.icon}
                       color={category.color}
                       size="sm"
                       className="mr-2"

@@ -142,6 +142,7 @@ export function RecurringExpensesSection({
                       <div className="flex items-center gap-3">
                         <CategoryIcon
                           code={expense.category_code}
+                          iconName={expense.category_icon}
                           color={expense.category_color}
                           size="md"
                         />

@@ -167,6 +167,7 @@ export default function CategoriesPage() {
                   <div className="flex items-center gap-3">
                     <CategoryIcon
                       code={category.code}
+                      iconName={category.icon}
                       color={category.color}
                       size="lg"
                       className="transition-transform group-hover:scale-105"
