@@ -1,0 +1,439 @@
+import { useState } from 'react'
+import { motion } from 'framer-motion'
+import {
+  Check,
+  X,
+  Clock,
+  CheckCircle,
+  SkipForward,
+  Banknote,
+  RefreshCw,
+  Calendar,
+  TrendingUp,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+  TableFooter,
+} from '@/components/ui/table'
+import { Badge } from '@/components/ui/badge'
+import { Progress } from '@/components/ui/progress'
+import { cn } from '@/lib/utils'
+import type { PlannedIncome, PlannedIncomeStatus } from '@/lib/api/types'
+
+interface PlannedIncomesSectionProps {
+  incomes: PlannedIncome[]
+  onReceive: (id: string) => Promise<void>
+  onSkip: (id: string) => Promise<void>
+  onGenerate?: () => Promise<void>
+  isGenerating?: boolean
+  isPending?: boolean
+  /** Слот для кнопки добавления */
+  addButton?: React.ReactNode
+}
+
+const STATUS_CONFIG: Record<
+  PlannedIncomeStatus,
+  { label: string; icon: typeof Clock; color: string }
+> = {
+  pending: { label: 'Ожидается', icon: Clock, color: 'text-amber-500' },
+  received: { label: 'Получено', icon: CheckCircle, color: 'text-emerald-500' },
+  skipped: { label: 'Пропущено', icon: SkipForward, color: 'text-muted-foreground' },
+}
+
+export function PlannedIncomesSection({
+  incomes,
+  onReceive,
+  onSkip,
+  onGenerate,
+  isGenerating,
+  isPending,
+  addButton,
+}: PlannedIncomesSectionProps) {
+  const [processingId, setProcessingId] = useState<string | null>(null)
+
+  const formatMoney = (amount: number) => {
+    return amount.toLocaleString('ru-RU', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+  }
+
+  const formatDate = (dateStr: string | null | undefined) => {
+    if (!dateStr) return '—'
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return '—'
+    return date.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+    })
+  }
+
+  // Извлечь число из nullable типа бэкенда
+  const getActualAmount = (
+    value: number | { Float64: number; Valid: boolean } | null | undefined
+  ): number | null => {
+    if (value == null) return null
+    if (typeof value === 'number') return value
+    if (typeof value === 'object' && 'Valid' in value && value.Valid) {
+      return value.Float64
+    }
+    return null
+  }
+
+  // Извлечь дату из nullable типа бэкенда
+  const getDateString = (
+    value: string | { Time: string; Valid: boolean } | null | undefined
+  ): string | null => {
+    if (value == null) return null
+    if (typeof value === 'string') return value
+    if (typeof value === 'object' && 'Valid' in value && value.Valid) {
+      return value.Time
+    }
+    return null
+  }
+
+  const handleReceive = async (id: string) => {
+    setProcessingId(id)
+    try {
+      await onReceive(id)
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const handleSkip = async (id: string) => {
+    setProcessingId(id)
+    try {
+      await onSkip(id)
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  // Группировка: pending сначала, потом received, потом skipped
+  const sortedIncomes = [...incomes].sort((a, b) => {
+    const statusOrder = { pending: 0, received: 1, skipped: 2 }
+    const orderDiff = statusOrder[a.status] - statusOrder[b.status]
+    if (orderDiff !== 0) return orderDiff
+    const dateStrA = getDateString(a.expected_date)
+    const dateStrB = getDateString(b.expected_date)
+    const dateA = dateStrA ? new Date(dateStrA).getTime() : 0
+    const dateB = dateStrB ? new Date(dateStrB).getTime() : 0
+    return (isNaN(dateA) ? 0 : dateA) - (isNaN(dateB) ? 0 : dateB)
+  })
+
+  const pendingIncomes = incomes.filter((e) => e.status === 'pending')
+  const receivedIncomes = incomes.filter((e) => e.status === 'received')
+
+  const skippedIncomes = incomes.filter((e) => e.status === 'skipped')
+
+  // Расчёт ожидаемых сумм по полученным доходам (для сравнения план/факт)
+  const expectedFromReceived = receivedIncomes.reduce(
+    (sum, e) => sum + e.expected_amount,
+    0
+  )
+  const actualFromReceived = receivedIncomes.reduce(
+    (sum, e) => sum + (getActualAmount(e.actual_amount) ?? e.expected_amount),
+    0
+  )
+
+  const totals = {
+    expected: incomes.reduce((sum, e) => sum + e.expected_amount, 0),
+    received: actualFromReceived,
+    receivedExpected: expectedFromReceived,
+    pending: pendingIncomes.reduce((sum, e) => sum + e.expected_amount, 0),
+    skipped: skippedIncomes.reduce((sum, e) => sum + e.expected_amount, 0),
+  }
+
+  // Разница между фактом и планом для полученных доходов
+  const receivedDiff = totals.received - totals.receivedExpected
+  // Процент выполнения
+  const progressPercent = totals.expected > 0
+    ? Math.round((totals.received / totals.expected) * 100)
+    : 0
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.1 }}
+    >
+      <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              Ожидаемые доходы
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-amber-500 border-amber-500/30">
+                <Clock className="mr-1 h-3 w-3" />
+                {pendingIncomes.length} ожидается
+              </Badge>
+              {addButton}
+              {onGenerate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onGenerate}
+                  disabled={isGenerating}
+                >
+                  <RefreshCw
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      isGenerating && 'animate-spin'
+                    )}
+                  />
+                  Сгенерировать
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Сводка: прогресс и план/факт */}
+          {incomes.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {/* Прогресс-бар */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">
+                    Получено {formatMoney(totals.received)} ₽ из {formatMoney(totals.expected)} ₽
+                  </span>
+                  <span className="font-medium text-emerald-500">{progressPercent}%</span>
+                </div>
+                <Progress value={progressPercent} className="h-2" />
+              </div>
+
+              {/* Карточки со сводкой */}
+              <div className="grid grid-cols-3 gap-3">
+                {/* Ожидается */}
+                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-amber-500 mb-1">
+                    <Clock className="h-3 w-3" />
+                    Ожидается
+                  </div>
+                  <p className="text-lg font-semibold tabular-nums">
+                    {formatMoney(totals.pending)} ₽
+                  </p>
+                </div>
+
+                {/* Получено */}
+                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-500 mb-1">
+                    <CheckCircle className="h-3 w-3" />
+                    Получено
+                  </div>
+                  <p className="text-lg font-semibold tabular-nums text-emerald-500">
+                    {formatMoney(totals.received)} ₽
+                  </p>
+                  {receivedDiff !== 0 && (
+                    <p className={cn(
+                      'text-xs mt-0.5 flex items-center gap-0.5',
+                      receivedDiff > 0 ? 'text-emerald-500' : 'text-red-500'
+                    )}>
+                      {receivedDiff > 0 ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )}
+                      {receivedDiff > 0 ? '+' : ''}{formatMoney(receivedDiff)} ₽ от плана
+                    </p>
+                  )}
+                </div>
+
+                {/* Пропущено */}
+                <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                    <SkipForward className="h-3 w-3" />
+                    Пропущено
+                  </div>
+                  <p className="text-lg font-semibold tabular-nums text-muted-foreground">
+                    {formatMoney(totals.skipped)} ₽
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="pt-0">
+          {incomes.length === 0 ? (
+            <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30">
+              <Calendar className="h-8 w-8 text-muted-foreground/50" />
+              <p className="text-sm text-muted-foreground">
+                Нет запланированных доходов
+              </p>
+              {onGenerate && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onGenerate}
+                  disabled={isGenerating}
+                >
+                  Сгенерировать из шаблонов
+                </Button>
+              )}
+            </div>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow className="hover:bg-transparent">
+                  <TableHead>Источник</TableHead>
+                  <TableHead className="w-[100px] text-center">Дата</TableHead>
+                  <TableHead className="w-[140px] text-right">Сумма</TableHead>
+                  <TableHead className="w-[100px] text-center">Статус</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sortedIncomes.map((income) => {
+                  const statusConfig = STATUS_CONFIG[income.status]
+                  const StatusIcon = statusConfig.icon
+                  const isProcessing = processingId === income.id
+                  const actualAmount = getActualAmount(income.actual_amount)
+
+                  return (
+                    <TableRow
+                      key={income.id}
+                      className={cn(
+                        'group',
+                        income.status === 'skipped' && 'opacity-50'
+                      )}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
+                            <Banknote className="h-4 w-4 text-emerald-500" />
+                          </div>
+                          <div>
+                            <p className="font-medium">{income.source}</p>
+                            {income.notes && (
+                              <p className="text-xs text-muted-foreground">
+                                {income.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </TableCell>
+
+                      <TableCell className="text-center text-sm text-muted-foreground">
+                        {formatDate(getDateString(income.expected_date))}
+                      </TableCell>
+
+                      <TableCell className="text-right">
+                        {income.status === 'received' && actualAmount != null ? (
+                          <div>
+                            <span className="text-base font-semibold tabular-nums text-emerald-500">
+                              +{formatMoney(actualAmount)} ₽
+                            </span>
+                            {actualAmount !== income.expected_amount && (
+                              <p className={cn(
+                                'text-xs mt-0.5 flex items-center justify-end gap-0.5',
+                                actualAmount > income.expected_amount ? 'text-emerald-500' : 'text-red-500'
+                              )}>
+                                {actualAmount > income.expected_amount ? (
+                                  <ArrowUp className="h-3 w-3" />
+                                ) : (
+                                  <ArrowDown className="h-3 w-3" />
+                                )}
+                                {actualAmount > income.expected_amount ? '+' : ''}
+                                {formatMoney(actualAmount - income.expected_amount)} ₽
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          <span
+                            className={cn(
+                              'text-base font-semibold tabular-nums',
+                              income.status === 'skipped'
+                                ? 'text-muted-foreground line-through'
+                                : 'text-emerald-500/70'
+                            )}
+                          >
+                            +{formatMoney(income.expected_amount)} ₽
+                          </span>
+                        )}
+                      </TableCell>
+
+                      <TableCell className="text-center">
+                        <div
+                          className={cn(
+                            'inline-flex items-center gap-1 text-xs',
+                            statusConfig.color
+                          )}
+                        >
+                          <StatusIcon className="h-3.5 w-3.5" />
+                          {statusConfig.label}
+                        </div>
+                      </TableCell>
+
+                      <TableCell>
+                        {income.status === 'pending' && (
+                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleReceive(income.id)}
+                              disabled={isPending || isProcessing}
+                              title="Отметить полученным"
+                            >
+                              <Check className="h-4 w-4 text-emerald-500" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => handleSkip(income.id)}
+                              disabled={isPending || isProcessing}
+                              title="Пропустить"
+                            >
+                              <X className="h-4 w-4 text-muted-foreground" />
+                            </Button>
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+              <TableFooter>
+                <TableRow className="bg-muted/50">
+                  <TableCell className="font-semibold text-base">Итого</TableCell>
+                  <TableCell></TableCell>
+                  <TableCell className="text-right">
+                    <span className="tabular-nums font-semibold text-base text-emerald-500">
+                      +{formatMoney(totals.expected)} ₽
+                    </span>
+                    {receivedDiff !== 0 && (
+                      <p className={cn(
+                        'text-xs mt-0.5 flex items-center justify-end gap-0.5',
+                        receivedDiff > 0 ? 'text-emerald-500' : 'text-red-500'
+                      )}>
+                        {receivedDiff > 0 ? '+' : ''}{formatMoney(receivedDiff)} ₽
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <span className="text-sm text-emerald-500 font-medium">
+                      {progressPercent}%
+                    </span>
+                  </TableCell>
+                  <TableCell></TableCell>
+                </TableRow>
+              </TableFooter>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+    </motion.div>
+  )
+}
