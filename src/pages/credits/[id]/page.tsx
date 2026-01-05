@@ -98,47 +98,66 @@ function ScheduleTable({
   onConfirmPayment: (item: ScheduleItem) => void
 }) {
   return (
-    <div className="border rounded-lg">
+    <div className="border rounded-xl overflow-hidden bg-card/50 backdrop-blur-sm">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[80px]">#</TableHead>
-            <TableHead>Дата</TableHead>
-            <TableHead className="text-right">Основной долг</TableHead>
-            <TableHead className="text-right">Проценты</TableHead>
-            <TableHead className="text-right">Всего</TableHead>
-            <TableHead className="text-right">Остаток</TableHead>
-            <TableHead className="w-[120px] text-center">Статус</TableHead>
+          <TableRow className="border-b-2 hover:bg-transparent">
+            <TableHead className="w-[80px] font-bold">#</TableHead>
+            <TableHead className="font-bold">Дата</TableHead>
+            <TableHead className="text-right font-bold">Основной долг</TableHead>
+            <TableHead className="text-right font-bold">Проценты</TableHead>
+            <TableHead className="text-right font-bold">Всего</TableHead>
+            <TableHead className="text-right font-bold">Остаток</TableHead>
+            <TableHead className="w-[130px] text-center font-bold">Действие</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {schedule.map((item) => (
-            <TableRow key={item.id} className={item.isPaid ? 'opacity-60' : ''}>
-              <TableCell className="font-medium">{item.paymentNumber}</TableCell>
-              <TableCell>{formatDate(item.dueDate)}</TableCell>
-              <TableCell className="text-right tabular-nums">
+          {schedule.map((item, index) => (
+            <TableRow
+              key={item.id}
+              className={cn(
+                'transition-all duration-200',
+                item.isPaid
+                  ? 'opacity-50 bg-muted/30'
+                  : 'hover:bg-accent/50',
+                index === 0 && !item.isPaid && 'bg-primary/5'
+              )}
+            >
+              <TableCell className="font-bold text-base">
+                <span className={cn(
+                  'flex h-8 w-8 items-center justify-center rounded-lg',
+                  item.isPaid ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
+                )}>
+                  {item.paymentNumber}
+                </span>
+              </TableCell>
+              <TableCell className="font-medium">{formatDate(item.dueDate)}</TableCell>
+              <TableCell className="text-right tabular-nums font-medium">
                 {formatMoney(item.principalPart)} ₽
               </TableCell>
-              <TableCell className="text-right tabular-nums">
+              <TableCell className="text-right tabular-nums font-medium text-muted-foreground">
                 {formatMoney(item.interestPart)} ₽
               </TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
+              <TableCell className="text-right tabular-nums font-bold text-base">
                 {formatMoney(item.totalPayment)} ₽
               </TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
+              <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
                 {formatMoney(item.remainingBalance)} ₽
               </TableCell>
               <TableCell className="text-center">
                 {item.isPaid ? (
-                  <CheckCircle2 className="h-5 w-5 text-green-500 inline" />
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    <span className="text-xs font-medium">Оплачен</span>
+                  </div>
                 ) : (
                   <Button
                     size="sm"
-                    variant="outline"
+                    variant={index === 0 ? 'default' : 'outline'}
                     onClick={() => onConfirmPayment(item)}
-                    className="h-8"
+                    className="h-9 font-medium"
                   >
-                    Оплатить
+                    {index === 0 ? 'Оплатить сейчас' : 'Оплатить'}
                   </Button>
                 )}
               </TableCell>
@@ -152,40 +171,45 @@ function ScheduleTable({
 
 function PaymentsTable({ payments }: { payments: PaymentHistoryItem[] }) {
   return (
-    <div className="border rounded-lg">
+    <div className="border rounded-xl overflow-hidden bg-card/50 backdrop-blur-sm">
       <Table>
         <TableHeader>
-          <TableRow>
-            <TableHead className="w-[80px]">#</TableHead>
-            <TableHead>Дата платежа</TableHead>
-            <TableHead>Дата по плану</TableHead>
-            <TableHead className="text-right">Основной долг</TableHead>
-            <TableHead className="text-right">Проценты</TableHead>
-            <TableHead className="text-right">Всего</TableHead>
-            <TableHead className="w-[100px]">Статус</TableHead>
+          <TableRow className="border-b-2 hover:bg-transparent">
+            <TableHead className="w-[80px] font-bold">#</TableHead>
+            <TableHead className="font-bold">Дата платежа</TableHead>
+            <TableHead className="font-bold">Дата по плану</TableHead>
+            <TableHead className="text-right font-bold">Основной долг</TableHead>
+            <TableHead className="text-right font-bold">Проценты</TableHead>
+            <TableHead className="text-right font-bold">Всего</TableHead>
+            <TableHead className="w-[110px] font-bold">Статус</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {payments.map((payment) => (
-            <TableRow key={payment.id}>
-              <TableCell className="font-medium">{payment.paymentNumber}</TableCell>
-              <TableCell>{formatDate(payment.paymentDate)}</TableCell>
-              <TableCell className="text-muted-foreground">
+            <TableRow key={payment.id} className="hover:bg-accent/50 transition-colors">
+              <TableCell className="font-bold">
+                <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-green-500/10 text-green-600">
+                  {payment.paymentNumber}
+                </span>
+              </TableCell>
+              <TableCell className="font-semibold">{formatDate(payment.paymentDate)}</TableCell>
+              <TableCell className="text-muted-foreground text-sm">
                 {formatDate(payment.dueDate)}
               </TableCell>
-              <TableCell className="text-right tabular-nums">
+              <TableCell className="text-right tabular-nums font-medium">
                 {formatMoney(payment.principalPaid)} ₽
               </TableCell>
-              <TableCell className="text-right tabular-nums">
+              <TableCell className="text-right tabular-nums font-medium text-muted-foreground">
                 {formatMoney(payment.interestPaid)} ₽
               </TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
+              <TableCell className="text-right tabular-nums font-bold text-base">
                 {formatMoney(payment.totalPaid)} ₽
               </TableCell>
               <TableCell>
-                <Badge variant={payment.status === 'completed' ? 'default' : 'secondary'}>
-                  {payment.status === 'completed' ? 'Оплачен' : payment.status}
-                </Badge>
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600">
+                  <CheckCircle2 className="h-4 w-4" />
+                  <span className="text-xs font-medium">Оплачен</span>
+                </div>
               </TableCell>
             </TableRow>
           ))}

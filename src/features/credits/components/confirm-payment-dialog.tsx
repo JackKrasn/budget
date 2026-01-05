@@ -138,40 +138,44 @@ export function ConfirmPaymentDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <CheckCircle2 className="h-5 w-5 text-green-500" />
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[550px]">
+        <DialogHeader className="space-y-3 pb-6 border-b">
+          <DialogTitle className="flex items-center gap-3 text-2xl">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-green-500/10">
+              <CheckCircle2 className="h-6 w-6 text-green-500" />
+            </div>
             Подтвердить платёж #{scheduleItem.paymentNumber}
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="text-base">
             Создание расхода и подтверждение платежа по кредиту
           </DialogDescription>
         </DialogHeader>
 
         {/* Payment Info */}
-        <div className="rounded-lg border bg-muted/50 p-4 space-y-2">
+        <div className="rounded-xl border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10 p-5 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Сумма платежа</span>
-            <span className="font-semibold tabular-nums">
+            <span className="text-sm font-medium text-muted-foreground">Сумма платежа</span>
+            <span className="text-2xl font-bold tabular-nums text-primary">
               {formatMoney(scheduleItem.totalPayment)} ₽
             </span>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Основной долг</span>
-            <span className="text-sm tabular-nums">
-              {formatMoney(scheduleItem.principalPart)} ₽
-            </span>
+          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-primary/10">
+            <div>
+              <span className="text-xs text-muted-foreground block mb-1">Основной долг</span>
+              <span className="text-base font-semibold tabular-nums">
+                {formatMoney(scheduleItem.principalPart)} ₽
+              </span>
+            </div>
+            <div>
+              <span className="text-xs text-muted-foreground block mb-1">Проценты</span>
+              <span className="text-base font-semibold tabular-nums">
+                {formatMoney(scheduleItem.interestPart)} ₽
+              </span>
+            </div>
           </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Проценты</span>
-            <span className="text-sm tabular-nums">
-              {formatMoney(scheduleItem.interestPart)} ₽
-            </span>
-          </div>
-          <div className="flex items-center justify-between border-t pt-2">
-            <span className="text-sm text-muted-foreground">Дата по плану</span>
-            <span className="text-sm">
+          <div className="flex items-center justify-between pt-3 border-t border-primary/10">
+            <span className="text-xs font-medium text-muted-foreground">Дата по плану</span>
+            <span className="text-sm font-medium">
               {new Date(scheduleItem.dueDate).toLocaleDateString('ru-RU')}
             </span>
           </div>
@@ -303,18 +307,19 @@ export function ConfirmPaymentDialog({
               )}
             />
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-8 border-t">
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-11"
                 onClick={() => onOpenChange(false)}
+                disabled={confirmPayment.isPending}
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
-                className="flex-1"
+                className="flex-1 h-11 font-semibold"
                 disabled={confirmPayment.isPending}
               >
                 {confirmPayment.isPending ? 'Подтверждение...' : 'Подтвердить платёж'}

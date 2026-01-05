@@ -124,16 +124,16 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
-        <DialogHeader>
-          <DialogTitle>Создать кредит</DialogTitle>
-          <DialogDescription>
-            Создайте новый кредит с автоматическим расчётом графика платежей
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[650px]">
+        <DialogHeader className="space-y-3 pb-6 border-b">
+          <DialogTitle className="text-2xl font-bold">Создать кредит</DialogTitle>
+          <DialogDescription className="text-base leading-relaxed">
+            Создайте новый кредит с автоматическим расчётом графика платежей и генерацией запланированных расходов
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-7 pt-6">
             {/* Name */}
             <FormField
               control={form.control}
@@ -389,18 +389,19 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
               )}
             />
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-3 pt-8 border-t">
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-11"
                 onClick={() => onOpenChange(false)}
+                disabled={createCredit.isPending}
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
-                className="flex-1"
+                className="flex-1 h-11 font-semibold"
                 disabled={createCredit.isPending}
               >
                 {createCredit.isPending ? 'Создание...' : 'Создать кредит'}
