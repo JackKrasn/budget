@@ -53,11 +53,8 @@ export function useCreateAccount() {
   return useMutation({
     mutationFn: (data: CreateAccountRequest) => accountsApi.create(data),
     onSuccess: async () => {
-      // Force immediate refetch with waiting
-      await queryClient.refetchQueries({
-        queryKey: accountKeys.list(),
-        type: 'active'
-      })
+      // Reset and refetch to force fresh data
+      await queryClient.resetQueries({ queryKey: accountKeys.list(), exact: true })
       toast.success('Счёт создан')
     },
     onError: (error) => {
