@@ -60,8 +60,9 @@ export function useCreateFund() {
 
   return useMutation({
     mutationFn: (data: CreateFundRequest) => fundsApi.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+    onSuccess: async () => {
+      // Reset and refetch to force fresh data
+      await queryClient.resetQueries({ queryKey: fundKeys.lists(), exact: false })
       toast.success('Фонд создан')
     },
     onError: (error) => {
