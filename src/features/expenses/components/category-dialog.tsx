@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -21,6 +21,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import {
+  Search,
   ShoppingCart,
   Home,
   Car,
@@ -90,6 +91,7 @@ import {
   Sun,
   Umbrella,
   Cigarette,
+  Shirt,
 } from 'lucide-react'
 import type { ExpenseCategory } from '@/lib/api/types'
 
@@ -188,6 +190,7 @@ const AVAILABLE_ICONS = [
   { name: 'sun', icon: Sun, label: 'Лето' },
   { name: 'umbrella', icon: Umbrella, label: 'Зонт' },
   { name: 'cigarette', icon: Cigarette, label: 'Табак' },
+  { name: 'shirt', icon: Shirt, label: 'Одежда' },
 ]
 
 const DEFAULT_COLORS = [
@@ -226,6 +229,8 @@ interface CategoryDialogProps {
   isPending?: boolean
 }
 
+const ICONS_PER_PAGE = 24
+
 export function CategoryDialog({
   open,
   onOpenChange,
@@ -235,6 +240,8 @@ export function CategoryDialog({
 }: CategoryDialogProps) {
   const [selectedIcon, setSelectedIcon] = useState(category?.icon || AVAILABLE_ICONS[0].name)
   const [selectedColor, setSelectedColor] = useState(category?.color || DEFAULT_COLORS[0])
+  const [iconSearch, setIconSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(0)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -246,6 +253,27 @@ export function CategoryDialog({
     },
   })
 
+  // Filter icons based on search
+  const filteredIcons = useMemo(() => {
+    if (!iconSearch.trim()) return AVAILABLE_ICONS
+
+    const searchLower = iconSearch.toLowerCase()
+    return AVAILABLE_ICONS.filter(
+      (icon) =>
+        icon.label.toLowerCase().includes(searchLower) ||
+        icon.name.toLowerCase().includes(searchLower)
+    )
+  }, [iconSearch])
+
+  // Paginate filtered icons
+  const paginatedIcons = useMemo(() => {
+    const start = currentPage * ICONS_PER_PAGE
+    return filteredIcons.slice(start, start + ICONS_PER_PAGE)
+  }, [filteredIcons, currentPage])
+
+  const totalPages = Math.ceil(filteredIcons.length / ICONS_PER_PAGE)
+  const hasMore = currentPage < totalPages - 1
+
   useEffect(() => {
     if (category) {
       form.reset({
@@ -254,8 +282,6 @@ export function CategoryDialog({
         icon: category.icon,
         color: category.color,
       })
-      setSelectedIcon(category.icon)
-      setSelectedColor(category.color)
     } else {
       form.reset({
         code: '',
@@ -263,8 +289,6 @@ export function CategoryDialog({
         icon: AVAILABLE_ICONS[0].name,
         color: DEFAULT_COLORS[0],
       })
-      setSelectedIcon(AVAILABLE_ICONS[0].name)
-      setSelectedColor(DEFAULT_COLORS[0])
     }
   }, [category, form])
 
@@ -275,6 +299,11 @@ export function CategoryDialog({
   useEffect(() => {
     form.setValue('color', selectedColor)
   }, [selectedColor, form])
+
+  const handleSearchChange = (value: string) => {
+    setIconSearch(value)
+    setCurrentPage(0) // Reset to first page when search changes
+  }
 
   async function handleSubmit(values: FormValues) {
     await onSubmit(values)
@@ -337,10 +366,23 @@ export function CategoryDialog({
             />
 
             {/* Icon */}
-            <div className="space-y-2">
+            <div className="space-y-3">
               <Label>Иконка</Label>
+
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Поиск иконки..."
+                  value={iconSearch}
+                  onChange={(e) => handleSearchChange(e.target.value)}
+                  className="pl-9"
+                />
+              </div>
+
+              {/* Icons grid */}
               <div className="grid grid-cols-6 gap-2">
-                {AVAILABLE_ICONS.map((item) => {
+                {paginatedIcons.map((item) => {
                   const Icon = item.icon
                   return (
                     <button
@@ -359,6 +401,35 @@ export function CategoryDialog({
                   )
                 })}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between text-sm text-muted-foreground">
+                  <span>
+                    Показано {paginatedIcons.length} из {filteredIcons.length}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                      disabled={currentPage === 0}
+                    >
+                      Назад
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => p + 1)}
+                      disabled={!hasMore}
+                    >
+                      Ещё
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Color */}
