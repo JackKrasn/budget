@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select'
 import { useCreateFund, useCreateDistributionRule } from '../hooks'
 import {
+  Search,
   TrendingUp,
   Home,
   ShoppingBag,
@@ -91,8 +92,12 @@ interface CreateFundDialogProps {
   children: React.ReactNode
 }
 
+const ICONS_PER_PAGE = 12
+
 export function CreateFundDialog({ children }: CreateFundDialogProps) {
   const [open, setOpen] = useState(false)
+  const [iconSearch, setIconSearch] = useState('')
+  const [currentPage, setCurrentPage] = useState(0)
   const createFund = useCreateFund()
   const createRule = useCreateDistributionRule()
 
@@ -109,8 +114,34 @@ export function CreateFundDialog({ children }: CreateFundDialogProps) {
     },
   })
 
+  // Filter icons based on search
+  const filteredIcons = useMemo(() => {
+    if (!iconSearch.trim()) return FUND_ICONS
+
+    const searchLower = iconSearch.toLowerCase()
+    return FUND_ICONS.filter(
+      (icon) =>
+        icon.label.toLowerCase().includes(searchLower) ||
+        icon.value.toLowerCase().includes(searchLower)
+    )
+  }, [iconSearch])
+
+  // Paginate filtered icons
+  const paginatedIcons = useMemo(() => {
+    const start = currentPage * ICONS_PER_PAGE
+    return filteredIcons.slice(start, start + ICONS_PER_PAGE)
+  }, [filteredIcons, currentPage])
+
+  const totalPages = Math.ceil(filteredIcons.length / ICONS_PER_PAGE)
+  const hasMore = currentPage < totalPages - 1
+
   const shouldCreateRule = form.watch('createRule')
   const ruleType = form.watch('ruleType')
+
+  const handleSearchChange = (value: string) => {
+    setIconSearch(value)
+    setCurrentPage(0) // Reset to first page when search changes
+  }
 
   async function onSubmit(values: FormValues) {
     try {
@@ -174,8 +205,21 @@ export function CreateFundDialog({ children }: CreateFundDialogProps) {
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Иконка</FormLabel>
+
+                  {/* Search */}
+                  <div className="relative mb-3">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      placeholder="Поиск иконки..."
+                      value={iconSearch}
+                      onChange={(e) => handleSearchChange(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+
+                  {/* Icons grid */}
                   <div className="grid grid-cols-6 gap-2">
-                    {FUND_ICONS.map((item) => {
+                    {paginatedIcons.map((item) => {
                       const Icon = item.icon
                       return (
                         <button
@@ -194,6 +238,36 @@ export function CreateFundDialog({ children }: CreateFundDialogProps) {
                       )
                     })}
                   </div>
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="mt-3 flex items-center justify-between text-sm text-muted-foreground">
+                      <span>
+                        Показано {paginatedIcons.length} из {filteredIcons.length}
+                      </span>
+                      <div className="flex gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((p) => Math.max(0, p - 1))}
+                          disabled={currentPage === 0}
+                        >
+                          Назад
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage((p) => p + 1)}
+                          disabled={!hasMore}
+                        >
+                          Ещё
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
                   <FormMessage />
                 </FormItem>
               )}
