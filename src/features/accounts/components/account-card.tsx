@@ -55,8 +55,9 @@ export function AccountCard({
   onArchive,
   onDelete,
 }: AccountCardProps) {
-  const Icon = ACCOUNT_ICONS[account.type_code] || ACCOUNT_ICONS.default
+  const Icon = ACCOUNT_ICONS[account.type_code || 'default'] || ACCOUNT_ICONS.default
   const currencySymbol = CURRENCY_SYMBOLS[account.currency] || account.currency
+  const typeName = account.type_name || 'Загрузка...'
 
   return (
     <motion.div
@@ -96,7 +97,7 @@ export function AccountCard({
                 <h3 className="font-semibold">{account.name}</h3>
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary" className="text-xs">
-                    {account.type_name}
+                    {typeName}
                   </Badge>
                   {account.is_archived && (
                     <Badge variant="outline" className="text-xs">

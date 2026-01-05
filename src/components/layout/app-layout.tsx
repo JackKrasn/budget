@@ -1,5 +1,6 @@
 import { Outlet, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   CalendarRange,
@@ -9,11 +10,11 @@ import {
   BarChart3,
   Settings,
   ChevronLeft,
-  Sparkles,
   Receipt,
   Banknote,
   FolderOpen,
 } from 'lucide-react'
+import { ThemeToggle } from '@/components/theme/theme-toggle'
 import {
   Sidebar,
   SidebarContent,
@@ -28,7 +29,6 @@ import {
   useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
-import { useEffect } from 'react'
 
 const navItems = [
   {
@@ -79,15 +79,38 @@ const navItems = [
 ]
 
 function Logo({ collapsed }: { collapsed: boolean }) {
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
+
+  useEffect(() => {
+    const checkTheme = () => {
+      const isDark = document.documentElement.classList.contains('dark')
+      setTheme(isDark ? 'dark' : 'light')
+    }
+
+    checkTheme()
+
+    // Watch for theme changes
+    const observer = new MutationObserver(checkTheme)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class'],
+    })
+
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <Link to="/" className="flex items-center gap-3 px-2 py-1">
       <motion.div
-        className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary/90 to-primary shadow-lg"
+        className="relative flex h-16 w-16 items-center justify-center rounded-xl overflow-hidden"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
-        <Sparkles className="h-5 w-5 text-primary-foreground" />
-        <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-white/20 to-transparent" />
+        <img
+          src={theme === 'light' ? '/logo-light.png' : '/logo.png'}
+          alt="Budget Planner Logo"
+          className="h-full w-full object-cover"
+        />
       </motion.div>
       <AnimatePresence mode="wait">
         {!collapsed && (
@@ -245,7 +268,8 @@ function Header() {
 
       <div className="flex-1" />
 
-      {/* Future: User menu, notifications, etc. */}
+      {/* Theme toggle */}
+      <ThemeToggle />
     </header>
   )
 }
@@ -273,11 +297,6 @@ function MainContent() {
 }
 
 export function AppLayout() {
-  // Apply dark class on mount
-  useEffect(() => {
-    document.documentElement.classList.add('dark')
-  }, [])
-
   return (
     <SidebarProvider defaultOpen={true}>
       <div className="noise-overlay gradient-mesh flex min-h-screen w-full">
