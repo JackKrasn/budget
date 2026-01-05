@@ -24,6 +24,7 @@ export function usePlannedExpenses(params?: PlannedExpensesListParams) {
   return useQuery({
     queryKey: plannedExpenseKeys.list(params),
     queryFn: () => plannedExpensesApi.list(params),
+    enabled: !!params?.budgetId, // Не выполнять запрос без budgetId
   })
 }
 

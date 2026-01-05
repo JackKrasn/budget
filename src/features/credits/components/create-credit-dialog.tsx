@@ -65,6 +65,7 @@ const formSchema = z.object({
   paymentDay: z.string().min(1, 'Введите день платежа'),
   accountId: z.string().min(1, 'Выберите счёт'),
   categoryId: z.string().min(1, 'Выберите категорию'),
+  paymentsMade: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -94,6 +95,7 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
       paymentDay: '1',
       accountId: '',
       categoryId: '',
+      paymentsMade: '',
       notes: '',
     },
   })
@@ -103,12 +105,13 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
       await createCredit.mutateAsync({
         name: values.name,
         principalAmount: parseFloat(values.principalAmount),
-        interestRate: parseFloat(values.interestRate),
+        interestRate: parseFloat(values.interestRate), // Бэкенд сам конвертирует (3 -> 0.03)
         termMonths: parseInt(values.termMonths, 10),
         startDate: values.startDate,
         paymentDay: parseInt(values.paymentDay, 10),
         accountId: values.accountId,
         categoryId: values.categoryId,
+        paymentsMade: values.paymentsMade ? parseInt(values.paymentsMade, 10) : undefined,
         notes: values.notes || undefined,
       })
 
@@ -338,6 +341,29 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
                   </Select>
                   <FormDescription>
                     Категория для учёта платежей в расходах
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Payments Made */}
+            <FormField
+              control={form.control}
+              name="paymentsMade"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Платежей уже сделано (необязательно)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="0"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Укажите количество уже произведённых платежей (для существующих кредитов)
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

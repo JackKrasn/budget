@@ -11,12 +11,13 @@ export type PaymentStatus = 'pending' | 'completed' | 'cancelled'
 export interface CreateCreditRequest {
   name: string
   principalAmount: number
-  interestRate: number // В процентах (12.5 = 12.5%)
+  interestRate: number // Процентная ставка (3 = 3%, 12.5 = 12.5%) - бэкенд сам конвертирует в decimal
   termMonths: number
   startDate: ISODate // YYYY-MM-DD
   paymentDay: number // День месяца для платежа (1-31)
   accountId: UUID
   categoryId: UUID
+  paymentsMade?: number // Количество уже сделанных платежей (для существующих кредитов)
   notes?: string
 }
 

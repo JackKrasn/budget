@@ -44,6 +44,12 @@ function formatDate(date: string): string {
   })
 }
 
+function formatInterestRate(rate: number): string {
+  // Бэкенд возвращает ставку как десятичную дробь (0.03 = 3%, 0.125 = 12.5%)
+  const percent = rate * 100
+  return percent % 1 === 0 ? percent.toFixed(0) : percent.toFixed(2)
+}
+
 const STATUS_CONFIG = {
   active: { label: 'Активный', variant: 'default' as const, color: '#10b981' },
   completed: { label: 'Погашен', variant: 'secondary' as const, color: '#6b7280' },
@@ -324,7 +330,7 @@ export default function CreditDetailsPage() {
           />
           <SummaryCard
             title="Процентная ставка"
-            value={`${credit.interest_rate}%`}
+            value={`${formatInterestRate(credit.interest_rate)}%`}
             subtitle={`${credit.term_months} месяцев`}
             icon={Percent}
             color="#f59e0b"

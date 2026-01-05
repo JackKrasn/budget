@@ -91,4 +91,10 @@ export const budgetsApi = {
    */
   generatePlannedIncomes: (budgetId: string) =>
     apiClient.post<{ generated: number }>(`${ENDPOINT}/${budgetId}/generate-planned-incomes`, {}),
+
+  /**
+   * Generate planned expenses from credit payment schedules
+   */
+  generateCreditPayments: (budgetId: string) =>
+    apiClient.post<{ generated: number }>(`${ENDPOINT}/${budgetId}/generate-credit-payments`, {}),
 }
