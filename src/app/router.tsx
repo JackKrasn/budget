@@ -7,6 +7,8 @@ import AssetsPage from '@/pages/assets/page'
 import AccountsPage from '@/pages/accounts/page'
 import ExpensesPage from '@/pages/expenses/page'
 import IncomesPage from '@/pages/incomes/page'
+import CreditsPage from '@/pages/credits/page'
+import CreditDetailsPage from '@/pages/credits/[id]/page'
 import CategoriesPage from '@/pages/categories/page'
 import AnalyticsPage from '@/pages/analytics/page'
 import SettingsPage from '@/pages/settings/page'
@@ -35,6 +37,14 @@ export const router = createBrowserRouter([
       {
         path: 'incomes',
         element: <IncomesPage />,
+      },
+      {
+        path: 'credits',
+        element: <CreditsPage />,
+      },
+      {
+        path: 'credits/:id',
+        element: <CreditDetailsPage />,
       },
       {
         path: 'categories',

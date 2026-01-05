@@ -13,6 +13,7 @@ import {
   Receipt,
   Banknote,
   FolderOpen,
+  Building2,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import {
@@ -57,6 +58,11 @@ const navItems = [
     href: '/incomes',
   },
   {
+    title: 'Кредиты',
+    icon: CreditCard,
+    href: '/credits',
+  },
+  {
     title: 'Категории',
     icon: FolderOpen,
     href: '/categories',
@@ -68,7 +74,7 @@ const navItems = [
   },
   {
     title: 'Счета',
-    icon: CreditCard,
+    icon: Building2,
     href: '/accounts',
   },
   {
