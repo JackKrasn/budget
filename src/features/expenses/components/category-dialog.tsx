@@ -92,6 +92,7 @@ import {
   Umbrella,
   Cigarette,
   Shirt,
+  Percent,
 } from 'lucide-react'
 import type { ExpenseCategory } from '@/lib/api/types'
 
@@ -191,6 +192,7 @@ const AVAILABLE_ICONS = [
   { name: 'umbrella', icon: Umbrella, label: 'Зонт' },
   { name: 'cigarette', icon: Cigarette, label: 'Табак' },
   { name: 'shirt', icon: Shirt, label: 'Одежда' },
+  { name: 'percent', icon: Percent, label: 'Кредиты' },
 ]
 
 const DEFAULT_COLORS = [

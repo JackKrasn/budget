@@ -23,13 +23,16 @@ import {
   useDeleteExpense,
   ExpenseRow,
   CreateExpenseDialog,
+  EditExpenseDialog,
   AccountFilter,
   CategoryFilter,
   CategoryGrid,
   type CategorySummary,
 } from '@/features/expenses'
+import type { ExpenseListRow } from '@/lib/api/types'
 import { useCurrentBudget } from '@/features/budget'
 import { useAccounts } from '@/features/accounts'
+import { DateRangePicker } from '@/components/common'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -53,6 +56,8 @@ const item = {
   show: { opacity: 1, y: 0 },
 }
 
+const SELECTED_ACCOUNT_KEY = 'budget-selected-account-id'
+
 export default function ExpensesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const categoryFromUrl = searchParams.get('category')
@@ -63,9 +68,13 @@ export default function ExpensesPage() {
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     categoryFromUrl
   )
-  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(
-    null
-  )
+  const [selectedAccountId, setSelectedAccountId] = useState<string | null>(() => {
+    // Load from localStorage on mount
+    const saved = localStorage.getItem(SELECTED_ACCOUNT_KEY)
+    return saved || null
+  })
+  const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
 
   // Синхронизация URL с фильтром категории
   useEffect(() => {
@@ -76,20 +85,33 @@ export default function ExpensesPage() {
     }
   }, [selectedCategoryId, setSearchParams])
 
-  // Get current month date range
-  const dateRange = useMemo(() => {
+  // Save selected account to localStorage
+  useEffect(() => {
+    if (selectedAccountId) {
+      localStorage.setItem(SELECTED_ACCOUNT_KEY, selectedAccountId)
+    } else {
+      localStorage.removeItem(SELECTED_ACCOUNT_KEY)
+    }
+  }, [selectedAccountId])
+
+  // Date range state
+  const [dateRange, setDateRange] = useState(() => {
     const now = new Date()
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     return {
-      from: firstDay.toISOString().split('T')[0],
-      to: lastDay.toISOString().split('T')[0],
+      from: firstDay,
+      to: lastDay,
     }
-  }, [])
+  })
+
+  const handleDateRangeChange = (from: Date, to: Date) => {
+    setDateRange({ from, to })
+  }
 
   const { data: expensesData, isLoading, error } = useExpenses({
-    from: dateRange.from,
-    to: dateRange.to,
+    from: dateRange.from.toISOString().split('T')[0],
+    to: dateRange.to.toISOString().split('T')[0],
     categoryId: selectedCategoryId || undefined,
     accountId: selectedAccountId || undefined,
   })
@@ -161,6 +183,11 @@ export default function ExpensesPage() {
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
   }, [expenses])
 
+  const handleEdit = (expense: ExpenseListRow) => {
+    setEditingExpense(expense)
+    setEditDialogOpen(true)
+  }
+
   const handleDelete = (id: string) => {
     if (confirm('Вы уверены, что хотите удалить этот расход?')) {
       deleteExpense.mutate(id)
@@ -207,10 +234,31 @@ export default function ExpensesPage() {
   const totalProgress =
     totalPlanned > 0 ? Math.min((totalActual / totalPlanned) * 100, 100) : 0
 
-  const currentMonthName = new Date().toLocaleDateString('ru-RU', {
-    month: 'long',
-    year: 'numeric',
-  })
+  const currentMonthName = useMemo(() => {
+    const isFullMonth =
+      dateRange.from.getDate() === 1 &&
+      dateRange.to.getMonth() === dateRange.from.getMonth() &&
+      dateRange.to.getDate() ===
+        new Date(dateRange.to.getFullYear(), dateRange.to.getMonth() + 1, 0).getDate()
+
+    if (isFullMonth) {
+      return dateRange.from.toLocaleDateString('ru-RU', {
+        month: 'long',
+        year: 'numeric',
+      })
+    }
+
+    const fromStr = dateRange.from.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+    })
+    const toStr = dateRange.to.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+    return `${fromStr} - ${toStr}`
+  }, [dateRange])
 
   return (
     <div className="space-y-6">
@@ -241,7 +289,7 @@ export default function ExpensesPage() {
             </p>
           </div>
         </div>
-        <CreateExpenseDialog>
+        <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
           <Button>
             <Plus className="mr-2 h-4 w-4" />
             Добавить расход
@@ -366,6 +414,13 @@ export default function ExpensesPage() {
         transition={{ delay: 0.2 }}
         className="space-y-4"
       >
+        {/* Date Range Picker */}
+        <DateRangePicker
+          from={dateRange.from}
+          to={dateRange.to}
+          onRangeChange={handleDateRangeChange}
+        />
+
         <div className="flex flex-wrap items-center gap-4">
           {/* Category Filter */}
           {categories.length > 0 && (
@@ -464,7 +519,7 @@ export default function ExpensesPage() {
                       За этот месяц расходы не найдены
                     </p>
                   </div>
-                  <CreateExpenseDialog>
+                  <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
                       Добавить расход
@@ -504,9 +559,7 @@ export default function ExpensesPage() {
                         <motion.div key={expense.id} variants={item}>
                           <ExpenseRow
                             expense={expense}
-                            onEdit={() => {
-                              // TODO: implement edit
-                            }}
+                            onEdit={() => handleEdit(expense)}
                             onDelete={() => handleDelete(expense.id)}
                           />
                         </motion.div>
@@ -526,7 +579,7 @@ export default function ExpensesPage() {
                         : 'За этот месяц расходы не найдены'}
                     </p>
                   </div>
-                  <CreateExpenseDialog>
+                  <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
                     <Button>
                       <Plus className="mr-2 h-4 w-4" />
                       Добавить расход
@@ -538,6 +591,13 @@ export default function ExpensesPage() {
           )}
         </AnimatePresence>
       )}
+
+      {/* Edit Expense Dialog */}
+      <EditExpenseDialog
+        expense={editingExpense}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
     </div>
   )
 }

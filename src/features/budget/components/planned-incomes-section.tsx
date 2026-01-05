@@ -25,7 +25,6 @@ import {
   TableFooter,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { cn } from '@/lib/utils'
 import type { PlannedIncome, PlannedIncomeStatus } from '@/lib/api/types'
 
@@ -171,7 +170,7 @@ export function PlannedIncomesSection({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              <TrendingUp className="h-4 w-4" style={{ color: 'oklch(0.68 0.15 230)' }} />
               Ожидаемые доходы
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -202,44 +201,55 @@ export function PlannedIncomesSection({
           {/* Сводка: прогресс и план/факт */}
           {incomes.length > 0 && (
             <div className="mt-4 space-y-3">
-              {/* Прогресс-бар */}
+              {/* Прогресс-бар с refined gradient design */}
               <div className="space-y-1.5">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">
                     Получено {formatMoney(totals.received)} ₽ из {formatMoney(totals.expected)} ₽
                   </span>
-                  <span className="font-medium text-emerald-500">{progressPercent}%</span>
+                  <span className="font-semibold">
+                    {progressPercent}%
+                  </span>
                 </div>
-                <Progress value={progressPercent} className="h-2" />
+                <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gradient-to-r from-[oklch(0.88_0.02_145)] to-[oklch(0.90_0.015_155)] dark:from-[oklch(0.28_0.02_145)] dark:to-[oklch(0.30_0.015_155)]">
+                  <div
+                    className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-[oklch(0.72_0.14_150)] via-[oklch(0.75_0.13_155)] to-[oklch(0.78_0.12_160)]"
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
               </div>
 
               {/* Карточки со сводкой */}
               <div className="grid grid-cols-3 gap-3">
                 {/* Ожидается */}
-                <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-amber-500 mb-1">
+                <div className="rounded-xl border border-border/50 bg-muted/30 p-3.5 transition-all hover:scale-[1.02]">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
                     <Clock className="h-3 w-3" />
                     Ожидается
                   </div>
-                  <p className="text-lg font-semibold tabular-nums">
+                  <p className="text-lg font-bold tabular-nums text-muted-foreground">
                     {formatMoney(totals.pending)} ₽
                   </p>
                 </div>
 
                 {/* Получено */}
-                <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/5 p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-emerald-500 mb-1">
+                <div className="rounded-xl border p-3.5 transition-all hover:scale-[1.02]" style={{
+                  borderColor: 'oklch(0.68 0.15 230 / 0.25)',
+                  backgroundColor: 'oklch(0.68 0.15 230 / 0.08)'
+                }}>
+                  <div className="flex items-center gap-1.5 text-xs mb-1.5" style={{ color: 'oklch(0.68 0.15 230)' }}>
                     <CheckCircle className="h-3 w-3" />
                     Получено
                   </div>
-                  <p className="text-lg font-semibold tabular-nums text-emerald-500">
+                  <p className="text-lg font-bold tabular-nums">
                     {formatMoney(totals.received)} ₽
                   </p>
                   {receivedDiff !== 0 && (
                     <p className={cn(
                       'text-xs mt-0.5 flex items-center gap-0.5',
-                      receivedDiff > 0 ? 'text-emerald-500' : 'text-red-500'
-                    )}>
+                      receivedDiff > 0 ? '' : 'text-red-500'
+                    )}
+                    style={receivedDiff > 0 ? { color: 'oklch(0.68 0.15 230)' } : undefined}>
                       {receivedDiff > 0 ? (
                         <ArrowUp className="h-3 w-3" />
                       ) : (
@@ -251,12 +261,12 @@ export function PlannedIncomesSection({
                 </div>
 
                 {/* Пропущено */}
-                <div className="rounded-lg border border-border/50 bg-muted/30 p-3">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1">
+                <div className="rounded-xl border border-border/50 bg-muted/30 p-3.5 transition-all hover:scale-[1.02]">
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5">
                     <SkipForward className="h-3 w-3" />
                     Пропущено
                   </div>
-                  <p className="text-lg font-semibold tabular-nums text-muted-foreground">
+                  <p className="text-lg font-bold tabular-nums text-muted-foreground">
                     {formatMoney(totals.skipped)} ₽
                   </p>
                 </div>
@@ -310,8 +320,8 @@ export function PlannedIncomesSection({
                     >
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
-                            <Banknote className="h-4 w-4 text-emerald-500" />
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: 'oklch(0.68 0.15 230 / 0.1)' }}>
+                            <Banknote className="h-4 w-4" style={{ color: 'oklch(0.68 0.15 230)' }} />
                           </div>
                           <div>
                             <p className="font-medium">{income.source}</p>
@@ -355,7 +365,7 @@ export function PlannedIncomesSection({
                               'text-base font-semibold tabular-nums',
                               income.status === 'skipped'
                                 ? 'text-muted-foreground line-through'
-                                : 'text-emerald-500/70'
+                                : 'text-muted-foreground'
                             )}
                           >
                             +{formatMoney(income.expected_amount)} ₽
@@ -386,7 +396,7 @@ export function PlannedIncomesSection({
                               disabled={isPending || isProcessing}
                               title="Отметить полученным"
                             >
-                              <Check className="h-4 w-4 text-emerald-500" />
+                              <Check className="h-4 w-4" style={{ color: 'oklch(0.68 0.15 230)' }} />
                             </Button>
                             <Button
                               variant="ghost"
@@ -410,7 +420,7 @@ export function PlannedIncomesSection({
                   <TableCell className="font-semibold text-base">Итого</TableCell>
                   <TableCell></TableCell>
                   <TableCell className="text-right">
-                    <span className="tabular-nums font-semibold text-base text-emerald-500">
+                    <span className="tabular-nums font-semibold text-base">
                       +{formatMoney(totals.expected)} ₽
                     </span>
                     {receivedDiff !== 0 && (
@@ -423,7 +433,7 @@ export function PlannedIncomesSection({
                     )}
                   </TableCell>
                   <TableCell className="text-center">
-                    <span className="text-sm text-emerald-500 font-medium">
+                    <span className="text-sm font-medium">
                       {progressPercent}%
                     </span>
                   </TableCell>

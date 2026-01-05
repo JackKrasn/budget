@@ -90,7 +90,7 @@ export function RecurringIncomesSection({
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
+              <TrendingUp className="h-4 w-4" style={{ color: 'oklch(0.68 0.15 230)' }} />
               Шаблоны регулярных доходов
             </CardTitle>
             <div className="flex items-center gap-2">
@@ -140,8 +140,8 @@ export function RecurringIncomesSection({
                   >
                     <TableCell>
                       <div className="flex items-center gap-3">
-                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
-                          <Banknote className="h-4 w-4 text-emerald-500" />
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ backgroundColor: 'oklch(0.68 0.15 230 / 0.1)' }}>
+                          <Banknote className="h-4 w-4" style={{ color: 'oklch(0.68 0.15 230)' }} />
                         </div>
                         <div>
                           <p className="font-medium">{income.source}</p>
@@ -174,7 +174,7 @@ export function RecurringIncomesSection({
                         disabled={isToggling}
                       >
                         {income.is_active ? (
-                          <ToggleRight className="h-5 w-5 text-emerald-500" />
+                          <ToggleRight className="h-5 w-5" style={{ color: 'oklch(0.68 0.15 230)' }} />
                         ) : (
                           <ToggleLeft className="h-5 w-5 text-muted-foreground" />
                         )}

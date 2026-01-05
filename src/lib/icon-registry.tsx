@@ -111,6 +111,7 @@ import {
   Sun,
   Cloud,
   Umbrella,
+  Percent,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -298,6 +299,9 @@ export const ICON_REGISTRY: Record<string, LucideIcon> = {
   'credit-card': CreditCard,
   credit: CreditCard,
   loans: CreditCard,
+  percent: Percent,
+  percentage: Percent,
+  interest: Percent,
   'piggy-bank': PiggyBank,
   savings: PiggyBank,
   'trending-up': TrendingUp,

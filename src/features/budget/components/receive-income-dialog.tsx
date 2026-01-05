@@ -97,7 +97,7 @@ export function ReceiveIncomeDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Banknote className="h-5 w-5 text-emerald-500" />
+            <Banknote className="h-5 w-5" style={{ color: 'oklch(0.68 0.15 230)' }} />
             Получить доход
           </DialogTitle>
           <DialogDescription>

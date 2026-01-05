@@ -43,6 +43,8 @@ import {
   Briefcase,
   GraduationCap,
   Heart,
+  Hammer,
+  CalendarArrowDown
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { RuleType } from '@/lib/api/types'
@@ -60,6 +62,8 @@ const FUND_ICONS = [
   { value: 'briefcase', icon: Briefcase, label: 'Работа' },
   { value: 'graduation-cap', icon: GraduationCap, label: 'Образование' },
   { value: 'heart', icon: Heart, label: 'Здоровье' },
+  { value: 'hammer', icon: Hammer, label: 'Ремонт' },
+  { value: 'calendar-arrow-down', icon: CalendarArrowDown, label: 'Ежегодные расходы' },
 ]
 
 const FUND_COLORS = [

@@ -199,7 +199,7 @@ export function PlannedExpensesSection({
                           <CategoryIcon
                             code={expense.category_code}
                             iconName={expense.category_icon}
-                            color={expense.category_color}
+                            color={expense.status === 'confirmed' ? '#22c55e' : expense.category_color}
                             size="md"
                           />
                           <div>
@@ -227,7 +227,7 @@ export function PlannedExpensesSection({
                               className={
                                 expense.status === 'skipped'
                                   ? 'text-muted-foreground line-through'
-                                  : ''
+                                  : 'text-muted-foreground'
                               }
                             >
                               {formatMoney(expense.planned_amount)} ₽

@@ -111,10 +111,32 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
                     </Badge>
                   )}
                 </div>
-                {expense.description && (
-                  <p className="text-sm text-muted-foreground truncate">
-                    {expense.description}
-                  </p>
+                {(expense.description || (expense.tags && expense.tags.length > 0)) && (
+                  <div className="flex items-center gap-2 mt-0.5">
+                    {expense.description && (
+                      <p className="text-sm text-muted-foreground truncate">
+                        {expense.description}
+                      </p>
+                    )}
+                    {expense.tags && expense.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 shrink-0">
+                        {expense.tags.map((tag) => (
+                          <Badge
+                            key={tag.id}
+                            variant="outline"
+                            className="text-xs px-2 py-0"
+                            style={{
+                              borderColor: tag.color,
+                              color: tag.color,
+                              backgroundColor: `${tag.color}10`,
+                            }}
+                          >
+                            {tag.name}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
                 <p className="text-xs text-muted-foreground mt-1">
                   {formatDate(expense.date)}
@@ -200,10 +222,32 @@ export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
             </Badge>
           )}
         </div>
-        {expense.description && (
-          <p className="text-sm text-muted-foreground truncate">
-            {expense.description}
-          </p>
+        {(expense.description || (expense.tags && expense.tags.length > 0)) && (
+          <div className="flex items-center gap-2 mt-0.5">
+            {expense.description && (
+              <p className="text-sm text-muted-foreground truncate">
+                {expense.description}
+              </p>
+            )}
+            {expense.tags && expense.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 shrink-0">
+                {expense.tags.map((tag) => (
+                  <Badge
+                    key={tag.id}
+                    variant="outline"
+                    className="text-xs px-1.5 py-0"
+                    style={{
+                      borderColor: tag.color,
+                      color: tag.color,
+                      backgroundColor: `${tag.color}10`,
+                    }}
+                  >
+                    {tag.name}
+                  </Badge>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

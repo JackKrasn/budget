@@ -490,6 +490,12 @@ export interface Expense {
   updated_at: ISODate
 }
 
+export interface ExpenseTagInfo {
+  id: UUID
+  name: string
+  color: string
+}
+
 export interface ExpenseListRow {
   id: UUID
   categoryId: UUID
@@ -503,6 +509,7 @@ export interface ExpenseListRow {
   date: ISODate
   description?: string
   fundedAmount: number
+  tags?: ExpenseTagInfo[]
 }
 
 export interface ExpenseFundAllocation {
@@ -552,6 +559,7 @@ export interface UpdateExpenseRequest {
   currency?: string
   date?: string
   description?: string
+  tagIds?: string[]
 }
 
 export interface ExpensesSummary {
