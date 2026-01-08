@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { Edit2, AlertTriangle, CheckCircle, Lock } from 'lucide-react'
+import { Edit2, AlertTriangle, CheckCircle, Lock, CalendarClock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
@@ -17,16 +17,19 @@ export function BudgetCategoryCard({
   onEdit,
   isFixed = false,
 }: BudgetCategoryCardProps) {
+  // Total planned includes manual budget + mandatory payments (credits, etc.)
+  const totalPlanned = item.plannedAmount + item.plannedExpensesSum
+
   const progress =
-    item.plannedAmount > 0
-      ? Math.min((item.actualAmount / item.plannedAmount) * 100, 100)
+    totalPlanned > 0
+      ? Math.min((item.actualAmount / totalPlanned) * 100, 100)
       : 0
 
-  const variance = item.plannedAmount - item.actualAmount
+  const variance = totalPlanned - item.actualAmount
   const isOverBudget = variance < 0
   const overBudgetPercent =
-    item.plannedAmount > 0 && isOverBudget
-      ? Math.round(((item.actualAmount - item.plannedAmount) / item.plannedAmount) * 100)
+    totalPlanned > 0 && isOverBudget
+      ? Math.round(((item.actualAmount - totalPlanned) / totalPlanned) * 100)
       : 0
 
   const formatMoney = (amount: number) => {
@@ -92,10 +95,23 @@ export function BudgetCategoryCard({
             <div className="text-right">
               <p className="text-muted-foreground">План</p>
               <p className="font-semibold tabular-nums">
-                {formatMoney(item.plannedAmount)} ₽
+                {formatMoney(totalPlanned)} ₽
               </p>
             </div>
           </div>
+
+          {/* Planned Expenses */}
+          {item.plannedExpensesSum > 0 && (
+            <div className="mb-3 rounded-md bg-blue-500/10 px-3 py-2">
+              <div className="flex items-center gap-2 text-xs">
+                <CalendarClock className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-muted-foreground">Запланировано платежей:</span>
+                <span className="ml-auto font-semibold tabular-nums text-blue-500">
+                  {formatMoney(item.plannedExpensesSum)} ₽
+                </span>
+              </div>
+            </div>
+          )}
 
           {/* Progress Bar */}
           <div className="mb-2">

@@ -48,6 +48,7 @@ import {
 import { useExpenseCategories, useExpenses, useCreateExpense } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
+import { budgetsApi } from '@/lib/api/budgets'
 import type { Fund, PlannedIncome } from '@/lib/api/types'
 
 // Ключ для localStorage
@@ -339,7 +340,10 @@ export default function BudgetPage() {
     }
 
     try {
+      // Генерируем recurring шаблоны
       await generatePlanned.mutateAsync(budgetId)
+      // Генерируем кредитные платежи
+      await budgetsApi.generateCreditPayments(budgetId)
       refetch()
     } catch {
       toast.error('Ошибка генерации')

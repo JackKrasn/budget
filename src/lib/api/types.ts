@@ -614,6 +614,7 @@ export interface BudgetItemWithCategory extends BudgetItem {
   actualAmount: number
   fundedAmount: number
   remaining: number
+  plannedExpensesSum: number
 }
 
 export interface FundDistributionSummary {

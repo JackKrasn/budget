@@ -176,7 +176,10 @@ export function BudgetTable({
   // Объединить все категории с данными бюджета
   const allRows = allCategories.map((category) => {
     const budgetItem = items.find((i) => i.categoryId === category.id)
-    const planned = budgetItem?.plannedAmount ?? 0
+    const plannedAmount = budgetItem?.plannedAmount ?? 0
+    const plannedExpensesSum = budgetItem?.plannedExpensesSum ?? 0
+    // Total planned = manual budget + mandatory payments (credits, etc.)
+    const totalPlanned = plannedAmount + plannedExpensesSum
     // Используем actualByCategory из расходов, а не из budget_items
     const actual = actualByCategory[category.id] ?? 0
     return {
@@ -185,9 +188,11 @@ export function BudgetTable({
       categoryCode: category.code,
       categoryIcon: category.icon,
       categoryColor: category.color,
-      planned,
+      plannedAmount,
+      plannedExpensesSum,
+      totalPlanned,
       actual,
-      variance: planned - actual,
+      variance: totalPlanned - actual,
       hasItem: !!budgetItem || actual > 0,
       isHidden: hiddenCategories.includes(category.id),
     }
@@ -199,7 +204,7 @@ export function BudgetTable({
   // Итоги
   const totals = rows.reduce(
     (acc, row) => ({
-      planned: acc.planned + row.planned,
+      planned: acc.planned + row.totalPlanned,
       actual: acc.actual + row.actual,
       variance: acc.variance + row.variance,
     }),
@@ -317,11 +322,26 @@ export function BudgetTable({
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <InlineAmountInput
-                    value={row.planned}
-                    onChange={(value) => onUpdateItem(row.categoryId, value)}
-                    disabled={isPending}
-                  />
+                  <div className="space-y-1">
+                    <InlineAmountInput
+                      value={row.plannedAmount}
+                      onChange={(value) => onUpdateItem(row.categoryId, value)}
+                      disabled={isPending}
+                    />
+                    {row.plannedExpensesSum > 0 && (
+                      <>
+                        <div className="text-xs text-blue-500 tabular-nums">
+                          +{formatMoney(row.plannedExpensesSum)} обяз.
+                        </div>
+                        <div className="pt-1 border-t border-border/30">
+                          <div className="text-xs text-muted-foreground">Итого:</div>
+                          <div className="text-sm font-semibold tabular-nums">
+                            {formatMoney(row.totalPlanned)} ₽
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </TableCell>
 
                 <TableCell className="text-right">
