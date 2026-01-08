@@ -25,6 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
 import { useCredit, useCreditSummary, useCreditPayments } from '@/features/credits'
 import { ConfirmPaymentDialog } from '@/features/credits/components'
 import type { ScheduleItem, PaymentHistoryItem } from '@/lib/api/credits'

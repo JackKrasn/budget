@@ -68,60 +68,37 @@ export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: Credi
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.97 }}
-      animate={{ opacity: 1, scale: 1 }}
-      whileHover={{ y: -4, scale: 1.01 }}
-      transition={{ duration: 0.25, ease: [0.34, 1.56, 0.64, 1] }}
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      whileHover={{ y: -2 }}
+      transition={{ duration: 0.2 }}
     >
       <Card
-        className="group relative overflow-hidden border-border/40 bg-gradient-to-br from-card via-card to-card/95 backdrop-blur-xl transition-all duration-300 hover:border-primary/30 hover:shadow-2xl hover:shadow-primary/10 cursor-pointer"
+        className="group cursor-pointer border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-md"
         onClick={onClick}
       >
-        {/* Animated gradient overlay */}
-        <div
-          className="absolute inset-0 opacity-0 transition-opacity duration-500 group-hover:opacity-[0.08]"
-          style={{
-            background: `radial-gradient(circle at top right, ${statusConfig.color} 0%, transparent 70%)`,
-          }}
-        />
-
-        {/* Decorative accent line */}
-        <div
-          className="absolute left-0 top-0 h-full w-1 opacity-60 transition-all duration-300 group-hover:w-1.5 group-hover:opacity-100"
-          style={{ backgroundColor: statusConfig.color }}
-        />
-
-        <CardContent className="relative p-6">
+        <CardContent className="p-5">
           {/* Header */}
-          <div className="mb-5 flex items-start justify-between gap-4">
-            <div className="flex items-start gap-4 min-w-0 flex-1">
-              <motion.div
-                className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl shadow-lg shadow-black/5 transition-all duration-300 group-hover:shadow-xl"
-                style={{ backgroundColor: `${statusConfig.color}15` }}
-                whileHover={{ rotate: [0, -5, 5, 0], scale: 1.05 }}
-                transition={{ duration: 0.5 }}
+          <div className="mb-4 flex items-start justify-between gap-4">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              <div
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+                style={{ backgroundColor: `${statusConfig.color}20` }}
               >
-                <CreditCardIcon className="h-7 w-7 transition-colors duration-300" style={{ color: statusConfig.color }} />
-              </motion.div>
+                <CreditCardIcon className="h-5 w-5" style={{ color: statusConfig.color }} />
+              </div>
 
               <div className="min-w-0 flex-1">
-                <div className="mb-2 flex items-center gap-2">
-                  <h3 className="font-bold text-xl truncate transition-colors duration-200 group-hover:text-primary">
-                    {credit.name}
-                  </h3>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Badge variant={statusConfig.variant} className="font-medium">
+                <h3 className="font-semibold text-base truncate mb-1">
+                  {credit.name}
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Badge variant={statusConfig.variant} className="text-xs">
                     {statusConfig.label}
                   </Badge>
-                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                    <CategoryIcon
-                      code={credit.category_code}
-                      color={statusConfig.color}
-                      size="sm"
-                    />
-                    <span className="truncate">{credit.category_name}</span>
-                  </div>
+                  <span className="text-xs text-muted-foreground truncate">
+                    {credit.category_name}
+                  </span>
                 </div>
               </div>
             </div>
@@ -131,12 +108,12 @@ export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: Credi
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-9 w-9 shrink-0 opacity-0 transition-all duration-200 group-hover:opacity-100 hover:bg-accent/80"
+                  className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit?.(); }}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Редактировать
@@ -154,22 +131,20 @@ export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: Credi
 
           {/* Progress Section */}
           {credit.status === 'active' && summary && (
-            <div className="mb-6 rounded-xl bg-gradient-to-br from-muted/40 to-muted/20 p-4 backdrop-blur-sm">
-              <div className="mb-3 flex items-center justify-between">
+            <div className="mb-4 rounded-lg bg-muted/50 p-3">
+              <div className="mb-2 flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                    Прогресс погашения
-                  </p>
-                  <p className="mt-1 text-2xl font-bold tabular-nums">{progressPercent.toFixed(1)}%</p>
+                  <p className="text-xs text-muted-foreground">Прогресс погашения</p>
+                  <p className="text-xl font-bold tabular-nums">{progressPercent.toFixed(1)}%</p>
                 </div>
                 <div className="text-right">
                   <p className="text-xs text-muted-foreground">Осталось</p>
-                  <p className="mt-1 text-lg font-semibold tabular-nums text-primary">
+                  <p className="text-base font-semibold tabular-nums">
                     {formatMoney(summary.remainingPrincipal)} ₽
                   </p>
                 </div>
               </div>
-              <div className="relative h-2.5 overflow-hidden rounded-full bg-background/60">
+              <div className="relative h-2 overflow-hidden rounded-full bg-background/60">
                 <motion.div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400"
                   initial={{ width: 0 }}
@@ -181,71 +156,53 @@ export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: Credi
           )}
 
           {/* Details Grid */}
-          <div className="grid grid-cols-2 gap-4 mb-5">
+          <div className="grid grid-cols-2 gap-3">
             {/* Principal Amount */}
-            <div className="group/item rounded-lg p-3 transition-colors hover:bg-accent/50">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <TrendingDown className="h-3.5 w-3.5" />
-                <span>Основной долг</span>
-              </div>
-              <div className="font-bold text-lg tabular-nums">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Основной долг</p>
+              <p className="font-semibold tabular-nums">
                 {formatMoney(credit.principal_amount)} ₽
-              </div>
+              </p>
             </div>
 
             {/* Interest Rate */}
-            <div className="group/item rounded-lg p-3 transition-colors hover:bg-accent/50">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <Percent className="h-3.5 w-3.5" />
-                <span>Ставка</span>
-              </div>
-              <div className="font-bold text-lg">{formatInterestRate(credit.interest_rate)}%</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
-                {credit.term_months} месяцев
-              </div>
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Ставка</p>
+              <p className="font-semibold">{formatInterestRate(credit.interest_rate)}%</p>
+              <p className="text-xs text-muted-foreground">
+                {credit.term_months} мес
+              </p>
             </div>
 
             {/* Monthly Payment */}
             {summary && (
-              <div className="group/item rounded-lg p-3 transition-colors hover:bg-accent/50">
-                <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  <Calendar className="h-3.5 w-3.5" />
-                  <span>Платёж</span>
-                </div>
-                <div className="font-bold text-lg tabular-nums">
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Ежемесячный платёж</p>
+                <p className="font-semibold tabular-nums">
                   {formatMoney(summary.monthlyPayment)} ₽
-                </div>
-                <div className="mt-0.5 text-xs text-muted-foreground">
+                </p>
+                <p className="text-xs text-muted-foreground">
                   {credit.payment_day} число
-                </div>
+                </p>
               </div>
             )}
 
             {/* Account */}
-            <div className="group/item rounded-lg p-3 transition-colors hover:bg-accent/50">
-              <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                <Wallet className="h-3.5 w-3.5" />
-                <span>Счёт</span>
-              </div>
-              <div className="font-medium truncate">{credit.account_name}</div>
-              <div className="mt-0.5 text-xs text-muted-foreground">
+            <div>
+              <p className="text-xs text-muted-foreground mb-1">Счёт</p>
+              <p className="font-medium text-sm truncate">{credit.account_name}</p>
+              <p className="text-xs text-muted-foreground">
                 с {formatDate(credit.start_date)}
-              </div>
+              </p>
             </div>
           </div>
 
           {/* Notes */}
           {credit.notes && (
-            <div className="mt-5 pt-5 border-t border-border/50">
-              <p className="text-sm text-muted-foreground line-clamp-2 leading-relaxed">{credit.notes}</p>
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-xs text-muted-foreground line-clamp-2">{credit.notes}</p>
             </div>
           )}
-
-          {/* View Details Indicator */}
-          <div className="mt-5 flex items-center justify-end gap-2 text-sm font-medium text-primary opacity-0 transition-all duration-300 group-hover:opacity-100">
-            <span>Подробнее</span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </div>
         </CardContent>
       </Card>
     </motion.div>

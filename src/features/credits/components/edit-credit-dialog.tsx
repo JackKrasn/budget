@@ -28,6 +28,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { FileText, Building2, CalendarDays, FileEdit } from 'lucide-react'
 import { useUpdateCredit } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 import { useExpenseCategories } from '@/features/expenses'
@@ -113,176 +114,243 @@ export function EditCreditDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Редактировать кредит</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[600px]">
+        <DialogHeader className="space-y-3 pb-6 border-b">
+          <DialogTitle className="text-2xl font-bold">Редактировать кредит</DialogTitle>
+          <DialogDescription className="text-base leading-relaxed">
             Измените параметры кредита (сумма, ставка и срок не редактируются)
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Name */}
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Название кредита</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Например: Ипотека Сбербанк" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pt-6">
+            {/* Basic Information Section */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Основная информация</h3>
+                  <p className="text-xs text-muted-foreground">Название и статус кредита</p>
+                </div>
+              </div>
 
-            {/* Account */}
-            <FormField
-              control={form.control}
-              name="accountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Счёт списания</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Название кредита</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите счёт" />
-                      </SelectTrigger>
+                      <Input
+                        placeholder="Например: Ипотека Сбербанк"
+                        className="h-11 text-base"
+                        {...field}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      {accounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id}>
-                          {acc.name} ({acc.currency})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Счёт, с которого будут списываться платежи
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Category */}
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Категория расходов</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите категорию" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Статус</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 text-base">
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="active">
                           <div className="flex items-center gap-2">
-                            <CategoryIcon
-                              code={cat.code}
-                              color={cat.color}
-                              size="sm"
-                            />
-                            {cat.name}
+                            <div className="h-2 w-2 rounded-full bg-green-500" />
+                            <span>Активный</span>
                           </div>
                         </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Категория для учёта платежей в расходах
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        <SelectItem value="completed">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-gray-500" />
+                            <span>Погашен</span>
+                          </div>
+                        </SelectItem>
+                        <SelectItem value="cancelled">
+                          <div className="flex items-center gap-2">
+                            <div className="h-2 w-2 rounded-full bg-red-500" />
+                            <span>Отменён</span>
+                          </div>
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            {/* Payment Day */}
-            <FormField
-              control={form.control}
-              name="paymentDay"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>День платежа</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="1"
-                      max="31"
-                      placeholder="15"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>Число месяца (1-31)</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Account & Category Section */}
+            <div className="space-y-5 rounded-xl border border-border/50 bg-muted/30 p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/10">
+                  <Building2 className="h-5 w-5 text-purple-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Счета и категории</h3>
+                  <p className="text-xs text-muted-foreground">Счёт списания и категория расходов</p>
+                </div>
+              </div>
 
-            {/* Status */}
-            <FormField
-              control={form.control}
-              name="status"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Статус</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+              <FormField
+                control={form.control}
+                name="accountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Счёт списания</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 text-base">
+                          <SelectValue placeholder="Выберите счёт" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name} ({acc.currency})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Счёт, с которого будут списываться платежи
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Категория расходов</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 text-base">
+                          <SelectValue placeholder="Выберите категорию" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            <div className="flex items-center gap-2">
+                              <CategoryIcon
+                                code={cat.code}
+                                color={cat.color}
+                                size="sm"
+                              />
+                              {cat.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Категория для учёта платежей в расходах
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Payment Settings Section */}
+            <div className="space-y-5 rounded-xl border border-border/50 bg-muted/30 p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
+                  <CalendarDays className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Настройки платежей</h3>
+                  <p className="text-xs text-muted-foreground">День ежемесячного платежа</p>
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="paymentDay"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>День платежа</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <Input
+                        type="number"
+                        min="1"
+                        max="31"
+                        placeholder="15"
+                        className="h-11 text-base tabular-nums"
+                        {...field}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="active">Активный</SelectItem>
-                      <SelectItem value="completed">Погашен</SelectItem>
-                      <SelectItem value="cancelled">Отменён</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormDescription>Число месяца (1-31)</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
-            {/* Notes */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Примечания (необязательно)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Дополнительная информация о кредите..."
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Notes Section */}
+            <div className="space-y-5 rounded-xl border border-dashed border-border/50 bg-muted/10 p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/30">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                  <FileEdit className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Примечания</h3>
+                  <p className="text-xs text-muted-foreground">Дополнительная информация (необязательно)</p>
+                </div>
+              </div>
 
-            <div className="flex gap-3 pt-4">
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Примечания (необязательно)</FormLabel>
+                    <FormControl>
+                      <Textarea
+                        placeholder="Дополнительная информация о кредите..."
+                        className="resize-none min-h-[100px]"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="flex gap-3 pt-8 border-t">
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-11"
                 onClick={() => onOpenChange(false)}
+                disabled={updateCredit.isPending}
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
-                className="flex-1"
+                className="flex-1 h-11 font-semibold"
                 disabled={updateCredit.isPending}
               >
-                {updateCredit.isPending ? 'Сохранение...' : 'Сохранить'}
+                {updateCredit.isPending ? 'Сохранение...' : 'Сохранить изменения'}
               </Button>
             </div>
           </form>

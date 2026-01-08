@@ -36,7 +36,7 @@ import {
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import { cn } from '@/lib/utils'
-import { CalendarIcon } from 'lucide-react'
+import { CalendarIcon, FileText, DollarSign, Building2, Settings } from 'lucide-react'
 import { useCreateCredit } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 import { useExpenseCategories } from '@/features/expenses'
@@ -127,60 +127,32 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[650px]">
         <DialogHeader className="space-y-3 pb-6 border-b">
           <DialogTitle className="text-2xl font-bold">Создать кредит</DialogTitle>
-          <DialogDescription className="text-base leading-relaxed">
-            Создайте новый кредит с автоматическим расчётом графика платежей и генерацией запланированных расходов
-          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-7 pt-6">
-            {/* Name */}
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Название кредита</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Например: Ипотека Сбербанк" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Principal Amount and Interest Rate */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="principalAmount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Сумма кредита</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="3000000"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8 pt-6">
+            {/* Basic Information Section */}
+            <div className="space-y-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Основная информация</h3>
+                  <p className="text-xs text-muted-foreground">Название кредита</p>
+                </div>
+              </div>
 
               <FormField
                 control={form.control}
-                name="interestRate"
+                name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Процентная ставка (%)</FormLabel>
+                    <FormLabel>Название кредита</FormLabel>
                     <FormControl>
                       <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="12.5"
+                        placeholder="Например: Ипотека Сбербанк"
+                        className="h-11 text-base"
                         {...field}
                       />
                     </FormControl>
@@ -190,204 +162,282 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
               />
             </div>
 
-            {/* Term and Payment Day */}
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="termMonths"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Срок (месяцев)</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        placeholder="240"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>Общий срок кредита</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+            {/* Loan Parameters Section */}
+            <div className="space-y-5 rounded-xl border border-border/50 bg-muted/30 p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10">
+                  <DollarSign className="h-5 w-5 text-blue-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Параметры кредита</h3>
+                  <p className="text-xs text-muted-foreground">Сумма, ставка и условия</p>
+                </div>
+              </div>
 
-              <FormField
-                control={form.control}
-                name="paymentDay"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>День платежа</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="31"
-                        placeholder="15"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>Число месяца (1-31)</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </div>
-
-            {/* Start Date */}
-            <FormField
-              control={form.control}
-              name="startDate"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Дата начала</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="principalAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Сумма кредита</FormLabel>
                       <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
-                        >
-                          {field.value ? (
-                            format(parseDateString(field.value), 'PPP', { locale: ru })
-                          ) : (
-                            <span>Выберите дату</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="3000000"
+                          className="h-11 text-base tabular-nums"
+                          {...field}
+                        />
                       </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ? parseDateString(field.value) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            field.onChange(formatDateToString(date))
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="interestRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Процентная ставка (%)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="12.5"
+                          className="h-11 text-base tabular-nums"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="termMonths"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Срок (месяцев)</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          placeholder="240"
+                          className="h-11 text-base tabular-nums"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>Общий срок кредита</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="paymentDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>День платежа</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="31"
+                          placeholder="15"
+                          className="h-11 text-base tabular-nums"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>Число месяца (1-31)</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="startDate"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Дата начала</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'w-full h-11 pl-3 text-left font-normal text-base',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(parseDateString(field.value), 'PPP', { locale: ru })
+                            ) : (
+                              <span>Выберите дату</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? parseDateString(field.value) : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              field.onChange(formatDateToString(date))
+                            }
+                          }}
+                          disabled={(date) =>
+                            date > new Date(new Date().setFullYear(new Date().getFullYear() + 1))
                           }
-                        }}
-                        disabled={(date) =>
-                          date > new Date(new Date().setFullYear(new Date().getFullYear() + 1))
-                        }
-                        locale={ru}
-                        initialFocus
+                          locale={ru}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormDescription>Дата первого платежа</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Account & Category Section */}
+            <div className="space-y-5 rounded-xl border border-border/50 bg-muted/30 p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/10">
+                  <Building2 className="h-5 w-5 text-purple-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Счета и категории</h3>
+                  <p className="text-xs text-muted-foreground">Выберите счёт списания и категорию расходов</p>
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="accountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Счёт списания</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 text-base">
+                          <SelectValue placeholder="Выберите счёт" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            {acc.name} ({acc.currency})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Счёт, с которого будут списываться платежи
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Категория расходов</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 text-base">
+                          <SelectValue placeholder="Выберите категорию" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            <div className="flex items-center gap-2">
+                              <CategoryIcon
+                                code={cat.code}
+                                color={cat.color}
+                                size="sm"
+                              />
+                              {cat.name}
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      Категория для учёта платежей в расходах
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Optional: Existing Credit Section */}
+            <div className="space-y-5 rounded-xl border border-dashed border-border/50 bg-muted/10 p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/30">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/10">
+                  <Settings className="h-5 w-5 text-amber-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Дополнительные настройки</h3>
+                  <p className="text-xs text-muted-foreground">Опциональные параметры для существующих кредитов</p>
+                </div>
+              </div>
+
+              <FormField
+                control={form.control}
+                name="paymentsMade"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Платежей уже сделано (необязательно)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="0"
+                        className="h-11 text-base tabular-nums"
+                        {...field}
                       />
-                    </PopoverContent>
-                  </Popover>
-                  <FormDescription>Дата первого платежа</FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Account */}
-            <FormField
-              control={form.control}
-              name="accountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Счёт списания</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите счёт" />
-                      </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
-                      {accounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id}>
-                          {acc.name} ({acc.currency})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Счёт, с которого будут списываться платежи
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormDescription>
+                      Укажите количество уже произведённых платежей (для существующих кредитов)
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Category */}
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Категория расходов</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Примечания (необязательно)</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите категорию" />
-                      </SelectTrigger>
+                      <Textarea
+                        placeholder="Дополнительная информация о кредите..."
+                        className="resize-none min-h-[100px]"
+                        {...field}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          <div className="flex items-center gap-2">
-                            <CategoryIcon
-                              code={cat.code}
-                              color={cat.color}
-                              size="sm"
-                            />
-                            {cat.name}
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    Категория для учёта платежей в расходах
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Payments Made */}
-            <FormField
-              control={form.control}
-              name="paymentsMade"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Платежей уже сделано (необязательно)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      min="0"
-                      placeholder="0"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Укажите количество уже произведённых платежей (для существующих кредитов)
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Notes */}
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Примечания (необязательно)</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Дополнительная информация о кредите..."
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="flex gap-3 pt-8 border-t">
               <Button
