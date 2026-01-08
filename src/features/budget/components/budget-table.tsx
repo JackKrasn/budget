@@ -205,10 +205,11 @@ export function BudgetTable({
   const totals = rows.reduce(
     (acc, row) => ({
       planned: acc.planned + row.totalPlanned,
+      mandatory: acc.mandatory + row.plannedExpensesSum,
       actual: acc.actual + row.actual,
       variance: acc.variance + row.variance,
     }),
-    { planned: 0, actual: 0, variance: 0 }
+    { planned: 0, mandatory: 0, actual: 0, variance: 0 }
   )
 
   const formatMoney = (amount: number) => {
@@ -284,6 +285,8 @@ export function BudgetTable({
               </div>
             </TableHead>
             <TableHead className="w-[120px] text-right">План</TableHead>
+            <TableHead className="w-[120px] text-right">Обязательные</TableHead>
+            <TableHead className="w-[120px] text-right">Итого план</TableHead>
             <TableHead className="w-[120px] text-right">Факт</TableHead>
             <TableHead className="w-[120px] text-right">Остаток</TableHead>
             <TableHead className="w-[50px]"></TableHead>
@@ -322,26 +325,27 @@ export function BudgetTable({
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <div className="space-y-1">
-                    <InlineAmountInput
-                      value={row.plannedAmount}
-                      onChange={(value) => onUpdateItem(row.categoryId, value)}
-                      disabled={isPending}
-                    />
-                    {row.plannedExpensesSum > 0 && (
-                      <>
-                        <div className="text-xs text-blue-500 tabular-nums">
-                          +{formatMoney(row.plannedExpensesSum)} обяз.
-                        </div>
-                        <div className="pt-1 border-t border-border/30">
-                          <div className="text-xs text-muted-foreground">Итого:</div>
-                          <div className="text-sm font-semibold tabular-nums">
-                            {formatMoney(row.totalPlanned)} ₽
-                          </div>
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <InlineAmountInput
+                    value={row.plannedAmount}
+                    onChange={(value) => onUpdateItem(row.categoryId, value)}
+                    disabled={isPending}
+                  />
+                </TableCell>
+
+                <TableCell className="text-right">
+                  {row.plannedExpensesSum > 0 ? (
+                    <span className="tabular-nums text-blue-500 font-medium">
+                      {formatMoney(row.plannedExpensesSum)} ₽
+                    </span>
+                  ) : (
+                    <span className="text-muted-foreground">—</span>
+                  )}
+                </TableCell>
+
+                <TableCell className="text-right">
+                  <span className="tabular-nums font-semibold">
+                    {formatMoney(row.totalPlanned)} ₽
+                  </span>
                 </TableCell>
 
                 <TableCell className="text-right">
@@ -386,6 +390,12 @@ export function BudgetTable({
         <TableFooter>
           <TableRow className="bg-muted/50 font-semibold">
             <TableCell>Итого</TableCell>
+            <TableCell className="text-right tabular-nums">
+              {formatMoney(totals.planned - totals.mandatory)} ₽
+            </TableCell>
+            <TableCell className="text-right tabular-nums text-blue-500">
+              {formatMoney(totals.mandatory)} ₽
+            </TableCell>
             <TableCell className="text-right tabular-nums">
               {formatMoney(totals.planned)} ₽
             </TableCell>
