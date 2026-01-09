@@ -601,6 +601,7 @@ export interface BudgetItem {
   budgetId: UUID
   categoryId: UUID
   plannedAmount: number
+  bufferAmount?: number
   notes?: string | null
   createdAt: ISODate
   updatedAt: ISODate
@@ -769,6 +770,13 @@ export interface PlannedExpenseWithDetails extends PlannedExpense {
   actual_amount?: number
 }
 
+export interface PlannedExpensesSummary {
+  totalPlanned: number
+  totalConfirmed: number
+  totalPending: number
+  totalSavings: number
+}
+
 export interface CreatePlannedExpenseRequest {
   budgetId: string
   categoryId: string
@@ -799,6 +807,7 @@ export interface ConfirmPlannedExpenseRequest {
 export interface PlannedExpensesListResponse {
   data: PlannedExpenseWithDetails[]
   total: number
+  summary?: PlannedExpensesSummary
 }
 
 export interface PlannedExpensesListParams {

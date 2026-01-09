@@ -24,7 +24,7 @@ import {
   useUpsertBudgetItem,
   useCopyBudget,
   usePlannedExpenses,
-  useConfirmPlannedExpense,
+  useConfirmPlannedExpenseWithExpense,
   useSkipPlannedExpense,
   useGeneratePlannedExpenses,
   useCreatePlannedExpense,
@@ -45,7 +45,7 @@ import {
   DistributionSummarySection,
   FloatingBudgetBalance,
 } from '@/features/budget'
-import { useExpenseCategories, useExpenses, useCreateExpense } from '@/features/expenses'
+import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
 import { budgetsApi } from '@/lib/api/budgets'
@@ -123,11 +123,10 @@ export default function BudgetPage() {
   const createBudget = useCreateBudget()
   const upsertItem = useUpsertBudgetItem()
   const copyBudget = useCopyBudget()
-  const confirmPlanned = useConfirmPlannedExpense()
+  const confirmPlannedWithExpense = useConfirmPlannedExpenseWithExpense()
   const skipPlanned = useSkipPlannedExpense()
   const generatePlanned = useGeneratePlannedExpenses()
   const createPlanned = useCreatePlannedExpense()
-  const createExpense = useCreateExpense()
   const createIncomeAndReceive = useCreateIncomeAndReceive()
   const skipPlannedIncome = useSkipPlannedIncome()
   const generatePlannedIncomes = useGeneratePlannedIncomes()
@@ -143,8 +142,6 @@ export default function BudgetPage() {
   const accounts = accountsData?.data ?? []
   // Преобразуем FundBalance в Fund для диалога
   const funds: Fund[] = fundsRaw.map((f) => f.fund)
-  // Счёт по умолчанию (первый не архивный)
-  const defaultAccountId = accounts.find((a) => !a.is_archived)?.id
 
   // Считаем фактические расходы по категориям
   const actualByCategory = useMemo(() => {
@@ -275,41 +272,21 @@ export default function BudgetPage() {
     }
   }
 
-  const handleConfirmPlanned = async (id: string) => {
-    // Находим planned expense
-    const plannedExpense = plannedExpenses.find((e) => e.id === id)
-    if (!plannedExpense) {
-      toast.error('Расход не найден')
-      return
+  const handleConfirmPlanned = async (
+    id: string,
+    data: {
+      actualAmount?: number
+      accountId: string
+      date: string
+      notes?: string
     }
-
-    // Определяем счёт: из planned expense или по умолчанию
-    const accountId = plannedExpense.account_id || defaultAccountId
-    if (!accountId) {
-      toast.error('Не найден счёт для списания. Создайте счёт в настройках.')
-      return
-    }
-
+  ) => {
     try {
-      // 1. Создаём реальный расход
-      const expense = await createExpense.mutateAsync({
-        categoryId: plannedExpense.category_id,
-        accountId,
-        amount: plannedExpense.planned_amount,
-        currency: plannedExpense.currency || 'RUB',
-        date: new Date().toISOString().split('T')[0],
-        description: plannedExpense.name,
-        fundAllocations: plannedExpense.fund_id
-          ? [{ fundId: plannedExpense.fund_id, amount: plannedExpense.planned_amount }]
-          : undefined,
-      })
-
-      // 2. Подтверждаем planned expense с ID созданного расхода
-      await confirmPlanned.mutateAsync({
+      await confirmPlannedWithExpense.mutateAsync({
         id,
-        data: { actualExpenseId: expense.id },
+        data,
+        budgetId: budget?.id,
       })
-
       toast.success('Расход подтверждён')
     } catch (error) {
       console.error('Ошибка подтверждения:', error)
@@ -707,11 +684,12 @@ export default function BudgetPage() {
           {/* Секция 1: Обязательные расходы */}
           <PlannedExpensesSection
             expenses={plannedExpenses}
+            accounts={accounts}
             onConfirm={handleConfirmPlanned}
             onSkip={handleSkipPlanned}
             onGenerate={handleGeneratePlanned}
             isGenerating={generatePlanned.isPending || createBudget.isPending}
-            isPending={confirmPlanned.isPending || skipPlanned.isPending}
+            isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending}
             addButton={
               budget?.id && (
                 <AddPlannedExpenseDialog

@@ -50,10 +50,24 @@ export const plannedExpensesApi = {
   delete: (id: string) => apiClient.delete<void>(`${ENDPOINT}/${id}`),
 
   /**
-   * Confirm planned expense (link to actual expense)
+   * Confirm planned expense (link to actual expense OR create new expense)
+   * If actualExpenseId is provided, links to existing expense
+   * Otherwise, creates a new expense with the provided details
    */
   confirm: (id: string, data: ConfirmPlannedExpenseRequest) =>
     apiClient.post<PlannedExpenseWithDetails>(`${ENDPOINT}/${id}/confirm`, data),
+
+  /**
+   * Confirm planned expense with new expense (creates expense automatically)
+   */
+  confirmWithExpense: (
+    id: string,
+    data: { actualAmount?: number; accountId?: string; date?: string; notes?: string }
+  ) =>
+    apiClient.post<PlannedExpenseWithDetails>(
+      `${ENDPOINT}/${id}/confirm-with-expense`,
+      data
+    ),
 
   /**
    * Skip planned expense

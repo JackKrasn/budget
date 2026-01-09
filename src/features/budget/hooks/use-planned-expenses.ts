@@ -53,6 +53,7 @@ export function useCreatePlannedExpense() {
     onSuccess: (_, { budgetId }) => {
       queryClient.invalidateQueries({ queryKey: plannedExpenseKeys.lists() })
       queryClient.invalidateQueries({ queryKey: budgetKeys.detail(budgetId) })
+      queryClient.invalidateQueries({ queryKey: budgetKeys.lists() })
       toast.success('Запланированный расход создан')
     },
     onError: (error) => {
@@ -111,6 +112,31 @@ export function useConfirmPlannedExpense() {
     }) => plannedExpensesApi.confirm(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: plannedExpenseKeys.lists() })
+      toast.success('Расход подтверждён')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+export function useConfirmPlannedExpenseWithExpense() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      id,
+      data,
+    }: {
+      id: string
+      data: { actualAmount?: number; accountId?: string; date?: string; notes?: string }
+      budgetId?: string
+    }) => plannedExpensesApi.confirmWithExpense(id, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: plannedExpenseKeys.lists() })
+      if (variables.budgetId) {
+        queryClient.invalidateQueries({ queryKey: budgetKeys.detail(variables.budgetId) })
+      }
       toast.success('Расход подтверждён')
     },
     onError: (error) => {

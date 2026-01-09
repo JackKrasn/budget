@@ -24,11 +24,21 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { PlannedExpenseWithDetails, PlannedExpenseStatus } from '@/lib/api/types'
+import type { PlannedExpenseWithDetails, PlannedExpenseStatus, Account } from '@/lib/api/types'
+import { ConfirmPlannedExpenseDialog } from './confirm-planned-expense-dialog'
 
 interface PlannedExpensesSectionProps {
   expenses: PlannedExpenseWithDetails[]
-  onConfirm: (id: string) => Promise<void>
+  accounts: Account[]
+  onConfirm: (
+    id: string,
+    data: {
+      actualAmount?: number
+      accountId: string
+      date: string
+      notes?: string
+    }
+  ) => Promise<void>
   onSkip: (id: string) => Promise<void>
   onGenerate?: () => Promise<void>
   isGenerating?: boolean
@@ -48,6 +58,7 @@ const STATUS_CONFIG: Record<
 
 export function PlannedExpensesSection({
   expenses,
+  accounts,
   onConfirm,
   onSkip,
   onGenerate,
@@ -56,6 +67,8 @@ export function PlannedExpensesSection({
   addButton,
 }: PlannedExpensesSectionProps) {
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [selectedExpense, setSelectedExpense] = useState<PlannedExpenseWithDetails | null>(null)
 
   const formatMoney = (amount: number) => {
     return amount.toLocaleString('ru-RU', {
@@ -76,10 +89,22 @@ export function PlannedExpensesSection({
     return null
   }
 
-  const handleConfirm = async (id: string) => {
-    setProcessingId(id)
+  const handleOpenConfirmDialog = (expense: PlannedExpenseWithDetails) => {
+    setSelectedExpense(expense)
+    setConfirmDialogOpen(true)
+  }
+
+  const handleConfirm = async (data: {
+    actualAmount?: number
+    accountId: string
+    date: string
+    notes?: string
+  }) => {
+    if (!selectedExpense) return
+
+    setProcessingId(selectedExpense.id)
     try {
-      await onConfirm(id)
+      await onConfirm(selectedExpense.id, data)
     } finally {
       setProcessingId(null)
     }
@@ -125,7 +150,7 @@ export function PlannedExpensesSection({
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Lock className="h-4 w-4 text-muted-foreground" />
-              Обязательные расходы на месяц
+              Запланированные расходы на месяц
             </CardTitle>
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-amber-500 border-amber-500/30">
@@ -212,23 +237,39 @@ export function PlannedExpensesSection({
                         </div>
                       </TableCell>
 
-                      <TableCell className="text-right tabular-nums font-semibold text-base">
+                      <TableCell className="text-right">
                         {(() => {
                           const actualAmount = getActualAmount(expense.actual_amount)
                           if (expense.status === 'confirmed' && actualAmount != null) {
+                            const savings = expense.planned_amount - actualAmount
                             return (
-                              <span className="text-emerald-500">
-                                {formatMoney(actualAmount)} ₽
-                              </span>
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="text-emerald-500 font-semibold text-base tabular-nums">
+                                  {formatMoney(actualAmount)} ₽
+                                </span>
+                                {savings !== 0 && (
+                                  <span
+                                    className={cn(
+                                      'text-xs tabular-nums',
+                                      savings > 0 ? 'text-emerald-600' : 'text-destructive'
+                                    )}
+                                  >
+                                    {savings > 0 ? '💰 ' : ''}
+                                    {savings > 0 ? '-' : '+'}
+                                    {formatMoney(Math.abs(savings))} ₽
+                                  </span>
+                                )}
+                              </div>
                             )
                           }
                           return (
                             <span
-                              className={
+                              className={cn(
+                                'tabular-nums font-semibold text-base',
                                 expense.status === 'skipped'
                                   ? 'text-muted-foreground line-through'
                                   : 'text-muted-foreground'
-                              }
+                              )}
                             >
                               {formatMoney(expense.planned_amount)} ₽
                             </span>
@@ -255,9 +296,9 @@ export function PlannedExpensesSection({
                               variant="ghost"
                               size="icon"
                               className="h-7 w-7"
-                              onClick={() => handleConfirm(expense.id)}
+                              onClick={() => handleOpenConfirmDialog(expense)}
                               disabled={isPending || isProcessing}
-                              title="Отметить оплаченным"
+                              title="Подтвердить оплату"
                             >
                               <Check className="h-4 w-4 text-emerald-500" />
                             </Button>
@@ -296,6 +337,15 @@ export function PlannedExpensesSection({
           )}
         </CardContent>
       </Card>
+
+      <ConfirmPlannedExpenseDialog
+        expense={selectedExpense}
+        accounts={accounts}
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
+        onConfirm={handleConfirm}
+        isPending={isPending}
+      />
     </motion.div>
   )
 }

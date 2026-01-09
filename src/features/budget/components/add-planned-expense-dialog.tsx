@@ -109,7 +109,7 @@ export function AddPlannedExpenseDialog({
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Добавить обязательный расход</DialogTitle>
+          <DialogTitle>Добавить запланированный расход</DialogTitle>
           <DialogDescription>
             Добавьте запланированный платёж на этот месяц
           </DialogDescription>

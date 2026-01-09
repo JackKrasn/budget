@@ -176,10 +176,11 @@ export function BudgetTable({
   // Объединить все категории с данными бюджета
   const allRows = allCategories.map((category) => {
     const budgetItem = items.find((i) => i.categoryId === category.id)
-    const plannedAmount = budgetItem?.plannedAmount ?? 0
     const plannedExpensesSum = budgetItem?.plannedExpensesSum ?? 0
-    // Total planned = manual budget + mandatory payments (credits, etc.)
-    const totalPlanned = plannedAmount + plannedExpensesSum
+    // Буфер = plannedAmount - plannedExpensesSum (то что пользователь может тратить свободно)
+    const bufferAmount = Math.max((budgetItem?.plannedAmount ?? 0) - plannedExpensesSum, 0)
+    // Total planned = buffer + mandatory payments (credits, etc.)
+    const totalPlanned = bufferAmount + plannedExpensesSum
     // Используем actualByCategory из расходов, а не из budget_items
     const actual = actualByCategory[category.id] ?? 0
     return {
@@ -188,7 +189,7 @@ export function BudgetTable({
       categoryCode: category.code,
       categoryIcon: category.icon,
       categoryColor: category.color,
-      plannedAmount,
+      bufferAmount,
       plannedExpensesSum,
       totalPlanned,
       actual,
@@ -204,12 +205,13 @@ export function BudgetTable({
   // Итоги
   const totals = rows.reduce(
     (acc, row) => ({
+      buffer: acc.buffer + row.bufferAmount,
       planned: acc.planned + row.totalPlanned,
       mandatory: acc.mandatory + row.plannedExpensesSum,
       actual: acc.actual + row.actual,
       variance: acc.variance + row.variance,
     }),
-    { planned: 0, mandatory: 0, actual: 0, variance: 0 }
+    { buffer: 0, planned: 0, mandatory: 0, actual: 0, variance: 0 }
   )
 
   const formatMoney = (amount: number) => {
@@ -284,8 +286,8 @@ export function BudgetTable({
                 )}
               </div>
             </TableHead>
-            <TableHead className="w-[120px] text-right">План</TableHead>
-            <TableHead className="w-[120px] text-right">Обязательные</TableHead>
+            <TableHead className="w-[120px] text-right">Буфер</TableHead>
+            <TableHead className="w-[120px] text-right">Запланировано</TableHead>
             <TableHead className="w-[120px] text-right">Итого план</TableHead>
             <TableHead className="w-[120px] text-right">Факт</TableHead>
             <TableHead className="w-[120px] text-right">Остаток</TableHead>
@@ -326,8 +328,8 @@ export function BudgetTable({
 
                 <TableCell className="text-right">
                   <InlineAmountInput
-                    value={row.plannedAmount}
-                    onChange={(value) => onUpdateItem(row.categoryId, value)}
+                    value={row.bufferAmount}
+                    onChange={(value) => onUpdateItem(row.categoryId, value + row.plannedExpensesSum)}
                     disabled={isPending}
                   />
                 </TableCell>
@@ -390,8 +392,8 @@ export function BudgetTable({
         <TableFooter>
           <TableRow className="bg-muted/50 font-semibold">
             <TableCell>Итого</TableCell>
-            <TableCell className="text-right tabular-nums">
-              {formatMoney(totals.planned - totals.mandatory)} ₽
+            <TableCell className="text-right tabular-nums text-muted-foreground">
+              {formatMoney(totals.buffer)} ₽
             </TableCell>
             <TableCell className="text-right tabular-nums text-blue-500">
               {formatMoney(totals.mandatory)} ₽
