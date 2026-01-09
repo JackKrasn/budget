@@ -9,6 +9,7 @@ import type {
 } from '@/lib/api/types'
 import { toast } from 'sonner'
 import { fundKeys } from '@/features/funds'
+import { accountKeys } from '@/features/accounts/hooks/use-accounts'
 
 export const incomeKeys = {
   all: ['incomes'] as const,
@@ -40,6 +41,8 @@ export function useCreateIncome() {
     mutationFn: (data: CreateIncomeRequest) => incomesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
+      // Invalidate accounts to refresh balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Доход добавлен')
     },
     onError: (error) => {
@@ -57,6 +60,8 @@ export function useUpdateIncome() {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
       queryClient.invalidateQueries({ queryKey: incomeKeys.detail(id) })
+      // Invalidate accounts to refresh balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Доход обновлён')
     },
     onError: (error) => {
@@ -72,6 +77,8 @@ export function useDeleteIncome() {
     mutationFn: (id: string) => incomesApi.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
+      // Invalidate accounts to refresh balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Доход удалён')
     },
     onError: (error) => {

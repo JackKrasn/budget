@@ -8,6 +8,7 @@ import type {
 } from '@/lib/api/types'
 import { toast } from 'sonner'
 import { budgetKeys } from './use-budgets'
+import { accountKeys } from '@/features/accounts/hooks/use-accounts'
 
 export const plannedExpenseKeys = {
   all: ['planned-expenses'] as const,
@@ -137,6 +138,8 @@ export function useConfirmPlannedExpenseWithExpense() {
       if (variables.budgetId) {
         queryClient.invalidateQueries({ queryKey: budgetKeys.detail(variables.budgetId) })
       }
+      // Invalidate accounts to refresh balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход подтверждён')
     },
     onError: (error) => {

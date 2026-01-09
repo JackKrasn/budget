@@ -7,6 +7,7 @@ import type {
 } from '@/lib/api'
 import { toast } from 'sonner'
 import { fundKeys } from '@/features/funds/hooks/use-funds'
+import { accountKeys } from '@/features/accounts/hooks/use-accounts'
 
 // === Query Keys ===
 
@@ -53,6 +54,8 @@ export function useCreateExpense() {
       queryClient.invalidateQueries({ queryKey: expenseKeys.lists() })
       // Invalidate funds if expense was funded from funds
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      // Invalidate accounts to refresh balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход создан')
     },
     onError: (error) => {
@@ -75,6 +78,8 @@ export function useUpdateExpense() {
       queryClient.invalidateQueries({
         queryKey: expenseKeys.detail(variables.id),
       })
+      // Invalidate accounts to refresh balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход обновлён')
     },
     onError: (error) => {
@@ -95,6 +100,8 @@ export function useDeleteExpense() {
       queryClient.invalidateQueries({ queryKey: expenseKeys.lists() })
       // Invalidate funds in case expense was funded from them
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      // Invalidate accounts to refresh balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход удалён')
     },
     onError: (error) => {

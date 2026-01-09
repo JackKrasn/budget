@@ -46,6 +46,7 @@ export interface Account {
   name: string
   account_type_id: UUID
   currency: string
+  current_balance: number
   bank_name?: string
   icon?: string
   color?: string

@@ -139,6 +139,18 @@ export function AccountCard({
             </DropdownMenu>
           </div>
 
+          {/* Balance */}
+          <div className="mb-3 rounded-lg bg-background/50 p-3">
+            <p className="text-xs text-muted-foreground mb-1">Баланс</p>
+            <p className="text-2xl font-bold tabular-nums">
+              {account.current_balance.toLocaleString('ru-RU', {
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0,
+              })}{' '}
+              <span className="text-lg">{currencySymbol}</span>
+            </p>
+          </div>
+
           {/* Details */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">

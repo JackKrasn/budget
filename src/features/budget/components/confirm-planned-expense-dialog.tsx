@@ -169,9 +169,14 @@ export function ConfirmPlannedExpenseDialog({
                     <SelectContent>
                       {accounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
-                          <div className="flex items-center gap-2">
-                            <Wallet className="h-4 w-4" />
-                            <span>{account.name}</span>
+                          <div className="flex items-center justify-between gap-2 w-full">
+                            <div className="flex items-center gap-2">
+                              <Wallet className="h-4 w-4" />
+                              <span>{account.name}</span>
+                            </div>
+                            <span className="text-xs text-muted-foreground tabular-nums ml-2">
+                              {account.current_balance.toLocaleString('ru-RU')} ₽
+                            </span>
                           </div>
                         </SelectItem>
                       ))}

@@ -39,6 +39,7 @@ export default function AccountsPage() {
   const accounts = data?.data ?? []
   const activeAccounts = accounts.filter((a) => !a.is_archived)
   const archivedAccounts = accounts.filter((a) => a.is_archived)
+  const totalBalance = data?.totalBalance ?? 0
 
   const handleEdit = (account: AccountWithType) => {
     setEditAccount(account)
@@ -100,6 +101,24 @@ export default function AccountsPage() {
                 <p className="text-sm text-muted-foreground">Всего счетов</p>
                 <p className="text-xl font-bold tabular-nums">
                   {activeAccounts.length}
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+                <CreditCard className="h-5 w-5 text-emerald-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Общий баланс</p>
+                <p className="text-xl font-bold tabular-nums">
+                  {totalBalance.toLocaleString('ru-RU', {
+                    minimumFractionDigits: 0,
+                    maximumFractionDigits: 0,
+                  })} ₽
                 </p>
               </div>
             </div>
