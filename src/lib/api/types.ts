@@ -300,7 +300,7 @@ export interface CreateContributionRequest {
   totalAmount: number
   currency: string
   incomeId?: string
-  allocations: ContributionAllocation[]
+  allocations?: ContributionAllocation[]
   note?: string
 }
 
