@@ -82,6 +82,7 @@ export interface UpdateAccountRequest {
 export interface AccountsListResponse {
   data: AccountWithType[]
   total: number
+  totalBalance: number
 }
 
 // === Asset Types ===
@@ -122,13 +123,19 @@ export interface AssetTypesListResponse {
 
 // === Assets ===
 
+// Go sql.NullFloat64 format
+export interface NullFloat64 {
+  Float64: number
+  Valid: boolean
+}
+
 export interface Asset {
   id: UUID
   name: string
   asset_type_id: UUID
   ticker?: string
   currency: string
-  current_price?: number
+  current_price?: number | NullFloat64
   account_id?: UUID
   created_at: ISODate
   updated_at: ISODate

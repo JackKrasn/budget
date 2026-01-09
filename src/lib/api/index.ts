@@ -8,6 +8,8 @@ export * from './types'
 // API modules
 export { accountsApi } from './accounts'
 export { accountTypesApi } from './account-types'
+export { assetsApi } from './assets'
+export { assetTypesApi } from './asset-types'
 export { fundsApi } from './funds'
 export { distributionRulesApi } from './distribution-rules'
 export { exchangeRatesApi } from './exchange-rates'
