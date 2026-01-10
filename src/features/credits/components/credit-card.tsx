@@ -4,11 +4,6 @@ import {
   Trash2,
   Pencil,
   CreditCard as CreditCardIcon,
-  TrendingDown,
-  Calendar,
-  Percent,
-  Wallet,
-  ArrowRight,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,9 +14,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Progress } from '@/components/ui/progress'
 import type { CreditListRow } from '@/lib/api/credits'
-import { CategoryIcon } from '@/components/common'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {

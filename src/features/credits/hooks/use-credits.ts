@@ -2,8 +2,8 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import * as creditsApi from '@/lib/api/credits'
 import type { CreditStatus, UUID } from '@/lib/api/credits'
+import type { Budget } from '@/lib/api/types'
 import { budgetsApi } from '@/lib/api'
-import { useCurrentBudget } from '@/features/budget/hooks/use-budgets'
 import { plannedExpenseKeys } from '@/features/budget/hooks/use-planned-expenses'
 
 const QUERY_KEYS = {
@@ -115,7 +115,7 @@ export function useCreateCredit() {
         console.log('[CREDIT] Available budgets:', response.data)
 
         // Сначала пробуем найти бюджет для текущего месяца
-        let targetBudget = response.data.find((b) => b.month === month)
+        let targetBudget = response.data.find((b: Budget) => b.month === month)
 
         // Если нет бюджета для текущего месяца, берём первый доступный бюджет
         if (!targetBudget && response.data.length > 0) {

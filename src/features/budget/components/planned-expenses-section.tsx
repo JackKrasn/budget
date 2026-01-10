@@ -90,6 +90,18 @@ export function PlannedExpensesSection({
     return null
   }
 
+  // Извлечь дату из nullable типа бэкенда (может быть {Time: string, Valid: boolean} или просто string)
+  const getDateString = (
+    value: string | { Time: string; Valid: boolean } | null | undefined
+  ): string => {
+    if (value == null) return ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'object' && 'Valid' in value && value.Valid) {
+      return value.Time
+    }
+    return ''
+  }
+
   const handleOpenConfirmDialog = (expense: PlannedExpenseWithDetails) => {
     setSelectedExpense(expense)
     setConfirmDialogOpen(true)
@@ -125,7 +137,9 @@ export function PlannedExpensesSection({
     const statusOrder = { pending: 0, confirmed: 1, skipped: 2 }
     const orderDiff = statusOrder[a.status] - statusOrder[b.status]
     if (orderDiff !== 0) return orderDiff
-    return new Date(a.planned_date).getTime() - new Date(b.planned_date).getTime()
+    const dateA = getDateString(a.planned_date)
+    const dateB = getDateString(b.planned_date)
+    return new Date(dateA).getTime() - new Date(dateB).getTime()
   })
 
   const pendingExpenses = expenses.filter((e) => e.status === 'pending')

@@ -180,7 +180,7 @@ export default function BudgetPage() {
       .reduce((sum, e) => sum + e.planned_amount, 0)
     const confirmedPlanned = plannedExpenses
       .filter((e) => e.status === 'confirmed')
-      .reduce((sum, e) => sum + (e.actual_amount ?? e.planned_amount), 0)
+      .reduce((sum, e) => sum + (getActualAmount(e.actual_amount) ?? e.planned_amount), 0)
 
     // Финансирование обязательных расходов из фондов
     // funded_amount приходит как { Float64: number, Valid: boolean }
