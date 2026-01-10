@@ -39,7 +39,7 @@ const allocationSchema = z.object({
 
 const formSchema = z.object({
   actualAmount: z.number().min(0.01, 'Сумма должна быть больше 0'),
-  allocations: z.array(allocationSchema).min(1, 'Добавьте хотя бы один актив'),
+  allocations: z.array(allocationSchema),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -66,36 +66,49 @@ export function ConfirmDistributionDialog({
   onConfirm,
   isConfirming,
 }: ConfirmDistributionDialogProps) {
-  const { data: fundAssetsData, isLoading: isLoadingAssets } = useFundAssets(
-    distribution?.fund_id ?? ''
-  )
+  // Only fetch assets when we have a valid fund_id and dialog is open
+  const fundId = open ? (distribution?.fund_id ?? '') : ''
+  const { data: fundAssetsData, isLoading: isLoadingAssets } = useFundAssets(fundId)
 
   const fundAssets = fundAssetsData?.data ?? []
+  const assetsReady = !isLoadingAssets && fundId !== ''
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      actualAmount: distribution?.planned_amount ?? 0,
+      actualAmount: 0,
       allocations: [],
     },
   })
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, replace } = useFieldArray({
     control: form.control,
     name: 'allocations',
   })
 
-  // Reset form when distribution changes
+  // Helper to get asset id (defined early for useEffect)
+  const getAssetIdFromFa = (fa: FundAssetBalance | undefined): string | undefined => {
+    if (!fa) return undefined
+    return fa.asset?.id ?? (fa as unknown as { asset_id: string }).asset_id
+  }
+
+  // Initialize form when dialog opens and assets are loaded
   useEffect(() => {
-    if (distribution) {
-      form.reset({
-        actualAmount: distribution.planned_amount,
-        allocations: fundAssets.length > 0
-          ? [{ assetId: fundAssets[0].asset.id, amount: distribution.planned_amount }]
-          : [],
-      })
+    if (!open || !distribution || !assetsReady) return
+
+    const firstAsset = fundAssets[0]
+    const firstAssetId = getAssetIdFromFa(firstAsset)
+
+    // Set actual amount
+    form.setValue('actualAmount', distribution.planned_amount)
+
+    // Set initial allocation if we have assets
+    if (firstAssetId) {
+      replace([{ assetId: firstAssetId, amount: distribution.planned_amount }])
+    } else {
+      replace([])
     }
-  }, [distribution, fundAssets, form])
+  }, [open, distribution?.id, assetsReady, fundAssets, form, replace, distribution?.planned_amount])
 
   // Watch actual amount and allocations to check balance
   const actualAmount = form.watch('actualAmount')
@@ -110,12 +123,34 @@ export function ConfirmDistributionDialog({
     })
   }
 
-  const handleAddAllocation = () => {
-    const usedAssetIds = new Set(allocations.map((a) => a.assetId))
-    const availableAsset = fundAssets.find((fa) => !usedAssetIds.has(fa.asset.id))
+  // Helper to get asset id from fund asset (handles both flat and nested structure)
+  const getAssetId = (fa: FundAssetBalance): string | undefined => {
+    // Try nested structure first (FundAssetBalance type), then flat structure (actual API response)
+    return fa.asset?.id ?? (fa as unknown as { asset_id: string }).asset_id
+  }
 
-    if (availableAsset) {
-      append({ assetId: availableAsset.asset.id, amount: remaining > 0 ? remaining : 0 })
+  const getAssetName = (fa: FundAssetBalance): string => {
+    return fa.asset?.name ?? (fa as unknown as { asset_name: string }).asset_name ?? 'Неизвестный актив'
+  }
+
+  const getAssetCurrency = (fa: FundAssetBalance): string => {
+    return fa.asset?.currency ?? (fa as unknown as { currency: string }).currency ?? ''
+  }
+
+  const handleAddAllocation = () => {
+    if (fundAssets.length === 0) return
+
+    const usedAssetIds = new Set(allocations.map((a) => a.assetId))
+    const availableAsset = fundAssets.find((fa) => {
+      const assetId = getAssetId(fa)
+      return assetId && !usedAssetIds.has(assetId)
+    })
+
+    const assetToAdd = availableAsset ?? fundAssets.find((fa) => getAssetId(fa))
+    const assetId = assetToAdd ? getAssetId(assetToAdd) : undefined
+
+    if (assetId) {
+      append({ assetId, amount: remaining > 0 ? remaining : actualAmount })
     }
   }
 
@@ -166,7 +201,7 @@ export function ConfirmDistributionDialog({
             {/* Allocations */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <FormLabel>Распределение по активам</FormLabel>
+                <span className="text-sm font-medium">Распределение по активам</span>
                 {fundAssets.length > fields.length && (
                   <Button
                     type="button"
@@ -183,10 +218,30 @@ export function ConfirmDistributionDialog({
               {isLoadingAssets ? (
                 <div className="flex items-center justify-center py-4">
                   <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  <span className="ml-2 text-sm text-muted-foreground">Загрузка активов...</span>
                 </div>
               ) : fundAssets.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border/50 p-4 text-center text-sm text-muted-foreground">
                   В этом фонде нет активов. Добавьте активы в настройках фонда.
+                </div>
+              ) : fields.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/50 p-4 text-center text-sm text-muted-foreground">
+                  <p className="mb-2">Выберите актив для распределения ({fundAssets.length} доступно)</p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const firstAsset = fundAssets[0]
+                      const assetId = getAssetIdFromFa(firstAsset)
+                      if (assetId) {
+                        append({ assetId, amount: actualAmount })
+                      }
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Добавить актив
+                  </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -207,11 +262,15 @@ export function ConfirmDistributionDialog({
                                   <SelectValue placeholder="Выберите актив" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  {fundAssets.map((fa: FundAssetBalance) => (
-                                    <SelectItem key={fa.asset.id} value={fa.asset.id}>
-                                      {fa.asset.name} ({fa.asset.currency})
-                                    </SelectItem>
-                                  ))}
+                                  {fundAssets.map((fa: FundAssetBalance) => {
+                                    const assetId = getAssetId(fa)
+                                    if (!assetId) return null
+                                    return (
+                                      <SelectItem key={assetId} value={assetId}>
+                                        {getAssetName(fa)} ({getAssetCurrency(fa)})
+                                      </SelectItem>
+                                    )
+                                  })}
                                 </SelectContent>
                               </Select>
                             </FormControl>
@@ -289,7 +348,11 @@ export function ConfirmDistributionDialog({
               </Button>
               <Button
                 type="submit"
-                disabled={isConfirming || remaining !== 0 || fields.length === 0}
+                disabled={
+                  isConfirming ||
+                  !assetsReady ||
+                  (fundAssets.length > 0 && (remaining !== 0 || fields.length === 0))
+                }
               >
                 {isConfirming ? (
                   <>

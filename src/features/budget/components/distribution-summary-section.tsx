@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock, Settings } from 'lucide-react'
+import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock, Settings, ExternalLink } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,7 @@ export function DistributionSummarySection({
   fundDistributions,
   totalIncome = 0,
 }: DistributionSummarySectionProps) {
+  const navigate = useNavigate()
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
   if (!summary || summary.totalExpectedDistribution === 0) {
@@ -154,7 +156,20 @@ export function DistributionSummarySection({
         <CardContent className="p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Прогресс распределения</span>
-            <span className="text-sm text-muted-foreground">{confirmProgress}%</span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">{confirmProgress}%</span>
+              {confirmProgress < 100 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => navigate('/incomes')}
+                >
+                  <ExternalLink className="mr-1.5 h-3 w-3" />
+                  Подтвердить
+                </Button>
+              )}
+            </div>
           </div>
           <Progress value={confirmProgress} className="h-2" />
           <div className="flex justify-between mt-2 text-xs text-muted-foreground">

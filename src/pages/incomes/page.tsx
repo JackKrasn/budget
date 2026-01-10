@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   Plus,
@@ -19,7 +20,6 @@ import {
   CreateIncomeDialog,
   IncomeRow,
   SourceFilter,
-  IncomeDetailSheet,
 } from '@/features/incomes'
 import { useAccounts } from '@/features/accounts'
 import { AccountFilter } from '@/features/expenses'
@@ -47,10 +47,9 @@ const item = {
 }
 
 export default function IncomesPage() {
+  const navigate = useNavigate()
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
-  const [selectedIncomeId, setSelectedIncomeId] = useState<string | null>(null)
-  const [detailSheetOpen, setDetailSheetOpen] = useState(false)
 
   // Get current month date range
   const dateRange = useMemo(() => {
@@ -118,8 +117,7 @@ export default function IncomesPage() {
   }
 
   const handleIncomeClick = (id: string) => {
-    setSelectedIncomeId(id)
-    setDetailSheetOpen(true)
+    navigate(`/incomes/${id}`)
   }
 
   const formatDateHeader = (dateStr: string) => {
@@ -425,12 +423,6 @@ export default function IncomesPage() {
         </AnimatePresence>
       )}
 
-      {/* Income Detail Sheet */}
-      <IncomeDetailSheet
-        incomeId={selectedIncomeId}
-        open={detailSheetOpen}
-        onOpenChange={setDetailSheetOpen}
-      />
     </div>
   )
 }

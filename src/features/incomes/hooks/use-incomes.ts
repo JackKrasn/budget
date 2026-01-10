@@ -31,6 +31,8 @@ export function useIncome(id: string) {
     queryKey: incomeKeys.detail(id),
     queryFn: () => incomesApi.get(id),
     enabled: !!id,
+    refetchOnMount: 'always',
+    staleTime: 0,
   })
 }
 
