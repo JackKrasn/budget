@@ -8,7 +8,6 @@ import {
   useDeleteFund,
   FundCard,
   CreateFundDialog,
-  FundDetailsSheet,
   ContributionDialog,
   WithdrawalDialog,
 } from '@/features/funds'
@@ -40,8 +39,6 @@ export default function FundsPage() {
   const { data, isLoading, error } = useFunds()
   const deleteFund = useDeleteFund()
   const [selectedFund, setSelectedFund] = useState<FundBalance | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
-  const [sheetDefaultTab, setSheetDefaultTab] = useState<'overview' | 'history' | 'settings'>('overview')
   const [contributionOpen, setContributionOpen] = useState(false)
   const [withdrawalOpen, setWithdrawalOpen] = useState(false)
 
@@ -55,18 +52,6 @@ export default function FundsPage() {
     if (confirm(`Вы уверены, что хотите удалить фонд "${fund.fund.name}"?`)) {
       deleteFund.mutate(fund.fund.id)
     }
-  }
-
-  const handleView = (fund: FundBalance) => {
-    setSelectedFund(fund)
-    setSheetDefaultTab('overview')
-    setSheetOpen(true)
-  }
-
-  const handleEdit = (fund: FundBalance) => {
-    setSelectedFund(fund)
-    setSheetDefaultTab('settings')
-    setSheetOpen(true)
   }
 
   const handleDeposit = (fund: FundBalance) => {
@@ -201,8 +186,6 @@ export default function FundsPage() {
                 <motion.div key={fund.fund.id} variants={item}>
                   <FundCard
                     fund={fund}
-                    onView={() => handleView(fund)}
-                    onEdit={() => handleEdit(fund)}
                     onDeposit={() => handleDeposit(fund)}
                     onWithdraw={() => handleWithdraw(fund)}
                     onDelete={() => handleDelete(fund)}
@@ -264,8 +247,6 @@ export default function FundsPage() {
                   <motion.div key={fund.fund.id} variants={item}>
                     <FundCard
                       fund={fund}
-                      onView={() => handleView(fund)}
-                      onEdit={() => handleEdit(fund)}
                       onDeposit={() => handleDeposit(fund)}
                       onWithdraw={() => handleWithdraw(fund)}
                       onDelete={() => handleDelete(fund)}
@@ -292,8 +273,6 @@ export default function FundsPage() {
                   <motion.div key={fund.fund.id} variants={item}>
                     <FundCard
                       fund={fund}
-                      onView={() => handleView(fund)}
-                      onEdit={() => handleEdit(fund)}
                       onDelete={() => handleDelete(fund)}
                     />
                   </motion.div>
@@ -303,14 +282,6 @@ export default function FundsPage() {
           )}
         </>
       )}
-
-      {/* Fund Details Sheet */}
-      <FundDetailsSheet
-        fund={selectedFund}
-        open={sheetOpen}
-        onOpenChange={setSheetOpen}
-        defaultTab={sheetDefaultTab}
-      />
 
       {/* Contribution Dialog */}
       <ContributionDialog

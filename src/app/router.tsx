@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/layout/app-layout'
 import DashboardPage from '@/pages/dashboard/page'
 import BudgetPage from '@/pages/budget/page'
 import FundsPage from '@/pages/funds/page'
+import FundDetailsPage from '@/pages/funds/[id]/page'
 import AssetsPage from '@/pages/assets/page'
 import AccountsPage from '@/pages/accounts/page'
 import ExpensesPage from '@/pages/expenses/page'
@@ -29,6 +30,10 @@ export const router = createBrowserRouter([
       {
         path: 'funds',
         element: <FundsPage />,
+      },
+      {
+        path: 'funds/:id',
+        element: <FundDetailsPage />,
       },
       {
         path: 'expenses',

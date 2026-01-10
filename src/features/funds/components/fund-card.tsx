@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Wallet,
@@ -14,10 +15,9 @@ import {
   GraduationCap,
   Heart,
   Trash2,
-  Pencil,
-  Plus,
-  Minus,
-  Eye,
+  ArrowUpRight,
+  ArrowDownRight,
+  ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +26,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import type { FundBalance } from '@/lib/api/types'
@@ -57,8 +56,6 @@ function formatMoney(amount: number): string {
 
 interface FundCardProps {
   fund: FundBalance
-  onView?: () => void
-  onEdit?: () => void
   onDeposit?: () => void
   onWithdraw?: () => void
   onDelete?: () => void
@@ -66,14 +63,17 @@ interface FundCardProps {
 
 export function FundCard({
   fund,
-  onView,
-  onEdit,
   onDeposit,
   onWithdraw,
   onDelete,
 }: FundCardProps) {
+  const navigate = useNavigate()
   const { fund: fundData, totalRub, assets } = fund
   const Icon = FUND_ICONS[fundData.icon] || Wallet
+
+  const handleNavigate = () => {
+    navigate(`/funds/${fundData.id}`)
+  }
 
   // Fetch distribution rules for this fund
   const { data: rulesData } = useFundDistributionRules(fundData.id)
@@ -94,9 +94,10 @@ export function FundCard({
     >
       <Card
         className={cn(
-          'group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5',
+          'group relative cursor-pointer overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5',
           fundData.status === 'paused' && 'opacity-60'
         )}
+        onClick={handleNavigate}
       >
         {/* Gradient overlay */}
         <div
@@ -144,28 +145,12 @@ export function FundCard({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onView}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Подробнее
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onDeposit}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Пополнить
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onWithdraw}>
-                  <Minus className="mr-2 h-4 w-4" />
-                  Списать
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onEdit}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Редактировать
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={onDelete}
                   className="text-destructive focus:text-destructive"
@@ -188,7 +173,7 @@ export function FundCard({
 
           {/* Assets summary */}
           {assets.length > 0 && (
-            <div className="mb-4 flex flex-wrap gap-1">
+            <div className="mb-3 flex flex-wrap gap-1">
               {assets.slice(0, 3).map((asset) => (
                 <Badge
                   key={asset.asset.id}
@@ -207,6 +192,45 @@ export function FundCard({
             </div>
           )}
 
+          {/* Action buttons */}
+          <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 h-9 text-xs gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/50"
+              onClick={(e) => {
+                e.stopPropagation()
+                onDeposit?.()
+              }}
+            >
+              <ArrowUpRight className="h-3.5 w-3.5" />
+              Пополнить
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1 h-9 text-xs gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
+              onClick={(e) => {
+                e.stopPropagation()
+                onWithdraw?.()
+              }}
+            >
+              <ArrowDownRight className="h-3.5 w-3.5" />
+              Списать
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-9 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
+              onClick={(e) => {
+                e.stopPropagation()
+                handleNavigate()
+              }}
+            >
+              Подробнее
+              <ChevronRight className="h-3.5 w-3.5" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </motion.div>
