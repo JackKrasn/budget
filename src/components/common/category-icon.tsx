@@ -208,6 +208,8 @@ export function getCategoryIcon(code: string): LucideIcon {
 interface FundIconProps {
   /** Название или код фонда */
   name: string
+  /** Название иконки Lucide (если есть) */
+  iconName?: string
   /** Цвет фона (hex или CSS color) */
   color?: string
   /** Размер контейнера */
@@ -218,19 +220,25 @@ interface FundIconProps {
 
 export function FundIcon({
   name,
+  iconName,
   color = '#6b7280',
   size = 'md',
   className,
 }: FundIconProps) {
-  // Ищем иконку по названию фонда (в нижнем регистре)
-  const nameLower = name.toLowerCase()
+  // Приоритет: iconName > поиск по названию > Wallet
   let Icon: LucideIcon = Wallet
 
-  // Проверяем, содержит ли название ключевые слова
-  for (const [key, icon] of Object.entries(FUND_ICONS)) {
-    if (nameLower.includes(key)) {
-      Icon = icon
-      break
+  if (iconName) {
+    // Если передано имя иконки, используем его
+    Icon = getIconByName(iconName)
+  } else {
+    // Иначе ищем иконку по названию фонда (в нижнем регистре)
+    const nameLower = name.toLowerCase()
+    for (const [key, icon] of Object.entries(FUND_ICONS)) {
+      if (nameLower.includes(key)) {
+        Icon = icon
+        break
+      }
     }
   }
 

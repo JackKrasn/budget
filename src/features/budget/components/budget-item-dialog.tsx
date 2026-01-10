@@ -1,7 +1,8 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
+import { PiggyBank } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -17,14 +18,27 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Label } from '@/components/ui/label'
+import { FundIcon, CategoryIcon } from '@/components/common'
+import { useFunds } from '@/features/funds'
 import type { BudgetItemWithCategory } from '@/lib/api/types'
 
 const formSchema = z.object({
   plannedAmount: z.string().min(1, 'Введите сумму'),
   notes: z.string().optional(),
+  fundId: z.string().optional(),
+  fundAllocation: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -33,7 +47,7 @@ interface BudgetItemDialogProps {
   item: BudgetItemWithCategory | null
   open: boolean
   onOpenChange: (open: boolean) => void
-  onSave: (categoryId: string, plannedAmount: number, notes?: string) => Promise<void>
+  onSave: (categoryId: string, plannedAmount: number, notes?: string, fundId?: string, fundAllocation?: number) => Promise<void>
   isPending?: boolean
 }
 
@@ -44,29 +58,65 @@ export function BudgetItemDialog({
   onSave,
   isPending,
 }: BudgetItemDialogProps) {
+  const [useFundFinancing, setUseFundFinancing] = useState(false)
+  const { data: fundsData } = useFunds({ status: 'active' })
+  const funds = fundsData?.data ?? []
+
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       plannedAmount: '',
       notes: '',
+      fundId: '',
+      fundAllocation: '',
     },
   })
 
   useEffect(() => {
     if (item) {
+      const hasFund = !!item.fundId
+      setUseFundFinancing(hasFund)
       form.reset({
         plannedAmount: String(item.plannedAmount),
         notes: item.notes || '',
+        fundId: item.fundId || '',
+        fundAllocation: item.fundAllocation ? String(item.fundAllocation) : '',
       })
     }
   }, [item, form])
+
+  // Watch planned amount to auto-fill fund allocation
+  const plannedAmount = form.watch('plannedAmount')
+  const fundAllocationValue = form.watch('fundAllocation')
+  const selectedFundId = form.watch('fundId')
+  const selectedFundBalance = funds.find(f => f.fund.id === selectedFundId)
+
+  const formatMoney = (amount: number) => {
+    return amount.toLocaleString('ru-RU', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+  }
+
+  const handleUseFundChange = (checked: boolean) => {
+    setUseFundFinancing(checked)
+    if (!checked) {
+      form.setValue('fundId', '')
+      form.setValue('fundAllocation', '')
+    } else if (plannedAmount) {
+      // Auto-fill fund allocation with planned amount
+      form.setValue('fundAllocation', plannedAmount)
+    }
+  }
 
   async function onSubmit(values: FormValues) {
     if (!item) return
     await onSave(
       item.categoryId,
       parseFloat(values.plannedAmount) || 0,
-      values.notes || undefined
+      values.notes || undefined,
+      useFundFinancing && values.fundId ? values.fundId : undefined,
+      useFundFinancing && values.fundAllocation ? parseFloat(values.fundAllocation) : undefined
     )
     onOpenChange(false)
   }
@@ -81,12 +131,12 @@ export function BudgetItemDialog({
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <span
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-lg"
-              style={{ backgroundColor: item.categoryColor + '20' }}
-            >
-              {item.categoryIcon}
-            </span>
+            <CategoryIcon
+              code={item.categoryCode}
+              iconName={item.categoryIcon}
+              color={item.categoryColor}
+              size="lg"
+            />
             {item.categoryName}
           </DialogTitle>
           <DialogDescription>
@@ -151,6 +201,141 @@ export function BudgetItemDialog({
                 </FormItem>
               )}
             />
+
+            {/* Fund Financing Section */}
+            {funds.length > 0 && (
+              <div className="space-y-3 rounded-lg border border-border/50 p-4">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="useFund"
+                    checked={useFundFinancing}
+                    onCheckedChange={handleUseFundChange}
+                  />
+                  <Label
+                    htmlFor="useFund"
+                    className="flex items-center gap-2 text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    <PiggyBank className="h-4 w-4 text-muted-foreground" />
+                    Финансировать из фонда
+                  </Label>
+                </div>
+
+                {useFundFinancing && (
+                  <div className="space-y-3 pt-2">
+                    <FormField
+                      control={form.control}
+                      name="fundId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Фонд</FormLabel>
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Выберите фонд">
+                                  {field.value && (() => {
+                                    const selectedFund = funds.find(f => f.fund.id === field.value)
+                                    if (!selectedFund) return null
+                                    return (
+                                      <span className="flex items-center gap-2">
+                                        <FundIcon
+                                          name={selectedFund.fund.name}
+                                          iconName={selectedFund.fund.icon}
+                                          color={selectedFund.fund.color}
+                                          size="sm"
+                                        />
+                                        {selectedFund.fund.name}
+                                      </span>
+                                    )
+                                  })()}
+                                </SelectValue>
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {funds.map((fb) => {
+                                const allocationAmt = parseFloat(fundAllocationValue || '0') || 0
+                                const remaining = fb.totalRub - allocationAmt
+                                return (
+                                  <SelectItem
+                                    key={fb.fund.id}
+                                    value={fb.fund.id}
+                                  >
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="flex items-center gap-2">
+                                        <FundIcon
+                                          name={fb.fund.name}
+                                          iconName={fb.fund.icon}
+                                          color={fb.fund.color}
+                                          size="sm"
+                                        />
+                                        {fb.fund.name}
+                                      </span>
+                                      <span className="text-xs text-muted-foreground ml-8">
+                                        Доступно: {formatMoney(fb.totalRub)} ₽
+                                        {allocationAmt > 0 && (
+                                          <span className={remaining < 0 ? ' text-destructive' : ''}>
+                                            {' → после: '}{formatMoney(remaining)} ₽
+                                          </span>
+                                        )}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                )
+                              })}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="fundAllocation"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Сумма из фонда (₽)</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              placeholder="0"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Preview: баланс фонда и остаток */}
+                    {selectedFundBalance && (
+                      <div className="rounded-lg bg-muted/50 p-3 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Доступно в фонде:</span>
+                          <span className="tabular-nums font-medium">
+                            {formatMoney(selectedFundBalance.totalRub)} ₽
+                          </span>
+                        </div>
+                        {parseFloat(fundAllocationValue || '0') > 0 && (
+                          <div className="flex justify-between mt-1">
+                            <span className="text-muted-foreground">Останется после:</span>
+                            <span className={`tabular-nums font-medium ${
+                              selectedFundBalance.totalRub - parseFloat(fundAllocationValue || '0') < 0
+                                ? 'text-destructive'
+                                : 'text-emerald-500'
+                            }`}>
+                              {formatMoney(selectedFundBalance.totalRub - parseFloat(fundAllocationValue || '0'))} ₽
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="flex gap-3 pt-2">
               <Button

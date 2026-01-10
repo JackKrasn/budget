@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Check, Wallet } from 'lucide-react'
+import { Check, Wallet, PiggyBank } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -66,6 +66,18 @@ export function ConfirmPlannedExpenseDialog({
   // Дата по умолчанию — сегодня
   const today = new Date().toISOString().split('T')[0]
 
+  // Извлечь число из nullable типа бэкенда (может быть {Float64: number, Valid: boolean} или просто number)
+  const getActualAmount = (
+    value: number | { Float64: number; Valid: boolean } | null | undefined
+  ): number | null => {
+    if (value == null) return null
+    if (typeof value === 'number') return value
+    if (typeof value === 'object' && 'Valid' in value && value.Valid) {
+      return value.Float64
+    }
+    return null
+  }
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -129,6 +141,16 @@ export function ConfirmPlannedExpenseDialog({
               {formatMoney(plannedAmount)} ₽
             </span>
           </div>
+          {/* Fund Financing Info */}
+          {expense.fund_id && getActualAmount(expense.funded_amount) ? (
+            <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border/30 text-muted-foreground">
+              <PiggyBank className="h-4 w-4" />
+              <span className="text-sm">Из фонда:</span>
+              <span className="text-sm font-medium tabular-nums">
+                {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} ₽
+              </span>
+            </div>
+          ) : null}
         </div>
 
         <Form {...form}>

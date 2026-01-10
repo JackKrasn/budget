@@ -9,6 +9,7 @@ import {
   Lock,
   RefreshCw,
   Calendar,
+  PiggyBank,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -130,6 +131,18 @@ export function PlannedExpensesSection({
   const pendingExpenses = expenses.filter((e) => e.status === 'pending')
   const confirmedExpenses = expenses.filter((e) => e.status === 'confirmed')
 
+  // Группировка по фондам
+  const fundBreakdown = expenses.reduce<Record<string, { name: string; amount: number }>>((acc, e) => {
+    const fundedAmount = getActualAmount(e.funded_amount)
+    if (fundedAmount && e.fund_name && e.fund_id) {
+      if (!acc[e.fund_id]) {
+        acc[e.fund_id] = { name: e.fund_name, amount: 0 }
+      }
+      acc[e.fund_id].amount += fundedAmount
+    }
+    return acc
+  }, {})
+
   const totals = {
     planned: expenses.reduce((sum, e) => sum + e.planned_amount, 0),
     confirmed: confirmedExpenses.reduce(
@@ -137,6 +150,18 @@ export function PlannedExpensesSection({
       0
     ),
     pending: pendingExpenses.reduce((sum, e) => sum + e.planned_amount, 0),
+    // Финансирование из фондов (funded_amount приходит как { Float64, Valid })
+    fromFunds: expenses
+      .filter((e) => getActualAmount(e.funded_amount))
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
+    pendingFromFunds: pendingExpenses
+      .filter((e) => getActualAmount(e.funded_amount))
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
+    fromBudget: expenses.reduce((sum, e) => sum + e.planned_amount, 0) -
+      expenses
+        .filter((e) => getActualAmount(e.funded_amount))
+        .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
+    fundBreakdown: Object.values(fundBreakdown),
   }
 
   return (
@@ -231,8 +256,13 @@ export function PlannedExpensesSection({
                             <p className="font-medium">{expense.name}</p>
                             <p className="text-xs text-muted-foreground">
                               {expense.category_name}
-                              {expense.fund_name && ` • ${expense.fund_name}`}
                             </p>
+                            {getActualAmount(expense.funded_amount) && expense.fund_name ? (
+                              <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                                <PiggyBank className="h-3 w-3" />
+                                Из фонда «{expense.fund_name}»: {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} ₽
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       </TableCell>
@@ -321,7 +351,30 @@ export function PlannedExpensesSection({
               </TableBody>
               <TableFooter>
                 <TableRow className="bg-muted/50">
-                  <TableCell className="font-semibold text-base">Итого</TableCell>
+                  <TableCell className="font-semibold text-base">
+                    <div>Итого</div>
+                    {totals.fromFunds > 0 && (
+                      <div className="font-normal text-xs space-y-0.5 mt-1 text-muted-foreground">
+                        <div>
+                          Из бюджета: <span className="text-foreground">{formatMoney(totals.fromBudget)} ₽</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <PiggyBank className="h-3 w-3" />
+                          Из фондов: {formatMoney(totals.fromFunds)} ₽
+                          {totals.fundBreakdown.length > 0 && (
+                            <span>
+                              ({totals.fundBreakdown.map((fund, idx) => (
+                                <span key={idx}>
+                                  {idx > 0 && ', '}
+                                  {fund.name}
+                                </span>
+                              ))})
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell className="text-right tabular-nums font-semibold text-base">
                     {formatMoney(totals.planned)} ₽
                   </TableCell>

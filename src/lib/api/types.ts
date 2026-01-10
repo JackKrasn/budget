@@ -624,6 +624,10 @@ export interface BudgetItemWithCategory extends BudgetItem {
   fundedAmount: number
   remaining: number
   plannedExpensesSum: number
+  // Fund financing fields
+  fundId?: UUID
+  fundName?: string
+  fundAllocation: number
 }
 
 export interface FundDistributionSummary {
@@ -645,10 +649,26 @@ export interface DistributionSummary {
   distributionDifference: number
 }
 
+// Fund Financing Summary (expenses funded from funds)
+export interface FundingSource {
+  fundId: UUID
+  fundName: string
+  plannedAmount: number
+  actualAmount: number
+}
+
+export interface FundFinancingSummary {
+  totalPlanned: number
+  plannedFromIncome: number
+  plannedFromFunds: number
+  fundBreakdown: FundingSource[]
+}
+
 export interface BudgetWithItems extends Budget {
   items: BudgetItemWithCategory[]
   distributionSummary?: DistributionSummary
   fundDistributions?: FundDistributionSummary[]
+  fundFinancingSummary?: FundFinancingSummary
 }
 
 export interface BudgetsListResponse {
@@ -675,7 +695,11 @@ export interface UpdateBudgetRequest {
 export interface UpsertBudgetItemRequest {
   categoryId: string
   plannedAmount: number
+  bufferAmount?: number
   notes?: string
+  // Fund financing fields
+  fundId?: string
+  fundAllocation?: number
 }
 
 export interface BudgetsListParams {
@@ -757,10 +781,11 @@ export interface PlannedExpense {
   category_id: UUID
   account_id?: UUID
   fund_id?: UUID
+  funded_amount?: number | NullFloat64
   name: string
   planned_amount: number
   currency: string
-  planned_date: ISODate
+  planned_date: ISODate | { Time: string; Valid: boolean }
   status: PlannedExpenseStatus
   actual_expense_id?: UUID
   notes?: string
@@ -775,7 +800,7 @@ export interface PlannedExpenseWithDetails extends PlannedExpense {
   category_color: string
   account_name?: string
   fund_name?: string
-  actual_amount?: number
+  actual_amount?: number | NullFloat64
 }
 
 export interface PlannedExpensesSummary {
@@ -790,6 +815,7 @@ export interface CreatePlannedExpenseRequest {
   categoryId: string
   accountId?: string
   fundId?: string
+  fundedAmount?: number
   name: string
   plannedAmount: number
   currency: string
@@ -801,6 +827,7 @@ export interface UpdatePlannedExpenseRequest {
   categoryId?: string
   accountId?: string
   fundId?: string
+  fundedAmount?: number
   name?: string
   plannedAmount?: number
   currency?: string

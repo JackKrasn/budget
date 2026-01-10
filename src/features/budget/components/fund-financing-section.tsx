@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Edit2, Check, X, Wallet, Plus } from 'lucide-react'
+import { Edit2, Check, X, Wallet, Plus, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -13,6 +13,11 @@ import {
   TableRow,
   TableFooter,
 } from '@/components/ui/table'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { FundIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
 import type { FundBalance } from '@/lib/api/types'
@@ -48,8 +53,9 @@ export function FundFinancingSection({
       available: acc.available + fund.availableAmount,
       planned: acc.planned + fund.plannedAmount,
       used: acc.used + fund.usedAmount,
+      remainingInFund: acc.remainingInFund + (fund.availableAmount - fund.plannedAmount),
     }),
-    { available: 0, planned: 0, used: 0 }
+    { available: 0, planned: 0, used: 0, remainingInFund: 0 }
   )
 
   const formatMoney = (amount: number) => {
@@ -136,10 +142,71 @@ export function FundFinancingSection({
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="w-[200px]">Фонд</TableHead>
-                <TableHead className="w-[120px] text-right">Доступно</TableHead>
-                <TableHead className="w-[120px] text-right">План</TableHead>
-                <TableHead className="w-[120px] text-right">Использовано</TableHead>
-                <TableHead className="w-[120px] text-right">Остаток</TableHead>
+                <TableHead className="w-[120px] text-right">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1 cursor-help">
+                        Доступно
+                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p>Текущий баланс фонда — сколько денег есть в фонде прямо сейчас</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="w-[120px] text-right">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1 cursor-help">
+                        План
+                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p>Сколько планируете потратить из этого фонда в этом месяце</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="w-[120px] text-right">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1 cursor-help">
+                        После плана
+                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p>Сколько останется в фонде после выполнения плана (Доступно − План)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="w-[120px] text-right">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1 cursor-help">
+                        Использовано
+                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p>Сколько уже фактически потрачено из фонда в этом месяце</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+                <TableHead className="w-[120px] text-right">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex items-center gap-1 cursor-help">
+                        Остаток
+                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-[200px]">
+                      <p>Сколько ещё можно потратить в рамках плана (План − Использовано)</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -148,6 +215,8 @@ export function FundFinancingSection({
                 const isEditing = editingId === fund.fundId
                 const remaining = fund.plannedAmount - fund.usedAmount
                 const isOverused = remaining < 0
+                const remainingInFund = fund.availableAmount - fund.plannedAmount
+                const isOverPlanned = remainingInFund < 0
 
                 return (
                   <TableRow key={fund.fundId} className="group">
@@ -155,6 +224,7 @@ export function FundFinancingSection({
                       <div className="flex items-center gap-3">
                         <FundIcon
                           name={fund.fundName}
+                          iconName={fund.fundIcon}
                           color={fund.fundColor}
                           size="md"
                         />
@@ -186,6 +256,19 @@ export function FundFinancingSection({
                           {formatMoney(fund.plannedAmount)} ₽
                         </span>
                       )}
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <span
+                        className={cn(
+                          'tabular-nums',
+                          isOverPlanned
+                            ? 'text-destructive font-medium'
+                            : 'text-muted-foreground'
+                        )}
+                      >
+                        {formatMoney(remainingInFund)} ₽
+                      </span>
                     </TableCell>
 
                     <TableCell className="text-right tabular-nums">
@@ -254,6 +337,18 @@ export function FundFinancingSection({
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatMoney(totals.planned)} ₽
+                </TableCell>
+                <TableCell className="text-right">
+                  <span
+                    className={cn(
+                      'tabular-nums',
+                      totals.remainingInFund < 0
+                        ? 'text-destructive'
+                        : 'text-muted-foreground'
+                    )}
+                  >
+                    {formatMoney(totals.remainingInFund)} ₽
+                  </span>
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {formatMoney(totals.used)} ₽

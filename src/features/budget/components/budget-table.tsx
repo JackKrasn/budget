@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { EyeOff, Plus, Settings2, Check, X } from 'lucide-react'
+import { EyeOff, Plus, Settings2, Check, X, PiggyBank, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -38,6 +38,10 @@ interface BudgetTableProps {
   actualByCategory?: Record<string, number>
   /** Callback для клика по категории (переход к расходам) */
   onCategoryClick?: (categoryId: string) => void
+  /** Callback для редактирования категории (открыть диалог настроек) */
+  onEditCategory?: (item: BudgetItemWithCategory) => void
+  /** Карта фондов для отображения названий (fundId -> fundName) */
+  fundNames?: Record<string, string>
 }
 
 // Компонент для inline-редактирования суммы с кнопками
@@ -172,17 +176,43 @@ export function BudgetTable({
   onAddCategory,
   actualByCategory = {},
   onCategoryClick,
+  onEditCategory,
+  fundNames = {},
 }: BudgetTableProps) {
   // Объединить все категории с данными бюджета
   const allRows = allCategories.map((category) => {
-    const budgetItem = items.find((i) => i.categoryId === category.id)
-    const plannedExpensesSum = budgetItem?.plannedExpensesSum ?? 0
+    const existingItem = items.find((i) => i.categoryId === category.id)
+    const plannedExpensesSum = existingItem?.plannedExpensesSum ?? 0
     // Буфер = plannedAmount - plannedExpensesSum (то что пользователь может тратить свободно)
-    const bufferAmount = Math.max((budgetItem?.plannedAmount ?? 0) - plannedExpensesSum, 0)
+    const bufferAmount = Math.max((existingItem?.plannedAmount ?? 0) - plannedExpensesSum, 0)
     // Total planned = buffer + mandatory payments (credits, etc.)
     const totalPlanned = bufferAmount + plannedExpensesSum
     // Используем actualByCategory из расходов, а не из budget_items
     const actual = actualByCategory[category.id] ?? 0
+    // Информация о финансировании из фонда
+    const fundId = existingItem?.fundId
+    const fundAllocation = existingItem?.fundAllocation ?? 0
+    const fundName = fundId ? fundNames[fundId] : undefined
+
+    // Создаём budgetItem для редактирования (виртуальный если нет реального)
+    const budgetItem: BudgetItemWithCategory = existingItem ?? {
+      id: '',
+      budgetId: '',
+      categoryId: category.id,
+      plannedAmount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      categoryName: category.name,
+      categoryCode: category.code,
+      categoryIcon: category.icon,
+      categoryColor: category.color,
+      actualAmount: actual,
+      fundedAmount: 0,
+      remaining: 0,
+      plannedExpensesSum: 0,
+      fundAllocation: 0,
+    }
+
     return {
       categoryId: category.id,
       categoryName: category.name,
@@ -194,8 +224,13 @@ export function BudgetTable({
       totalPlanned,
       actual,
       variance: totalPlanned - actual,
-      hasItem: !!budgetItem || actual > 0,
+      hasItem: !!existingItem || actual > 0,
       isHidden: hiddenCategories.includes(category.id),
+      // Финансирование из фонда
+      fundId,
+      fundAllocation,
+      fundName,
+      budgetItem,
     }
   })
 
@@ -307,23 +342,44 @@ export function BudgetTable({
                 )}
               >
                 <TableCell>
-                  <button
-                    type="button"
-                    className={cn(
-                      'flex items-center gap-3 text-left',
-                      onCategoryClick && 'hover:opacity-80 cursor-pointer transition-opacity'
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      className={cn(
+                        'flex items-center gap-3 text-left flex-1 min-w-0',
+                        onCategoryClick && 'hover:opacity-80 cursor-pointer transition-opacity'
+                      )}
+                      onClick={() => onCategoryClick?.(row.categoryId)}
+                      disabled={!onCategoryClick}
+                    >
+                      <CategoryIcon
+                        code={row.categoryCode}
+                        iconName={row.categoryIcon}
+                        color={row.categoryColor}
+                        size="md"
+                      />
+                      <div className="min-w-0">
+                        <p className="font-medium">{row.categoryName}</p>
+                        {row.fundName && row.fundAllocation > 0 && (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <PiggyBank className="h-3 w-3" />
+                            Из фонда «{row.fundName}»: {formatMoney(row.fundAllocation)} ₽
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                    {onEditCategory && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => onEditCategory(row.budgetItem)}
+                        title="Настройки категории"
+                      >
+                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                      </Button>
                     )}
-                    onClick={() => onCategoryClick?.(row.categoryId)}
-                    disabled={!onCategoryClick}
-                  >
-                    <CategoryIcon
-                      code={row.categoryCode}
-                      iconName={row.categoryIcon}
-                      color={row.categoryColor}
-                      size="md"
-                    />
-                    <p className="font-medium">{row.categoryName}</p>
-                  </button>
+                  </div>
                 </TableCell>
 
                 <TableCell className="text-right">

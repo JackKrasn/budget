@@ -44,12 +44,13 @@ import {
   mapFundBalanceToFinancing,
   DistributionSummarySection,
   FloatingBudgetBalance,
+  BudgetItemDialog,
 } from '@/features/budget'
 import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
 import { budgetsApi } from '@/lib/api/budgets'
-import type { Fund, PlannedIncome } from '@/lib/api/types'
+import type { PlannedIncome, BudgetItemWithCategory } from '@/lib/api/types'
 
 // Ключ для localStorage
 const HIDDEN_CATEGORIES_KEY = 'budget-hidden-categories'
@@ -77,6 +78,8 @@ export default function BudgetPage() {
   const [hiddenCategories, setHiddenCategoriesState] = useState<string[]>(getHiddenCategories)
   const [receiveIncomeDialogOpen, setReceiveIncomeDialogOpen] = useState(false)
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
+  const [editItemDialogOpen, setEditItemDialogOpen] = useState(false)
+  const [editingItem, setEditingItem] = useState<BudgetItemWithCategory | null>(null)
 
   // Вычисляем даты для фильтрации расходов
   const dateFrom = useMemo(() => {
@@ -133,15 +136,13 @@ export default function BudgetPage() {
 
   const budget = budgetData
   const allBudgets = allBudgetsData?.data ?? []
-  const items = budget?.items ?? []
+  const items = useMemo(() => budget?.items ?? [], [budget?.items])
   const categories = categoriesData?.data ?? []
-  const plannedExpenses = plannedData?.data ?? []
-  const plannedIncomes = plannedIncomesData?.data ?? []
+  const plannedExpenses = useMemo(() => plannedData?.data ?? [], [plannedData?.data])
+  const plannedIncomes = useMemo(() => plannedIncomesData?.data ?? [], [plannedIncomesData?.data])
   const expenses = expensesData?.data ?? []
-  const fundsRaw = fundsData?.data ?? []
+  const fundsRaw = useMemo(() => fundsData?.data ?? [], [fundsData?.data])
   const accounts = accountsData?.data ?? []
-  // Преобразуем FundBalance в Fund для диалога
-  const funds: Fund[] = fundsRaw.map((f) => f.fund)
 
   // Считаем фактические расходы по категориям
   const actualByCategory = useMemo(() => {
@@ -181,6 +182,20 @@ export default function BudgetPage() {
       .filter((e) => e.status === 'confirmed')
       .reduce((sum, e) => sum + (e.actual_amount ?? e.planned_amount), 0)
 
+    // Финансирование обязательных расходов из фондов
+    // funded_amount приходит как { Float64: number, Valid: boolean }
+    const plannedFromFunds = plannedExpenses
+      .filter((e) => e.status === 'pending' && getActualAmount(e.funded_amount))
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0)
+    const confirmedFromFunds = plannedExpenses
+      .filter((e) => e.status === 'confirmed' && getActualAmount(e.funded_amount))
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0)
+    const totalFromFunds = plannedFromFunds + confirmedFromFunds
+
+    // Обязательные из бюджета (без финансирования из фондов)
+    const pendingPlannedFromBudget = pendingPlanned - plannedFromFunds
+    const confirmedPlannedFromBudget = confirmedPlanned - confirmedFromFunds
+
     // Статистика доходов
     const expectedIncome = plannedIncomes.reduce((sum, i) => sum + i.expected_amount, 0)
     const receivedIncome = plannedIncomes
@@ -190,12 +205,12 @@ export default function BudgetPage() {
       .filter((i) => i.status === 'pending')
       .reduce((sum, i) => sum + i.expected_amount, 0)
 
-    // Распределения в фонды
+    // Распределения в фонды (входящие)
     const expectedFundDistributions = budget?.distributionSummary?.totalExpectedDistribution ?? 0
     const actualFundDistributions = budget?.distributionSummary?.totalActualDistribution ?? 0
 
-    // Доступно для планирования = Ожидаемый доход - План по категориям - Ожидаемые обязательные - Ожидаемые распределения в фонды
-    const availableForPlanning = expectedIncome - totalPlanned - pendingPlanned - expectedFundDistributions
+    // Доступно для планирования = Ожидаемый доход - План по категориям - Обязательные ИЗ БЮДЖЕТА - Распределения в фонды
+    const availableForPlanning = expectedIncome - totalPlanned - pendingPlannedFromBudget - expectedFundDistributions
 
     // Реально доступно = Полученный доход - Фактические расходы - Подтверждённые распределения
     const actuallyAvailable = receivedIncome - totalActual - actualFundDistributions
@@ -208,6 +223,13 @@ export default function BudgetPage() {
       totalPlannedExpenses,
       pendingPlanned,
       confirmedPlanned,
+      // Новые поля для финансирования из фондов
+      plannedFromFunds,
+      confirmedFromFunds,
+      totalFromFunds,
+      pendingPlannedFromBudget,
+      confirmedPlannedFromBudget,
+      // Доходы
       expectedIncome,
       receivedIncome,
       pendingIncome,
@@ -218,12 +240,51 @@ export default function BudgetPage() {
     }
   }, [items, plannedExpenses, plannedIncomes, actualByCategory, budget?.distributionSummary])
 
-  // Данные для секции финансирования из фондов (пока заглушка)
+  // Данные для секции финансирования из фондов
   const fundFinancingData = useMemo(() => {
+    // Собираем суммы из запланированных расходов по фондам
+    // funded_amount приходит как { Float64: number, Valid: boolean }
+    const fundPlanned = new Map<string, number>()
+    const fundUsed = new Map<string, number>()
+
+    // 1. Добавляем суммы из запланированных расходов (planned expenses)
+    for (const expense of plannedExpenses) {
+      const fundedAmount = getActualAmount(expense.funded_amount)
+      if (expense.fund_id && fundedAmount && fundedAmount > 0) {
+        const current = fundPlanned.get(expense.fund_id) || 0
+        fundPlanned.set(expense.fund_id, current + fundedAmount)
+
+        // Если расход подтверждён, считаем как использованный
+        if (expense.status === 'confirmed') {
+          const currentUsed = fundUsed.get(expense.fund_id) || 0
+          fundUsed.set(expense.fund_id, currentUsed + fundedAmount)
+        }
+      }
+    }
+
+    // 2. Добавляем суммы из бюджетных категорий с финансированием из фондов
+    for (const item of items) {
+      if (item.fundId && item.fundAllocation && item.fundAllocation > 0) {
+        const current = fundPlanned.get(item.fundId) || 0
+        fundPlanned.set(item.fundId, current + item.fundAllocation)
+
+        // Фактически использовано = actualAmount категории (но не больше fundAllocation)
+        const usedFromFund = Math.min(item.actualAmount, item.fundAllocation)
+        if (usedFromFund > 0) {
+          const currentUsed = fundUsed.get(item.fundId) || 0
+          fundUsed.set(item.fundId, currentUsed + usedFromFund)
+        }
+      }
+    }
+
     return fundsRaw.map((f) =>
-      mapFundBalanceToFinancing(f, 0, 0) // plannedAmount и usedAmount пока 0
+      mapFundBalanceToFinancing(
+        f,
+        fundPlanned.get(f.fund.id) || 0,
+        fundUsed.get(f.fund.id) || 0
+      )
     )
-  }, [fundsRaw])
+  }, [fundsRaw, plannedExpenses, items])
 
   const handleMonthChange = (newYear: number, newMonth: number) => {
     setYear(newYear)
@@ -252,6 +313,45 @@ export default function BudgetPage() {
       // Принудительно инвалидируем и ждём обновления
       await queryClient.invalidateQueries({ queryKey: budgetKeys.byMonth(year, month) })
       toast.success('Лимит обновлён')
+    } catch (error) {
+      console.error('Ошибка сохранения:', error)
+      toast.error('Ошибка сохранения')
+    }
+  }
+
+  // Сохранение настроек категории (с финансированием из фонда)
+  const handleSaveItem = async (
+    categoryId: string,
+    plannedAmount: number,
+    notes?: string,
+    fundId?: string,
+    fundAllocation?: number
+  ) => {
+    let budgetId = budget?.id
+
+    if (!budgetId) {
+      try {
+        const newBudget = await createBudget.mutateAsync({ year, month })
+        budgetId = newBudget.id
+      } catch {
+        toast.error('Ошибка создания бюджета')
+        return
+      }
+    }
+
+    try {
+      await upsertItem.mutateAsync({
+        budgetId,
+        data: {
+          categoryId,
+          plannedAmount,
+          notes,
+          fundId,
+          fundAllocation,
+        },
+      })
+      await queryClient.invalidateQueries({ queryKey: budgetKeys.byMonth(year, month) })
+      toast.success('Настройки сохранены')
     } catch (error) {
       console.error('Ошибка сохранения:', error)
       toast.error('Ошибка сохранения')
@@ -399,10 +499,12 @@ export default function BudgetPage() {
     budgetId: string
     categoryId: string
     fundId?: string
+    fundedAmount?: number
     name: string
     plannedAmount: number
     currency: string
     plannedDate: string
+    notes?: string
   }) => {
     try {
       await createPlanned.mutateAsync(data)
@@ -508,21 +610,32 @@ export default function BudgetPage() {
           </CardContent>
         </Card>
 
-        {/* Обязательные расходы */}
+        {/* Запланированные расходы */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-orange-500/10">
                 <Calendar className="h-4 w-4 text-orange-500" />
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Обязательные</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-muted-foreground">Запланированные</p>
                 <p className="text-lg font-bold tabular-nums text-orange-500">
                   {formatMoney(stats.totalPlannedExpenses)} ₽
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  ожидает {formatMoney(stats.pendingPlanned)} ₽
-                </p>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                  <span className="whitespace-nowrap">
+                    из бюджета {formatMoney(stats.pendingPlannedFromBudget)} ₽
+                  </span>
+                  {stats.plannedFromFunds > 0 && (
+                    <>
+                      <span>•</span>
+                      <span className="flex items-center gap-1 whitespace-nowrap">
+                        <PiggyBank className="h-3 w-3" />
+                        из фондов {formatMoney(stats.plannedFromFunds)} ₽
+                      </span>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>
@@ -552,8 +665,8 @@ export default function BudgetPage() {
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-500/10">
-                <PiggyBank className="h-4 w-4 text-violet-500" />
+              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-muted">
+                <PiggyBank className="h-4 w-4 text-muted-foreground" />
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">В фонды</p>
@@ -582,12 +695,12 @@ export default function BudgetPage() {
             <div className="flex items-center gap-3">
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                  stats.availableForPlanning < 0 ? 'bg-destructive/10' : 'bg-violet-500/10'
+                  stats.availableForPlanning < 0 ? 'bg-destructive/10' : 'bg-muted'
                 }`}
               >
                 <Calculator
                   className={`h-4 w-4 ${
-                    stats.availableForPlanning < 0 ? 'text-destructive' : 'text-violet-500'
+                    stats.availableForPlanning < 0 ? 'text-destructive' : 'text-muted-foreground'
                   }`}
                 />
               </div>
@@ -697,7 +810,7 @@ export default function BudgetPage() {
                   year={year}
                   month={month}
                   categories={categories}
-                  funds={funds}
+                  funds={fundsRaw}
                   onAdd={handleAddPlannedExpense}
                   isPending={createPlanned.isPending}
                 />
@@ -717,14 +830,24 @@ export default function BudgetPage() {
               onToggleCategory={handleToggleCategory}
               actualByCategory={actualByCategory}
               onCategoryClick={handleCategoryClick}
+              onEditCategory={(item) => {
+                setEditingItem(item)
+                setEditItemDialogOpen(true)
+              }}
+              fundNames={fundsRaw.reduce((acc, f) => {
+                acc[f.fund.id] = f.fund.name
+                return acc
+              }, {} as Record<string, string>)}
             />
           </div>
 
-          {/* Секция 3: Финансирование из фондов */}
-          <FundFinancingSection
-            funds={fundFinancingData}
-            onUpdate={handleUpdateFundFinancing}
-          />
+          {/* Секция 3: Финансирование из фондов (показываем только если есть планы использования) */}
+          {fundFinancingData.some(f => f.plannedAmount > 0) && (
+            <FundFinancingSection
+              funds={fundFinancingData.filter(f => f.plannedAmount > 0)}
+              onUpdate={handleUpdateFundFinancing}
+            />
+          )}
         </div>
       )}
 
@@ -746,6 +869,15 @@ export default function BudgetPage() {
         income={receivingIncome}
         onSubmit={handleConfirmReceiveIncome}
         isPending={createIncomeAndReceive.isPending}
+      />
+
+      {/* Budget Item Dialog (настройки категории) */}
+      <BudgetItemDialog
+        item={editingItem}
+        open={editItemDialogOpen}
+        onOpenChange={setEditItemDialogOpen}
+        onSave={handleSaveItem}
+        isPending={upsertItem.isPending}
       />
 
       {/* Floating Budget Balance */}
