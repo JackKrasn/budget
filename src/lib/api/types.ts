@@ -1052,3 +1052,96 @@ export interface ConfirmDistributionRequest {
   actualAmount: number
   allocations: DistributionAllocation[]
 }
+
+// === Deposits (Банковские вклады) ===
+
+export type AccrualPeriod = 'monthly' | 'quarterly' | 'annually' | 'at_maturity'
+export type DepositStatus = 'active' | 'matured' | 'closed_early'
+
+// Go time format can be string or { Time: string; Valid: boolean }
+export type NullableDate = ISODate | { Time: string; Valid: boolean } | null
+
+export interface Deposit {
+  id: UUID
+  assetId: UUID
+  assetName: string
+  currency: string
+  principalAmount: number
+  currentAmount: number
+  interestRate: number
+  termMonths: number
+  accrualPeriod: AccrualPeriod
+  hasCapitalization: boolean
+  startDate: NullableDate
+  maturityDate: NullableDate
+  nextAccrualDate?: NullableDate
+  status: DepositStatus
+  fundId?: UUID
+  fundName?: string
+  totalInterest: number
+  projectedYield: number
+  daysRemaining: number
+  notes?: string
+  createdAt: NullableDate
+}
+
+export interface CreateDepositRequest {
+  name: string
+  fundId: string
+  currency: string
+  principalAmount: number
+  interestRate: number
+  termMonths: number
+  accrualPeriod: AccrualPeriod
+  hasCapitalization: boolean
+  startDate: string
+  notes?: string
+}
+
+export interface UpdateDepositRequest {
+  notes?: string
+}
+
+export interface DepositAccrual {
+  id: UUID
+  depositId: UUID
+  accrualDate: NullableDate
+  periodStart: NullableDate
+  periodEnd: NullableDate
+  principalAtStart: number
+  interestAccrued: number
+  principalAtEnd: number
+  accrualType: 'regular' | 'early_closure' | 'maturity'
+  isCapitalized: boolean
+  notes?: string
+  createdAt: NullableDate
+}
+
+export interface DepositsSummary {
+  totalDeposits: number
+  totalPrincipal: number
+  totalCurrentValue: number
+  totalInterestEarned: number
+}
+
+export interface DepositsListResponse {
+  data: Deposit[]
+  total: number
+  summary?: DepositsSummary
+}
+
+export interface DepositsListParams {
+  status?: DepositStatus
+  fundId?: string
+  [key: string]: string | number | boolean | undefined
+}
+
+export interface DepositAccrualsResponse {
+  data: DepositAccrual[]
+  total: number
+}
+
+export interface MaturingDepositsParams {
+  days?: number
+  [key: string]: string | number | boolean | undefined
+}

@@ -18,6 +18,7 @@ import {
   ArrowUpDown,
   Landmark,
   PieChart,
+  PiggyBank,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import {
@@ -65,6 +66,7 @@ const navGroups = [
     items: [
       { title: 'Счета', icon: Building2, href: '/accounts' },
       { title: 'Фонды', icon: Wallet, href: '/funds' },
+      { title: 'Депозиты', icon: PiggyBank, href: '/deposits' },
       { title: 'Активы', icon: TrendingUp, href: '/assets' },
       { title: 'Кредиты', icon: CreditCard, href: '/credits' },
     ],
