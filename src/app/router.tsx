@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppLayout } from '@/components/layout/app-layout'
 import DashboardPage from '@/pages/dashboard/page'
 import BudgetPage from '@/pages/budget/page'
@@ -11,7 +11,6 @@ import IncomesPage from '@/pages/incomes/page'
 import IncomeDetailsPage from '@/pages/incomes/[id]/page'
 import CreditsPage from '@/pages/credits/page'
 import CreditDetailsPage from '@/pages/credits/[id]/page'
-import DepositsPage from '@/pages/deposits/page'
 import DepositDetailsPage from '@/pages/deposits/[id]/page'
 import CategoriesPage from '@/pages/categories/page'
 import AnalyticsPage from '@/pages/analytics/page'
@@ -60,7 +59,7 @@ export const router = createBrowserRouter([
       },
       {
         path: 'deposits',
-        element: <DepositsPage />,
+        element: <Navigate to="/assets" replace />,
       },
       {
         path: 'deposits/:id',
