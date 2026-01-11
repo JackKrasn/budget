@@ -14,6 +14,8 @@ interface DistributionSummarySectionProps {
   summary?: DistributionSummary
   fundDistributions?: FundDistributionSummary[]
   totalIncome?: number // Общая сумма ожидаемых (запланированных) доходов
+  /** Скрыть обёртку и заголовок (когда используется внутри CollapsibleSection) */
+  hideWrapper?: boolean
 }
 
 function formatMoney(amount: number): string {
@@ -27,6 +29,7 @@ export function DistributionSummarySection({
   summary,
   fundDistributions,
   totalIncome = 0,
+  hideWrapper,
 }: DistributionSummarySectionProps) {
   const navigate = useNavigate()
   const [editDialogOpen, setEditDialogOpen] = useState(false)
@@ -41,28 +44,8 @@ export function DistributionSummarySection({
 
   const isPositiveDiff = summary.distributionDifference >= 0
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.15 }}
-      className="space-y-4"
-    >
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold flex items-center gap-2">
-          <PiggyBank className="h-5 w-5 text-violet-500" />
-          Распределение по фондам
-        </h2>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setEditDialogOpen(true)}
-        >
-          <Settings className="mr-2 h-4 w-4" />
-          Настроить
-        </Button>
-      </div>
-
+  const content = (
+    <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Expected Distribution */}
@@ -260,6 +243,36 @@ export function DistributionSummarySection({
         fundDistributions={fundDistributions || []}
         totalIncome={totalIncome}
       />
+    </div>
+  )
+
+  if (hideWrapper) {
+    return <div>{content}</div>
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.15 }}
+      className="space-y-4"
+    >
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold flex items-center gap-2">
+          <PiggyBank className="h-5 w-5 text-violet-500" />
+          Распределение по фондам
+        </h2>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setEditDialogOpen(true)}
+        >
+          <Settings className="mr-2 h-4 w-4" />
+          Настроить
+        </Button>
+      </div>
+
+      {content}
     </motion.div>
   )
 }

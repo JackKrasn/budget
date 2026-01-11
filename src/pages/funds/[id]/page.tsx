@@ -440,12 +440,25 @@ export default function FundDetailsPage() {
                           </p>
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold tabular-nums">
-                            {formatMoney(asset.amount)} {asset.asset.currency}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            ≈ {formatMoney(asset.valueRub)} ₽
-                          </p>
+                          {asset.asset.typeCode === 'currency' ? (
+                            <>
+                              <p className="font-semibold tabular-nums">
+                                {formatMoney(asset.amount)} {asset.asset.currency}
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                ≈ {formatMoney(asset.valueRub)} ₽
+                              </p>
+                            </>
+                          ) : (
+                            <>
+                              <p className="font-semibold tabular-nums">
+                                {formatMoney(asset.valueRub)} ₽
+                              </p>
+                              <p className="text-sm text-muted-foreground">
+                                {asset.amount} шт. × {formatMoney(asset.amount > 0 ? asset.valueRub / asset.amount : 0)} ₽
+                              </p>
+                            </>
+                          )}
                         </div>
                       </motion.div>
                     ))}

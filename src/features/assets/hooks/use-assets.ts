@@ -49,8 +49,10 @@ export function useCreateAsset() {
 
   return useMutation({
     mutationFn: (data: CreateAssetRequest) => assetsApi.create(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: assetKeys.lists() })
+    onSuccess: async () => {
+      // Используем refetchQueries вместо invalidateQueries чтобы дождаться загрузки данных
+      // Это гарантирует, что новый актив отобразится с корректными данными типа
+      await queryClient.refetchQueries({ queryKey: assetKeys.lists() })
       toast.success('Актив создан')
     },
     onError: (error) => {

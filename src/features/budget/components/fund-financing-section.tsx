@@ -37,6 +37,8 @@ interface FundFinancingSectionProps {
   onUpdate: (fundId: string, plannedAmount: number) => Promise<void>
   onAddFund?: () => void
   isPending?: boolean
+  /** Скрыть обёртку Card (когда используется внутри CollapsibleSection) */
+  hideWrapper?: boolean
 }
 
 export function FundFinancingSection({
@@ -44,6 +46,7 @@ export function FundFinancingSection({
   onUpdate,
   onAddFund,
   isPending,
+  hideWrapper,
 }: FundFinancingSectionProps) {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editValue, setEditValue] = useState('')
@@ -90,7 +93,25 @@ export function FundFinancingSection({
     }
   }
 
+  // Empty state content
+  const emptyContent = (
+    <div className="flex h-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30">
+      <p className="text-sm text-muted-foreground">
+        Нет доступных фондов для финансирования
+      </p>
+      {onAddFund && (
+        <Button variant="outline" size="sm" onClick={onAddFund}>
+          <Plus className="mr-2 h-4 w-4" />
+          Добавить фонд
+        </Button>
+      )}
+    </div>
+  )
+
   if (funds.length === 0) {
+    if (hideWrapper) {
+      return <div>{emptyContent}</div>
+    }
     return (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -105,21 +126,249 @@ export function FundFinancingSection({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="flex h-24 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30">
-              <p className="text-sm text-muted-foreground">
-                Нет доступных фондов для финансирования
-              </p>
-              {onAddFund && (
-                <Button variant="outline" size="sm" onClick={onAddFund}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Добавить фонд
-                </Button>
-              )}
-            </div>
+            {emptyContent}
           </CardContent>
         </Card>
       </motion.div>
     )
+  }
+
+  const tableContent = (
+    <Table>
+      <TableHeader>
+        <TableRow className="hover:bg-transparent">
+          <TableHead className="w-[200px]">Фонд</TableHead>
+          <TableHead className="w-[120px] text-right">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 cursor-help">
+                  Доступно
+                  <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[200px]">
+                <p>Текущий баланс фонда — сколько денег есть в фонде прямо сейчас</p>
+              </TooltipContent>
+            </Tooltip>
+          </TableHead>
+          <TableHead className="w-[120px] text-right">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 cursor-help">
+                  План
+                  <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[200px]">
+                <p>Сколько планируете потратить из этого фонда в этом месяце</p>
+              </TooltipContent>
+            </Tooltip>
+          </TableHead>
+          <TableHead className="w-[120px] text-right">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 cursor-help">
+                  После плана
+                  <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[200px]">
+                <p>Сколько останется в фонде после выполнения плана (Доступно − План)</p>
+              </TooltipContent>
+            </Tooltip>
+          </TableHead>
+          <TableHead className="w-[120px] text-right">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 cursor-help">
+                  Использовано
+                  <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[200px]">
+                <p>Сколько уже фактически потрачено из фонда в этом месяце</p>
+              </TooltipContent>
+            </Tooltip>
+          </TableHead>
+          <TableHead className="w-[120px] text-right">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="inline-flex items-center gap-1 cursor-help">
+                  Остаток
+                  <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[200px]">
+                <p>Сколько ещё можно потратить в рамках плана (План − Использовано)</p>
+              </TooltipContent>
+            </Tooltip>
+          </TableHead>
+          <TableHead className="w-[50px]"></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {funds.map((fund) => {
+          const isEditing = editingId === fund.fundId
+          const remaining = fund.plannedAmount - fund.usedAmount
+          const isOverused = remaining < 0
+          const remainingInFund = fund.availableAmount - fund.plannedAmount
+          const isOverPlanned = remainingInFund < 0
+
+          return (
+            <TableRow key={fund.fundId} className="group">
+              <TableCell>
+                <div className="flex items-center gap-3">
+                  <FundIcon
+                    name={fund.fundName}
+                    iconName={fund.fundIcon}
+                    color={fund.fundColor}
+                    size="md"
+                  />
+                  <span className="font-medium">{fund.fundName}</span>
+                </div>
+              </TableCell>
+
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {formatMoney(fund.availableAmount)} ₽
+              </TableCell>
+
+              <TableCell className="text-right">
+                {isEditing ? (
+                  <Input
+                    type="number"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onKeyDown={(e) => handleKeyDown(e, fund.fundId)}
+                    className="h-8 w-24 text-right ml-auto"
+                    autoFocus
+                  />
+                ) : (
+                  <span
+                    className={cn(
+                      'tabular-nums',
+                      fund.plannedAmount === 0 && 'text-muted-foreground'
+                    )}
+                  >
+                    {formatMoney(fund.plannedAmount)} ₽
+                  </span>
+                )}
+              </TableCell>
+
+              <TableCell className="text-right">
+                <span
+                  className={cn(
+                    'tabular-nums',
+                    isOverPlanned
+                      ? 'text-destructive font-medium'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {formatMoney(remainingInFund)} ₽
+                </span>
+              </TableCell>
+
+              <TableCell className="text-right tabular-nums">
+                {formatMoney(fund.usedAmount)} ₽
+              </TableCell>
+
+              <TableCell className="text-right">
+                <span
+                  className={cn(
+                    'tabular-nums font-medium',
+                    isOverused
+                      ? 'text-destructive'
+                      : remaining > 0
+                        ? 'text-emerald-500'
+                        : 'text-muted-foreground'
+                  )}
+                >
+                  {remaining > 0 ? '+' : ''}
+                  {formatMoney(remaining)} ₽
+                </span>
+              </TableCell>
+
+              <TableCell>
+                {isEditing ? (
+                  <div className="flex gap-1">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={() => handleSave(fund.fundId)}
+                      disabled={isPending}
+                    >
+                      <Check className="h-4 w-4 text-emerald-500" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7"
+                      onClick={handleCancel}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={() =>
+                      handleStartEdit(fund.fundId, fund.plannedAmount)
+                    }
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+      <TableFooter>
+        <TableRow className="bg-muted/50 font-semibold">
+          <TableCell>Итого из фондов</TableCell>
+          <TableCell className="text-right tabular-nums text-muted-foreground">
+            {formatMoney(totals.available)} ₽
+          </TableCell>
+          <TableCell className="text-right tabular-nums">
+            {formatMoney(totals.planned)} ₽
+          </TableCell>
+          <TableCell className="text-right">
+            <span
+              className={cn(
+                'tabular-nums',
+                totals.remainingInFund < 0
+                  ? 'text-destructive'
+                  : 'text-muted-foreground'
+              )}
+            >
+              {formatMoney(totals.remainingInFund)} ₽
+            </span>
+          </TableCell>
+          <TableCell className="text-right tabular-nums">
+            {formatMoney(totals.used)} ₽
+          </TableCell>
+          <TableCell className="text-right">
+            <span
+              className={cn(
+                'tabular-nums',
+                totals.planned - totals.used < 0
+                  ? 'text-destructive'
+                  : 'text-emerald-500'
+              )}
+            >
+              {formatMoney(totals.planned - totals.used)} ₽
+            </span>
+          </TableCell>
+          <TableCell></TableCell>
+        </TableRow>
+      </TableFooter>
+    </Table>
+  )
+
+  if (hideWrapper) {
+    return <div>{tableContent}</div>
   }
 
   return (
@@ -138,237 +387,7 @@ export function FundFinancingSection({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-[200px]">Фонд</TableHead>
-                <TableHead className="w-[120px] text-right">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-1 cursor-help">
-                        Доступно
-                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p>Текущий баланс фонда — сколько денег есть в фонде прямо сейчас</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableHead>
-                <TableHead className="w-[120px] text-right">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-1 cursor-help">
-                        План
-                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p>Сколько планируете потратить из этого фонда в этом месяце</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableHead>
-                <TableHead className="w-[120px] text-right">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-1 cursor-help">
-                        После плана
-                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p>Сколько останется в фонде после выполнения плана (Доступно − План)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableHead>
-                <TableHead className="w-[120px] text-right">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-1 cursor-help">
-                        Использовано
-                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p>Сколько уже фактически потрачено из фонда в этом месяце</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableHead>
-                <TableHead className="w-[120px] text-right">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span className="inline-flex items-center gap-1 cursor-help">
-                        Остаток
-                        <HelpCircle className="h-3 w-3 text-muted-foreground/50" />
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="max-w-[200px]">
-                      <p>Сколько ещё можно потратить в рамках плана (План − Использовано)</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TableHead>
-                <TableHead className="w-[50px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {funds.map((fund) => {
-                const isEditing = editingId === fund.fundId
-                const remaining = fund.plannedAmount - fund.usedAmount
-                const isOverused = remaining < 0
-                const remainingInFund = fund.availableAmount - fund.plannedAmount
-                const isOverPlanned = remainingInFund < 0
-
-                return (
-                  <TableRow key={fund.fundId} className="group">
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <FundIcon
-                          name={fund.fundName}
-                          iconName={fund.fundIcon}
-                          color={fund.fundColor}
-                          size="md"
-                        />
-                        <span className="font-medium">{fund.fundName}</span>
-                      </div>
-                    </TableCell>
-
-                    <TableCell className="text-right tabular-nums text-muted-foreground">
-                      {formatMoney(fund.availableAmount)} ₽
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      {isEditing ? (
-                        <Input
-                          type="number"
-                          value={editValue}
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => handleKeyDown(e, fund.fundId)}
-                          className="h-8 w-24 text-right ml-auto"
-                          autoFocus
-                        />
-                      ) : (
-                        <span
-                          className={cn(
-                            'tabular-nums',
-                            fund.plannedAmount === 0 && 'text-muted-foreground'
-                          )}
-                        >
-                          {formatMoney(fund.plannedAmount)} ₽
-                        </span>
-                      )}
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      <span
-                        className={cn(
-                          'tabular-nums',
-                          isOverPlanned
-                            ? 'text-destructive font-medium'
-                            : 'text-muted-foreground'
-                        )}
-                      >
-                        {formatMoney(remainingInFund)} ₽
-                      </span>
-                    </TableCell>
-
-                    <TableCell className="text-right tabular-nums">
-                      {formatMoney(fund.usedAmount)} ₽
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      <span
-                        className={cn(
-                          'tabular-nums font-medium',
-                          isOverused
-                            ? 'text-destructive'
-                            : remaining > 0
-                              ? 'text-emerald-500'
-                              : 'text-muted-foreground'
-                        )}
-                      >
-                        {remaining > 0 ? '+' : ''}
-                        {formatMoney(remaining)} ₽
-                      </span>
-                    </TableCell>
-
-                    <TableCell>
-                      {isEditing ? (
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={() => handleSave(fund.fundId)}
-                            disabled={isPending}
-                          >
-                            <Check className="h-4 w-4 text-emerald-500" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                            onClick={handleCancel}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      ) : (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={() =>
-                            handleStartEdit(fund.fundId, fund.plannedAmount)
-                          }
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                )
-              })}
-            </TableBody>
-            <TableFooter>
-              <TableRow className="bg-muted/50 font-semibold">
-                <TableCell>Итого из фондов</TableCell>
-                <TableCell className="text-right tabular-nums text-muted-foreground">
-                  {formatMoney(totals.available)} ₽
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatMoney(totals.planned)} ₽
-                </TableCell>
-                <TableCell className="text-right">
-                  <span
-                    className={cn(
-                      'tabular-nums',
-                      totals.remainingInFund < 0
-                        ? 'text-destructive'
-                        : 'text-muted-foreground'
-                    )}
-                  >
-                    {formatMoney(totals.remainingInFund)} ₽
-                  </span>
-                </TableCell>
-                <TableCell className="text-right tabular-nums">
-                  {formatMoney(totals.used)} ₽
-                </TableCell>
-                <TableCell className="text-right">
-                  <span
-                    className={cn(
-                      'tabular-nums',
-                      totals.planned - totals.used < 0
-                        ? 'text-destructive'
-                        : 'text-emerald-500'
-                    )}
-                  >
-                    {formatMoney(totals.planned - totals.used)} ₽
-                  </span>
-                </TableCell>
-                <TableCell></TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
+          {tableContent}
         </CardContent>
       </Card>
     </motion.div>

@@ -13,9 +13,14 @@ import {
   PiggyBank,
   Calculator,
   LayoutGrid,
+  TrendingUp,
+  Receipt,
+  LayoutList,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { CollapsibleSection } from '@/components/ui/collapsible-section'
 import { toast } from 'sonner'
 import {
   useBudgetByMonth,
@@ -776,34 +781,65 @@ export default function BudgetPage() {
 
       {/* Content */}
       {!isLoading && !error && (
-        <div className="space-y-6">
+        <div className="space-y-4">
           {/* Секция 0: Ожидаемые доходы */}
-          <PlannedIncomesSection
-            incomes={plannedIncomes}
-            onReceive={handleReceivePlannedIncome}
-            onSkip={handleSkipPlannedIncome}
-            onGenerate={handleGeneratePlannedIncomes}
-            isGenerating={generatePlannedIncomes.isPending || createBudget.isPending}
-            isPending={createIncomeAndReceive.isPending || skipPlannedIncome.isPending}
-          />
+          <CollapsibleSection
+            id="planned-incomes"
+            title="Ожидаемые доходы"
+            icon={<TrendingUp className="h-4 w-4 text-emerald-500" />}
+            badge={
+              plannedIncomes.length > 0 && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {plannedIncomes.filter((i) => i.status === 'pending').length} ожидают
+                </Badge>
+              )
+            }
+          >
+            <PlannedIncomesSection
+              incomes={plannedIncomes}
+              onReceive={handleReceivePlannedIncome}
+              onSkip={handleSkipPlannedIncome}
+              onGenerate={handleGeneratePlannedIncomes}
+              isGenerating={generatePlannedIncomes.isPending || createBudget.isPending}
+              isPending={createIncomeAndReceive.isPending || skipPlannedIncome.isPending}
+              hideWrapper
+            />
+          </CollapsibleSection>
 
           {/* Секция 0.5: Распределение по фондам */}
-          <DistributionSummarySection
-            summary={budget?.distributionSummary}
-            fundDistributions={budget?.fundDistributions}
-            totalIncome={stats.expectedIncome}
-          />
+          <CollapsibleSection
+            id="fund-distributions"
+            title="Распределение по фондам"
+            icon={<PiggyBank className="h-4 w-4 text-primary" />}
+            badge={
+              stats.expectedFundDistributions > 0 && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {formatMoney(stats.expectedFundDistributions)} ₽
+                </Badge>
+              )
+            }
+          >
+            <DistributionSummarySection
+              summary={budget?.distributionSummary}
+              fundDistributions={budget?.fundDistributions}
+              totalIncome={stats.expectedIncome}
+              hideWrapper
+            />
+          </CollapsibleSection>
 
-          {/* Секция 1: Обязательные расходы */}
-          <PlannedExpensesSection
-            expenses={plannedExpenses}
-            accounts={accounts}
-            onConfirm={handleConfirmPlanned}
-            onSkip={handleSkipPlanned}
-            onGenerate={handleGeneratePlanned}
-            isGenerating={generatePlanned.isPending || createBudget.isPending}
-            isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending}
-            addButton={
+          {/* Секция 1: Запланированные расходы */}
+          <CollapsibleSection
+            id="planned-expenses"
+            title="Запланированные расходы"
+            icon={<Receipt className="h-4 w-4 text-orange-500" />}
+            badge={
+              plannedExpenses.length > 0 && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {plannedExpenses.filter((e) => e.status === 'pending').length} ожидают
+                </Badge>
+              )
+            }
+            headerAction={
               budget?.id && (
                 <AddPlannedExpenseDialog
                   budgetId={budget.id}
@@ -816,11 +852,32 @@ export default function BudgetPage() {
                 />
               )
             }
-          />
+          >
+            <PlannedExpensesSection
+              expenses={plannedExpenses}
+              accounts={accounts}
+              onConfirm={handleConfirmPlanned}
+              onSkip={handleSkipPlanned}
+              onGenerate={handleGeneratePlanned}
+              isGenerating={generatePlanned.isPending || createBudget.isPending}
+              isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending}
+              hideWrapper
+            />
+          </CollapsibleSection>
 
           {/* Секция 2: Таблица категорий */}
-          <div>
-            <h2 className="mb-4 text-lg font-semibold">Расходы по категориям</h2>
+          <CollapsibleSection
+            id="budget-categories"
+            title="Расходы по категориям"
+            icon={<LayoutList className="h-4 w-4 text-primary" />}
+            badge={
+              items.length > 0 && (
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {items.length} категорий
+                </Badge>
+              )
+            }
+          >
             <BudgetTable
               items={items}
               allCategories={categories}
@@ -839,14 +896,26 @@ export default function BudgetPage() {
                 return acc
               }, {} as Record<string, string>)}
             />
-          </div>
+          </CollapsibleSection>
 
           {/* Секция 3: Финансирование из фондов (показываем только если есть планы использования) */}
-          {fundFinancingData.some(f => f.plannedAmount > 0) && (
-            <FundFinancingSection
-              funds={fundFinancingData.filter(f => f.plannedAmount > 0)}
-              onUpdate={handleUpdateFundFinancing}
-            />
+          {fundFinancingData.some((f) => f.plannedAmount > 0) && (
+            <CollapsibleSection
+              id="fund-financing"
+              title="Финансирование из фондов"
+              icon={<Wallet className="h-4 w-4 text-cyan-500" />}
+              badge={
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {formatMoney(stats.totalFromFunds)} ₽
+                </Badge>
+              }
+            >
+              <FundFinancingSection
+                funds={fundFinancingData.filter((f) => f.plannedAmount > 0)}
+                onUpdate={handleUpdateFundFinancing}
+                hideWrapper
+              />
+            </CollapsibleSection>
           )}
         </div>
       )}

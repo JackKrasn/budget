@@ -46,6 +46,8 @@ interface PlannedExpensesSectionProps {
   isPending?: boolean
   /** Слот для кнопки добавления */
   addButton?: React.ReactNode
+  /** Скрыть обёртку Card (когда используется внутри CollapsibleSection) */
+  hideWrapper?: boolean
 }
 
 const STATUS_CONFIG: Record<
@@ -66,6 +68,7 @@ export function PlannedExpensesSection({
   isGenerating,
   isPending,
   addButton,
+  hideWrapper,
 }: PlannedExpensesSectionProps) {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
@@ -178,6 +181,209 @@ export function PlannedExpensesSection({
     fundBreakdown: Object.values(fundBreakdown),
   }
 
+  const content = (
+    <>
+      {expenses.length === 0 ? (
+        <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30">
+          <Calendar className="h-8 w-8 text-muted-foreground/50" />
+          <p className="text-sm text-muted-foreground">
+            Нет запланированных обязательных расходов
+          </p>
+          {onGenerate && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onGenerate}
+              disabled={isGenerating}
+            >
+              Сгенерировать из шаблонов
+            </Button>
+          )}
+        </div>
+      ) : (
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Статья</TableHead>
+              <TableHead className="w-[120px] text-right">Сумма</TableHead>
+              <TableHead className="w-[100px] text-center">Статус</TableHead>
+              <TableHead className="w-[80px]"></TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {sortedExpenses.map((expense) => {
+              const statusConfig = STATUS_CONFIG[expense.status]
+              const StatusIcon = statusConfig.icon
+              const isProcessing = processingId === expense.id
+
+              return (
+                <TableRow
+                  key={expense.id}
+                  className={cn(
+                    'group',
+                    expense.status === 'skipped' && 'opacity-50'
+                  )}
+                >
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <CategoryIcon
+                        code={expense.category_code}
+                        iconName={expense.category_icon}
+                        color={expense.status === 'confirmed' ? '#22c55e' : expense.category_color}
+                        size="md"
+                      />
+                      <div>
+                        <p className="font-medium">{expense.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {expense.category_name}
+                        </p>
+                        {getActualAmount(expense.funded_amount) && expense.fund_name ? (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                            <PiggyBank className="h-3 w-3" />
+                            Из фонда «{expense.fund_name}»: {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} ₽
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    {(() => {
+                      const actualAmount = getActualAmount(expense.actual_amount)
+                      if (expense.status === 'confirmed' && actualAmount != null) {
+                        const savings = expense.planned_amount - actualAmount
+                        return (
+                          <div className="flex flex-col items-end gap-0.5">
+                            <span className="text-emerald-500 font-semibold text-base tabular-nums">
+                              {formatMoney(actualAmount)} ₽
+                            </span>
+                            {savings !== 0 && (
+                              <span
+                                className={cn(
+                                  'text-xs tabular-nums',
+                                  savings > 0 ? 'text-emerald-600' : 'text-destructive'
+                                )}
+                              >
+                                {savings > 0 ? '💰 ' : ''}
+                                {savings > 0 ? '-' : '+'}
+                                {formatMoney(Math.abs(savings))} ₽
+                              </span>
+                            )}
+                          </div>
+                        )
+                      }
+                      return (
+                        <span
+                          className={cn(
+                            'tabular-nums font-semibold text-base',
+                            expense.status === 'skipped'
+                              ? 'text-muted-foreground line-through'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          {formatMoney(expense.planned_amount)} ₽
+                        </span>
+                      )
+                    })()}
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    <div
+                      className={cn(
+                        'inline-flex items-center gap-1 text-xs',
+                        statusConfig.color
+                      )}
+                    >
+                      <StatusIcon className="h-3.5 w-3.5" />
+                      {statusConfig.label}
+                    </div>
+                  </TableCell>
+
+                  <TableCell>
+                    {expense.status === 'pending' && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleOpenConfirmDialog(expense)}
+                          disabled={isPending || isProcessing}
+                          title="Подтвердить оплату"
+                        >
+                          <Check className="h-4 w-4 text-emerald-500" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={() => handleSkip(expense.id)}
+                          disabled={isPending || isProcessing}
+                          title="Пропустить"
+                        >
+                          <X className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+          <TableFooter>
+            <TableRow className="bg-muted/50">
+              <TableCell className="font-semibold text-base">
+                <div>Итого</div>
+                {totals.fromFunds > 0 && (
+                  <div className="font-normal text-xs space-y-0.5 mt-1 text-muted-foreground">
+                    <div>
+                      Из бюджета: <span className="text-foreground">{formatMoney(totals.fromBudget)} ₽</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <PiggyBank className="h-3 w-3" />
+                      Из фондов: {formatMoney(totals.fromFunds)} ₽
+                      {totals.fundBreakdown.length > 0 && (
+                        <span>
+                          ({totals.fundBreakdown.map((fund, idx) => (
+                            <span key={idx}>
+                              {idx > 0 && ', '}
+                              {fund.name}
+                            </span>
+                          ))})
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </TableCell>
+              <TableCell className="text-right tabular-nums font-semibold text-base">
+                {formatMoney(totals.planned)} ₽
+              </TableCell>
+              <TableCell className="text-center">
+                <span className="text-sm text-emerald-500 font-medium">
+                  {formatMoney(totals.confirmed)} ₽ оплачено
+                </span>
+              </TableCell>
+              <TableCell></TableCell>
+            </TableRow>
+          </TableFooter>
+        </Table>
+      )}
+
+      <ConfirmPlannedExpenseDialog
+        expense={selectedExpense}
+        accounts={accounts}
+        open={confirmDialogOpen}
+        onOpenChange={setConfirmDialogOpen}
+        onConfirm={handleConfirm}
+        isPending={isPending}
+      />
+    </>
+  )
+
+  if (hideWrapper) {
+    return <div>{content}</div>
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -217,202 +423,9 @@ export function PlannedExpensesSection({
           </div>
         </CardHeader>
         <CardContent className="pt-0">
-          {expenses.length === 0 ? (
-            <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30">
-              <Calendar className="h-8 w-8 text-muted-foreground/50" />
-              <p className="text-sm text-muted-foreground">
-                Нет запланированных обязательных расходов
-              </p>
-              {onGenerate && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onGenerate}
-                  disabled={isGenerating}
-                >
-                  Сгенерировать из шаблонов
-                </Button>
-              )}
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>Статья</TableHead>
-                  <TableHead className="w-[120px] text-right">Сумма</TableHead>
-                  <TableHead className="w-[100px] text-center">Статус</TableHead>
-                  <TableHead className="w-[80px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {sortedExpenses.map((expense) => {
-                  const statusConfig = STATUS_CONFIG[expense.status]
-                  const StatusIcon = statusConfig.icon
-                  const isProcessing = processingId === expense.id
-
-                  return (
-                    <TableRow
-                      key={expense.id}
-                      className={cn(
-                        'group',
-                        expense.status === 'skipped' && 'opacity-50'
-                      )}
-                    >
-                      <TableCell>
-                        <div className="flex items-center gap-3">
-                          <CategoryIcon
-                            code={expense.category_code}
-                            iconName={expense.category_icon}
-                            color={expense.status === 'confirmed' ? '#22c55e' : expense.category_color}
-                            size="md"
-                          />
-                          <div>
-                            <p className="font-medium">{expense.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {expense.category_name}
-                            </p>
-                            {getActualAmount(expense.funded_amount) && expense.fund_name ? (
-                              <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                                <PiggyBank className="h-3 w-3" />
-                                Из фонда «{expense.fund_name}»: {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} ₽
-                              </p>
-                            ) : null}
-                          </div>
-                        </div>
-                      </TableCell>
-
-                      <TableCell className="text-right">
-                        {(() => {
-                          const actualAmount = getActualAmount(expense.actual_amount)
-                          if (expense.status === 'confirmed' && actualAmount != null) {
-                            const savings = expense.planned_amount - actualAmount
-                            return (
-                              <div className="flex flex-col items-end gap-0.5">
-                                <span className="text-emerald-500 font-semibold text-base tabular-nums">
-                                  {formatMoney(actualAmount)} ₽
-                                </span>
-                                {savings !== 0 && (
-                                  <span
-                                    className={cn(
-                                      'text-xs tabular-nums',
-                                      savings > 0 ? 'text-emerald-600' : 'text-destructive'
-                                    )}
-                                  >
-                                    {savings > 0 ? '💰 ' : ''}
-                                    {savings > 0 ? '-' : '+'}
-                                    {formatMoney(Math.abs(savings))} ₽
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          }
-                          return (
-                            <span
-                              className={cn(
-                                'tabular-nums font-semibold text-base',
-                                expense.status === 'skipped'
-                                  ? 'text-muted-foreground line-through'
-                                  : 'text-muted-foreground'
-                              )}
-                            >
-                              {formatMoney(expense.planned_amount)} ₽
-                            </span>
-                          )
-                        })()}
-                      </TableCell>
-
-                      <TableCell className="text-center">
-                        <div
-                          className={cn(
-                            'inline-flex items-center gap-1 text-xs',
-                            statusConfig.color
-                          )}
-                        >
-                          <StatusIcon className="h-3.5 w-3.5" />
-                          {statusConfig.label}
-                        </div>
-                      </TableCell>
-
-                      <TableCell>
-                        {expense.status === 'pending' && (
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleOpenConfirmDialog(expense)}
-                              disabled={isPending || isProcessing}
-                              title="Подтвердить оплату"
-                            >
-                              <Check className="h-4 w-4 text-emerald-500" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7"
-                              onClick={() => handleSkip(expense.id)}
-                              disabled={isPending || isProcessing}
-                              title="Пропустить"
-                            >
-                              <X className="h-4 w-4 text-muted-foreground" />
-                            </Button>
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-              <TableFooter>
-                <TableRow className="bg-muted/50">
-                  <TableCell className="font-semibold text-base">
-                    <div>Итого</div>
-                    {totals.fromFunds > 0 && (
-                      <div className="font-normal text-xs space-y-0.5 mt-1 text-muted-foreground">
-                        <div>
-                          Из бюджета: <span className="text-foreground">{formatMoney(totals.fromBudget)} ₽</span>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <PiggyBank className="h-3 w-3" />
-                          Из фондов: {formatMoney(totals.fromFunds)} ₽
-                          {totals.fundBreakdown.length > 0 && (
-                            <span>
-                              ({totals.fundBreakdown.map((fund, idx) => (
-                                <span key={idx}>
-                                  {idx > 0 && ', '}
-                                  {fund.name}
-                                </span>
-                              ))})
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums font-semibold text-base">
-                    {formatMoney(totals.planned)} ₽
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <span className="text-sm text-emerald-500 font-medium">
-                      {formatMoney(totals.confirmed)} ₽ оплачено
-                    </span>
-                  </TableCell>
-                  <TableCell></TableCell>
-                </TableRow>
-              </TableFooter>
-            </Table>
-          )}
+          {content}
         </CardContent>
       </Card>
-
-      <ConfirmPlannedExpenseDialog
-        expense={selectedExpense}
-        accounts={accounts}
-        open={confirmDialogOpen}
-        onOpenChange={setConfirmDialogOpen}
-        onConfirm={handleConfirm}
-        isPending={isPending}
-      />
     </motion.div>
   )
 }

@@ -14,6 +14,10 @@ import {
   Banknote,
   FolderOpen,
   Building2,
+  Sparkles,
+  ArrowUpDown,
+  Landmark,
+  PieChart,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import {
@@ -27,60 +31,52 @@ import {
   SidebarProvider,
   SidebarTrigger,
   SidebarInset,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
   useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 
-const navItems = [
+// Навигация с группами
+const navGroups = [
   {
-    title: 'Главная',
-    icon: LayoutDashboard,
-    href: '/',
+    id: 'core',
+    label: 'Основное',
+    icon: Sparkles,
+    items: [
+      { title: 'Главная', icon: LayoutDashboard, href: '/' },
+      { title: 'Бюджет', icon: CalendarRange, href: '/budget' },
+    ],
   },
   {
-    title: 'Бюджет',
-    icon: CalendarRange,
-    href: '/budget',
+    id: 'operations',
+    label: 'Операции',
+    icon: ArrowUpDown,
+    items: [
+      { title: 'Расходы', icon: Receipt, href: '/expenses' },
+      { title: 'Доходы', icon: Banknote, href: '/incomes' },
+    ],
   },
   {
-    title: 'Фонды',
-    icon: Wallet,
-    href: '/funds',
+    id: 'assets',
+    label: 'Активы',
+    icon: Landmark,
+    items: [
+      { title: 'Счета', icon: Building2, href: '/accounts' },
+      { title: 'Фонды', icon: Wallet, href: '/funds' },
+      { title: 'Активы', icon: TrendingUp, href: '/assets' },
+      { title: 'Кредиты', icon: CreditCard, href: '/credits' },
+    ],
   },
   {
-    title: 'Расходы',
-    icon: Receipt,
-    href: '/expenses',
-  },
-  {
-    title: 'Доходы',
-    icon: Banknote,
-    href: '/incomes',
-  },
-  {
-    title: 'Кредиты',
-    icon: CreditCard,
-    href: '/credits',
-  },
-  {
-    title: 'Категории',
-    icon: FolderOpen,
-    href: '/categories',
-  },
-  {
-    title: 'Активы',
-    icon: TrendingUp,
-    href: '/assets',
-  },
-  {
-    title: 'Счета',
-    icon: Building2,
-    href: '/accounts',
-  },
-  {
-    title: 'Аналитика',
-    icon: BarChart3,
-    href: '/analytics',
+    id: 'insights',
+    label: 'Аналитика',
+    icon: PieChart,
+    items: [
+      { title: 'Категории', icon: FolderOpen, href: '/categories' },
+      { title: 'Отчёты', icon: BarChart3, href: '/analytics' },
+    ],
   },
 ]
 
@@ -95,7 +91,6 @@ function Logo({ collapsed }: { collapsed: boolean }) {
 
     checkTheme()
 
-    // Watch for theme changes
     const observer = new MutationObserver(checkTheme)
     observer.observe(document.documentElement, {
       attributes: true,
@@ -106,9 +101,9 @@ function Logo({ collapsed }: { collapsed: boolean }) {
   }, [])
 
   return (
-    <Link to="/" className="flex items-center gap-3 px-2 py-1">
+    <Link to="/" className="flex items-center gap-3 px-1">
       <motion.div
-        className="relative flex h-16 w-16 items-center justify-center rounded-xl overflow-hidden"
+        className="relative flex h-10 w-10 items-center justify-center rounded-xl overflow-hidden"
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
       >
@@ -145,7 +140,7 @@ function NavItem({
   isActive,
   collapsed,
 }: {
-  item: (typeof navItems)[0]
+  item: { title: string; icon: React.ComponentType<{ className?: string }>; href: string }
   isActive: boolean
   collapsed: boolean
 }) {
@@ -158,22 +153,34 @@ function NavItem({
         isActive={isActive}
         tooltip={collapsed ? item.title : undefined}
         className={cn(
-          'relative overflow-hidden transition-all duration-200',
+          'group/item relative overflow-hidden transition-all duration-200 h-9',
           isActive && 'bg-sidebar-accent text-sidebar-accent-foreground'
         )}
       >
         <Link to={item.href}>
           <motion.div
             className="relative z-10 flex items-center gap-3"
-            whileHover={{ x: 2 }}
+            initial={false}
+            whileHover={{ x: collapsed ? 0 : 2 }}
             transition={{ duration: 0.15 }}
           >
-            <Icon
-              className={cn(
-                'h-4 w-4 shrink-0 transition-colors',
-                isActive ? 'text-primary' : 'text-muted-foreground'
+            <div className="relative">
+              <Icon
+                className={cn(
+                  'h-4 w-4 shrink-0 transition-all duration-200',
+                  isActive
+                    ? 'text-primary'
+                    : 'text-muted-foreground group-hover/item:text-foreground'
+                )}
+              />
+              {isActive && (
+                <motion.div
+                  layoutId="nav-glow"
+                  className="absolute -inset-2 rounded-lg bg-primary/10 blur-md"
+                  transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                />
               )}
-            />
+            </div>
             <AnimatePresence mode="wait">
               {!collapsed && (
                 <motion.span
@@ -181,23 +188,88 @@ function NavItem({
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
                   transition={{ duration: 0.15 }}
-                  className="truncate"
+                  className={cn(
+                    'truncate text-[13px] transition-colors duration-200',
+                    isActive ? 'font-medium' : 'font-normal'
+                  )}
                 >
                   {item.title}
                 </motion.span>
               )}
             </AnimatePresence>
           </motion.div>
+
+          {/* Active indicator line */}
           {isActive && (
             <motion.div
               layoutId="activeIndicator"
-              className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary"
+              className="absolute left-0 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary"
               transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             />
           )}
+
+          {/* Hover highlight */}
+          <div className="absolute inset-0 -z-10 bg-gradient-to-r from-transparent via-sidebar-accent/50 to-transparent opacity-0 transition-opacity duration-300 group-hover/item:opacity-100" />
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  )
+}
+
+function NavGroup({
+  group,
+  collapsed,
+  activeHref,
+}: {
+  group: (typeof navGroups)[0]
+  collapsed: boolean
+  activeHref: string
+}) {
+  const GroupIcon = group.icon
+  const hasActiveItem = group.items.some((item) =>
+    item.href === '/' ? activeHref === '/' : activeHref.startsWith(item.href)
+  )
+
+  return (
+    <SidebarGroup className="py-1.5">
+      <AnimatePresence mode="wait">
+        {!collapsed && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <SidebarGroupLabel
+              className={cn(
+                'mb-1 flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors duration-200',
+                hasActiveItem ? 'text-primary' : 'text-muted-foreground/70'
+              )}
+            >
+              <GroupIcon className="h-3 w-3" />
+              {group.label}
+            </SidebarGroupLabel>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <SidebarGroupContent>
+        <SidebarMenu className="gap-0.5">
+          {group.items.map((item) => (
+            <NavItem
+              key={item.href}
+              item={item}
+              isActive={
+                item.href === '/'
+                  ? activeHref === '/'
+                  : activeHref.startsWith(item.href)
+              }
+              collapsed={collapsed}
+            />
+          ))}
+        </SidebarMenu>
+      </SidebarGroupContent>
+    </SidebarGroup>
   )
 }
 
@@ -209,30 +281,60 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="icon" className="border-r-0">
       {/* Subtle gradient overlay */}
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] to-transparent" />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/[0.02] via-transparent to-gold/[0.01]" />
 
-      <SidebarHeader className="relative border-b border-sidebar-border/50 px-4 py-4">
+      {/* Top accent line */}
+      <div className="absolute left-0 right-0 top-0 h-[1px] bg-gradient-to-r from-transparent via-primary/20 to-transparent" />
+
+      <SidebarHeader className="relative border-b border-sidebar-border/30 px-3 py-3">
         <Logo collapsed={collapsed} />
       </SidebarHeader>
 
-      <SidebarContent className="relative px-3 py-4">
-        <SidebarMenu className="gap-1">
-          {navItems.map((item) => (
-            <NavItem
-              key={item.href}
-              item={item}
-              isActive={
-                item.href === '/'
-                  ? location.pathname === '/'
-                  : location.pathname.startsWith(item.href)
-              }
-              collapsed={collapsed}
-            />
+      <SidebarContent className="relative px-2 py-2">
+        {/* Staggered animation container */}
+        <motion.div
+          initial="hidden"
+          animate="visible"
+          variants={{
+            hidden: { opacity: 0 },
+            visible: {
+              opacity: 1,
+              transition: {
+                staggerChildren: 0.05,
+                delayChildren: 0.1,
+              },
+            },
+          }}
+          className="space-y-1"
+        >
+          {navGroups.map((group, groupIndex) => (
+            <motion.div
+              key={group.id}
+              variants={{
+                hidden: { opacity: 0, x: -8 },
+                visible: { opacity: 1, x: 0 },
+              }}
+              transition={{ duration: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+            >
+              <NavGroup
+                group={group}
+                collapsed={collapsed}
+                activeHref={location.pathname}
+              />
+
+              {/* Separator between groups (except last) */}
+              {groupIndex < navGroups.length - 1 && !collapsed && (
+                <div className="mx-2 my-2 h-[1px] bg-gradient-to-r from-transparent via-sidebar-border/50 to-transparent" />
+              )}
+            </motion.div>
           ))}
-        </SidebarMenu>
+        </motion.div>
       </SidebarContent>
 
-      <SidebarFooter className="relative border-t border-sidebar-border/50 px-3 py-3">
+      <SidebarFooter className="relative border-t border-sidebar-border/30 px-2 py-2">
+        {/* Bottom accent */}
+        <div className="absolute bottom-full left-0 right-0 h-8 bg-gradient-to-t from-sidebar to-transparent pointer-events-none" />
+
         <SidebarMenu>
           <NavItem
             item={{
@@ -244,6 +346,22 @@ function AppSidebar() {
             collapsed={collapsed}
           />
         </SidebarMenu>
+
+        {/* Version badge */}
+        <AnimatePresence>
+          {!collapsed && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="mt-2 flex items-center justify-center"
+            >
+              <span className="text-[9px] font-medium tracking-wider text-muted-foreground/40">
+                v1.0.0 BETA
+              </span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </SidebarFooter>
     </Sidebar>
   )
