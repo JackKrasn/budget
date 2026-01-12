@@ -586,6 +586,7 @@ export interface ExpensesListParams {
   to?: string
   categoryId?: string
   accountId?: string
+  tagId?: string
   [key: string]: string | number | boolean | undefined
 }
 

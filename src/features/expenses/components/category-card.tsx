@@ -1,43 +1,13 @@
 import { motion } from 'framer-motion'
 import {
-  Wallet,
-  ShoppingCart,
-  Home,
-  Car,
-  Utensils,
-  Plane,
-  Heart,
-  Gift,
-  GraduationCap,
-  Smartphone,
-  Zap,
-  Coffee,
-  Film,
-  ShoppingBag,
   TrendingUp,
   TrendingDown,
   Minus,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { CategoryIcon } from '@/components/common/category-icon'
 import { cn } from '@/lib/utils'
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  food: Utensils,
-  transport: Car,
-  housing: Home,
-  utilities: Zap,
-  health: Heart,
-  education: GraduationCap,
-  entertainment: Film,
-  shopping: ShoppingBag,
-  travel: Plane,
-  gifts: Gift,
-  phone: Smartphone,
-  coffee: Coffee,
-  groceries: ShoppingCart,
-  default: Wallet,
-}
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -62,7 +32,6 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category, onClick }: CategoryCardProps) {
-  const Icon = CATEGORY_ICONS[category.categoryCode] || CATEGORY_ICONS.default
   const progress =
     category.plannedAmount > 0
       ? Math.min((category.actualAmount / category.plannedAmount) * 100, 100)
@@ -101,13 +70,13 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
         <CardContent className="relative p-5">
           <div className="flex items-start justify-between gap-3">
             {/* Icon */}
-            <div
-              className="flex h-12 w-12 items-center justify-center rounded-xl transition-transform group-hover:scale-110"
-              style={{ backgroundColor: `${category.categoryColor}20` }}
-            >
-              <Icon
-                className="h-6 w-6"
-                style={{ color: category.categoryColor }}
+            <div className="transition-transform group-hover:scale-110">
+              <CategoryIcon
+                code={category.categoryCode}
+                iconName={category.categoryIcon}
+                color={category.categoryColor}
+                size="lg"
+                className="h-12 w-12 rounded-xl"
               />
             </div>
 

@@ -14,7 +14,7 @@ import {
   Banknote,
   FolderOpen,
   Building2,
-  Sparkles,
+  Home,
   ArrowUpDown,
   Landmark,
   PieChart,
@@ -43,7 +43,7 @@ const navGroups = [
   {
     id: 'core',
     label: 'Основное',
-    icon: Sparkles,
+    icon: Home,
     items: [
       { title: 'Главная', icon: LayoutDashboard, href: '/' },
       { title: 'Бюджет', icon: CalendarRange, href: '/budget' },
@@ -226,9 +226,6 @@ function NavGroup({
   activeHref: string
 }) {
   const GroupIcon = group.icon
-  const hasActiveItem = group.items.some((item) =>
-    item.href === '/' ? activeHref === '/' : activeHref.startsWith(item.href)
-  )
 
   return (
     <SidebarGroup className="py-1.5">
@@ -241,10 +238,7 @@ function NavGroup({
             transition={{ duration: 0.2 }}
           >
             <SidebarGroupLabel
-              className={cn(
-                'mb-1 flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] transition-colors duration-200',
-                hasActiveItem ? 'text-primary' : 'text-muted-foreground/70'
-              )}
+              className="mb-1 flex items-center gap-2 px-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground/70"
             >
               <GroupIcon className="h-3 w-3" />
               {group.label}

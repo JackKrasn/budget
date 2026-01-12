@@ -12,6 +12,7 @@ import {
   List,
   ChevronLeft,
   Target,
+  Tag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -20,14 +21,18 @@ import { Progress } from '@/components/ui/progress'
 import {
   useExpenses,
   useExpenseCategories,
+  useExpenseTags,
   useDeleteExpense,
   ExpenseRow,
   CreateExpenseDialog,
   EditExpenseDialog,
   AccountFilter,
   CategoryFilter,
+  TagFilter,
   CategoryGrid,
+  TagGrid,
   type CategorySummary,
+  type TagSummary,
 } from '@/features/expenses'
 import type { ExpenseListRow } from '@/lib/api/types'
 import { useCurrentBudget } from '@/features/budget'
@@ -61,13 +66,15 @@ const SELECTED_ACCOUNT_KEY = 'budget-selected-account-id'
 export default function ExpensesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const categoryFromUrl = searchParams.get('category')
+  const tagFromUrl = searchParams.get('tag')
 
-  const [viewMode, setViewMode] = useState<'categories' | 'list'>(
-    categoryFromUrl ? 'list' : 'categories'
+  const [viewMode, setViewMode] = useState<'categories' | 'tags' | 'list'>(
+    categoryFromUrl || tagFromUrl ? 'list' : 'categories'
   )
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     categoryFromUrl
   )
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(tagFromUrl)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(() => {
     // Load from localStorage on mount
     const saved = localStorage.getItem(SELECTED_ACCOUNT_KEY)
@@ -76,14 +83,17 @@ export default function ExpensesPage() {
   const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
-  // Синхронизация URL с фильтром категории
+  // Синхронизация URL с фильтрами
   useEffect(() => {
+    const params: Record<string, string> = {}
     if (selectedCategoryId) {
-      setSearchParams({ category: selectedCategoryId })
-    } else {
-      setSearchParams({})
+      params.category = selectedCategoryId
     }
-  }, [selectedCategoryId, setSearchParams])
+    if (selectedTagId) {
+      params.tag = selectedTagId
+    }
+    setSearchParams(params)
+  }, [selectedCategoryId, selectedTagId, setSearchParams])
 
   // Save selected account to localStorage
   useEffect(() => {
@@ -114,8 +124,10 @@ export default function ExpensesPage() {
     to: dateRange.to.toISOString().split('T')[0],
     categoryId: selectedCategoryId || undefined,
     accountId: selectedAccountId || undefined,
+    tagId: selectedTagId || undefined,
   })
   const { data: categoriesData } = useExpenseCategories()
+  const { data: tagsData } = useExpenseTags()
   const { data: accountsData } = useAccounts()
   const { data: currentBudget, isLoading: isBudgetLoading } = useCurrentBudget()
   const deleteExpense = useDeleteExpense()
@@ -123,6 +135,7 @@ export default function ExpensesPage() {
   const expenses = expensesData?.data ?? []
   const summary = expensesData?.summary
   const categories = categoriesData?.data ?? []
+  const tags = tagsData?.data ?? []
   const accounts = accountsData?.data ?? []
   const budgetItems = currentBudget?.items ?? []
 
@@ -168,6 +181,31 @@ export default function ExpensesPage() {
 
     return Object.values(summariesMap)
   }, [expenses, budgetItems, categories])
+
+  // Aggregate expenses by tag
+  const tagSummaries = useMemo<TagSummary[]>(() => {
+    const summariesMap: Record<string, TagSummary> = {}
+
+    expenses.forEach((expense) => {
+      if (expense.tags && expense.tags.length > 0) {
+        expense.tags.forEach((tag) => {
+          if (!summariesMap[tag.id]) {
+            summariesMap[tag.id] = {
+              tagId: tag.id,
+              tagName: tag.name,
+              tagColor: tag.color,
+              totalAmount: 0,
+              expenseCount: 0,
+            }
+          }
+          summariesMap[tag.id].totalAmount += expense.amount
+          summariesMap[tag.id].expenseCount += 1
+        })
+      }
+    })
+
+    return Object.values(summariesMap)
+  }, [expenses])
 
   // Group expenses by date for list view
   // Фильтрация уже применена в expenses через selectedCategoryIds
@@ -215,17 +253,34 @@ export default function ExpensesPage() {
 
   const handleCategoryClick = (categoryId: string) => {
     setSelectedCategoryId(categoryId)
+    setSelectedTagId(null)
+    setViewMode('list')
+  }
+
+  const handleTagClick = (tagId: string) => {
+    setSelectedTagId(tagId)
+    setSelectedCategoryId(null)
     setViewMode('list')
   }
 
   const handleBackToCategories = () => {
     setSelectedCategoryId(null)
+    setSelectedTagId(null)
     setViewMode('categories')
   }
 
-  // Получить название выбранной категории для заголовка
+  const handleBackToTags = () => {
+    setSelectedTagId(null)
+    setSelectedCategoryId(null)
+    setViewMode('tags')
+  }
+
+  // Получить название выбранной категории/тега для заголовка
   const selectedCategory = selectedCategoryId
     ? categories.find((c) => c.id === selectedCategoryId)
+    : null
+  const selectedTag = selectedTagId
+    ? tags.find((t) => t.id === selectedTagId)
     : null
 
   // Calculate total planned and progress
@@ -270,11 +325,11 @@ export default function ExpensesPage() {
         className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex items-center gap-3">
-          {selectedCategoryId && (
+          {(selectedCategoryId || selectedTagId) && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={handleBackToCategories}
+              onClick={selectedTagId ? handleBackToTags : handleBackToCategories}
               className="shrink-0"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -282,7 +337,11 @@ export default function ExpensesPage() {
           )}
           <div>
             <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              {selectedCategory ? selectedCategory.name : 'Расходы'}
+              {selectedCategory
+                ? selectedCategory.name
+                : selectedTag
+                  ? selectedTag.name
+                  : 'Расходы'}
             </h1>
             <p className="mt-1 text-muted-foreground capitalize">
               {currentMonthName}
@@ -429,6 +488,22 @@ export default function ExpensesPage() {
               selectedId={selectedCategoryId}
               onSelect={(id) => {
                 setSelectedCategoryId(id)
+                setSelectedTagId(null)
+                if (id) {
+                  setViewMode('list')
+                }
+              }}
+            />
+          )}
+
+          {/* Tag Filter */}
+          {tags.length > 0 && (
+            <TagFilter
+              tags={tags}
+              selectedId={selectedTagId}
+              onSelect={(id) => {
+                setSelectedTagId(id)
+                setSelectedCategoryId(null)
                 if (id) {
                   setViewMode('list')
                 }
@@ -451,9 +526,14 @@ export default function ExpensesPage() {
           <Tabs
             value={viewMode}
             onValueChange={(v) => {
-              setViewMode(v as 'categories' | 'list')
+              setViewMode(v as 'categories' | 'tags' | 'list')
               if (v === 'categories') {
                 setSelectedCategoryId(null)
+                setSelectedTagId(null)
+              }
+              if (v === 'tags') {
+                setSelectedCategoryId(null)
+                setSelectedTagId(null)
               }
             }}
           >
@@ -461,6 +541,10 @@ export default function ExpensesPage() {
               <TabsTrigger value="categories" className="gap-2">
                 <LayoutGrid className="h-4 w-4" />
                 <span className="hidden sm:inline">Категории</span>
+              </TabsTrigger>
+              <TabsTrigger value="tags" className="gap-2">
+                <Tag className="h-4 w-4" />
+                <span className="hidden sm:inline">Метки</span>
               </TabsTrigger>
               <TabsTrigger value="list" className="gap-2">
                 <List className="h-4 w-4" />
@@ -528,6 +612,36 @@ export default function ExpensesPage() {
                 </div>
               )}
             </motion.div>
+          ) : viewMode === 'tags' ? (
+            <motion.div
+              key="tags"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              {tagSummaries.length > 0 ? (
+                <TagGrid
+                  tags={tagSummaries}
+                  onTagClick={handleTagClick}
+                />
+              ) : (
+                <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
+                  <Tag className="h-12 w-12 text-muted-foreground/50" />
+                  <div className="text-center">
+                    <p className="font-medium">Нет меток</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Расходы с метками не найдены
+                    </p>
+                  </div>
+                  <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Добавить расход
+                    </Button>
+                  </CreateExpenseDialog>
+                </div>
+              )}
+            </motion.div>
           ) : (
             <motion.div
               key="list"
@@ -576,7 +690,9 @@ export default function ExpensesPage() {
                     <p className="mt-1 text-sm text-muted-foreground">
                       {selectedCategoryId
                         ? 'В этой категории расходы не найдены'
-                        : 'За этот месяц расходы не найдены'}
+                        : selectedTagId
+                          ? 'С этой меткой расходы не найдены'
+                          : 'За этот месяц расходы не найдены'}
                     </p>
                   </div>
                   <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
