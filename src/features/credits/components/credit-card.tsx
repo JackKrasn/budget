@@ -16,10 +16,13 @@ import {
 } from '@/components/ui/dropdown-menu'
 import type { CreditListRow } from '@/lib/api/credits'
 
-function formatMoney(amount: number): string {
+function formatMoney(amount: number | null | undefined): string {
+  if (amount === null || amount === undefined || isNaN(amount)) {
+    return '0'
+  }
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -55,9 +58,24 @@ interface CreditCardProps {
   onClick?: () => void
 }
 
+// Helper для извлечения значения из NullFloat64 (Go sql.NullFloat64)
+function getNullableFloat(value: unknown): number | null {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') return value
+  // Go sql.NullFloat64 format: {Float64: number, Valid: boolean}
+  if (typeof value === 'object' && 'Float64' in value && 'Valid' in value) {
+    const nullable = value as { Float64: number; Valid: boolean }
+    return nullable.Valid ? nullable.Float64 : null
+  }
+  return null
+}
+
 export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: CreditCardProps) {
   const statusConfig = STATUS_CONFIG[credit.status]
   const progressPercent = summary?.progressPercent ?? 0
+
+  // Извлекаем monthly_payment из возможного NullFloat64 формата
+  const creditMonthlyPayment = getNullableFloat(credit.monthly_payment)
 
   return (
     <motion.div
@@ -89,9 +107,11 @@ export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: Credi
                   <Badge variant={statusConfig.variant} className="text-xs">
                     {statusConfig.label}
                   </Badge>
-                  <span className="text-xs text-muted-foreground truncate">
-                    {credit.category_name}
-                  </span>
+                  {credit.category_name && (
+                    <span className="text-xs text-muted-foreground truncate">
+                      {credit.category_name}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>
@@ -150,12 +170,19 @@ export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: Credi
 
           {/* Details Grid */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Principal Amount */}
+            {/* Principal/Current Balance */}
             <div>
-              <p className="text-xs text-muted-foreground mb-1">Основной долг</p>
-              <p className="font-semibold tabular-nums">
-                {formatMoney(credit.principal_amount)} ₽
+              <p className="text-xs text-muted-foreground mb-1">
+                {credit.current_balance !== credit.principal_amount ? 'Текущий остаток' : 'Основной долг'}
               </p>
+              <p className="font-semibold tabular-nums">
+                {formatMoney(credit.current_balance)} ₽
+              </p>
+              {credit.current_balance !== credit.principal_amount && (
+                <p className="text-xs text-muted-foreground">
+                  из {formatMoney(credit.principal_amount)} ₽
+                </p>
+              )}
             </div>
 
             {/* Interest Rate */}
@@ -168,22 +195,33 @@ export function CreditCard({ credit, summary, onEdit, onDelete, onClick }: Credi
             </div>
 
             {/* Monthly Payment */}
-            {summary && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Ежемесячный платёж</p>
-                <p className="font-semibold tabular-nums">
-                  {formatMoney(summary.monthlyPayment)} ₽
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {credit.payment_day} число
-                </p>
-              </div>
-            )}
+            <div>
+              <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                Ежемесячный платёж
+                {creditMonthlyPayment != null && creditMonthlyPayment > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/10 text-purple-600 dark:text-purple-400 font-medium">
+                    Банк
+                  </span>
+                )}
+              </p>
+              <p className="font-semibold tabular-nums">
+                {(() => {
+                  const payment = creditMonthlyPayment ?? summary?.monthlyPayment
+                  if (payment != null && payment > 0) {
+                    return `${formatMoney(payment)} ₽`
+                  }
+                  return <span className="text-muted-foreground">—</span>
+                })()}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {credit.payment_day} число
+              </p>
+            </div>
 
             {/* Account */}
             <div>
               <p className="text-xs text-muted-foreground mb-1">Счёт</p>
-              <p className="font-medium text-sm truncate">{credit.account_name}</p>
+              <p className="font-medium text-sm truncate">{credit.account_name || 'Не указан'}</p>
               <p className="text-xs text-muted-foreground">
                 с {formatDate(credit.start_date)}
               </p>

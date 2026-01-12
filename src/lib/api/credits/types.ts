@@ -7,17 +7,22 @@ export type { UUID } from '../types'
 export type CreditStatus = 'active' | 'completed' | 'cancelled'
 export type PaymentStatus = 'pending' | 'completed' | 'cancelled'
 
+// Early payment reduction types
+export type EarlyPaymentReductionType = 'reduce_payment' | 'reduce_term'
+
 // Credit creation request
 export interface CreateCreditRequest {
   name: string
   principalAmount: number
+  currentBalance?: number // Текущий остаток долга (для существующих кредитов)
   interestRate: number // Процентная ставка (3 = 3%, 12.5 = 12.5%) - бэкенд сам конвертирует в decimal
-  termMonths: number
+  termMonths?: number // Опционально, если указан endDate
+  endDate?: ISODate // Дата последнего платежа (приоритет над termMonths)
+  monthlyPayment?: number // Текущий платёж от банка (если был ЧДП)
   startDate: ISODate // YYYY-MM-DD
-  paymentDay: number // День месяца для платежа (1-31)
-  accountId: UUID
-  categoryId: UUID
-  paymentsMade?: number // Количество уже сделанных платежей (для существующих кредитов)
+  paymentDay?: number // День месяца для платежа (1-31)
+  accountId?: UUID
+  categoryId?: UUID
   notes?: string
 }
 
@@ -27,6 +32,8 @@ export interface UpdateCreditRequest {
   accountId?: UUID
   categoryId?: UUID
   paymentDay?: number
+  endDate?: ISODate
+  monthlyPayment?: number
   status?: CreditStatus
   notes?: string
 }
@@ -36,12 +43,15 @@ export interface Credit {
   id: UUID
   name: string
   principal_amount: number
+  current_balance: number // Текущий остаток долга
   interest_rate: number
   term_months: number
   start_date: ISODate
+  end_date?: ISODate // Дата последнего платежа
+  monthly_payment?: number // Платёж от банка (если указан)
   payment_day: number
-  account_id: UUID
-  category_id: UUID
+  account_id?: UUID
+  category_id?: UUID
   status: CreditStatus
   notes?: string
   created_at: string
@@ -53,15 +63,18 @@ export interface CreditListRow {
   id: UUID
   name: string
   principal_amount: number
+  current_balance: number // Текущий остаток долга
   interest_rate: number
   term_months: number
   start_date: ISODate
+  end_date?: ISODate // Дата последнего платежа
+  monthly_payment?: number // Платёж от банка (если указан)
   payment_day: number
-  account_id: UUID
-  account_name: string
-  category_id: UUID
-  category_name: string
-  category_code: string
+  account_id?: UUID
+  account_name?: string
+  category_id?: UUID
+  category_name?: string
+  category_code?: string
   status: CreditStatus
   notes?: string
   created_at: string
@@ -79,6 +92,13 @@ export interface ScheduleItem {
   totalPayment: number
   remainingBalance: number
   isPaid: boolean
+  isManual: boolean // Был ли платёж изменён вручную
+  originalTotalPayment?: number // Оригинальная сумма (если isManual=true)
+}
+
+// Update schedule item request
+export interface UpdateScheduleItemRequest {
+  totalPayment: number
 }
 
 // Credit with full schedule
@@ -86,15 +106,18 @@ export interface CreditWithSchedule {
   id: UUID
   name: string
   principal_amount: number
+  current_balance: number // Текущий остаток долга
   interest_rate: number
   term_months: number
   start_date: ISODate
+  end_date?: ISODate // Дата последнего платежа
+  monthly_payment?: number // Платёж от банка (если указан)
   payment_day: number
-  account_id: UUID
-  account_name: string
-  category_id: UUID
-  category_name: string
-  category_code: string
+  account_id?: UUID
+  account_name?: string
+  category_id?: UUID
+  category_name?: string
+  category_code?: string
   status: CreditStatus
   notes?: string
   created_at: string
@@ -156,4 +179,25 @@ export interface AllCreditsSummary {
 export interface CreditsListResponse {
   data: CreditListRow[]
   total: number
+}
+
+// Early payment (частично-досрочный платёж)
+export interface EarlyPayment {
+  id: UUID
+  creditId: UUID
+  paymentDate: ISODate
+  amount: number
+  balanceBefore: number
+  balanceAfter: number
+  reductionType: EarlyPaymentReductionType
+  notes?: string
+  createdAt: string
+}
+
+// Create early payment request
+export interface CreateEarlyPaymentRequest {
+  paymentDate: ISODate
+  amount: number
+  reductionType: EarlyPaymentReductionType
+  notes?: string
 }

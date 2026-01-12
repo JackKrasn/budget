@@ -2,6 +2,8 @@ import { apiClient } from '../client'
 import type {
   CreateCreditRequest,
   UpdateCreditRequest,
+  UpdateScheduleItemRequest,
+  CreateEarlyPaymentRequest,
   CreditsListResponse,
   CreditWithSchedule,
   Credit,
@@ -10,6 +12,7 @@ import type {
   UpcomingPayment,
   CreditSummary,
   AllCreditsSummary,
+  EarlyPayment,
   CreditStatus,
   UUID,
 } from './types'
@@ -98,4 +101,45 @@ export async function getUpcomingPayments(limit = 10): Promise<UpcomingPayment[]
  */
 export async function getAllCreditsSummary(): Promise<AllCreditsSummary> {
   return await apiClient.get<AllCreditsSummary>(`${BASE_URL}/summary`)
+}
+
+/**
+ * Обновить платёж в графике (ручная корректировка)
+ */
+export async function updateScheduleItem(
+  creditId: UUID,
+  scheduleId: UUID,
+  data: UpdateScheduleItemRequest
+): Promise<ScheduleItem> {
+  return await apiClient.patch<ScheduleItem>(
+    `${BASE_URL}/${creditId}/schedule/${scheduleId}`,
+    data
+  )
+}
+
+/**
+ * Получить список частично-досрочных платежей
+ */
+export async function getEarlyPayments(creditId: UUID): Promise<EarlyPayment[]> {
+  return await apiClient.get<EarlyPayment[]>(`${BASE_URL}/${creditId}/early-payments`)
+}
+
+/**
+ * Создать частично-досрочный платёж
+ */
+export async function createEarlyPayment(
+  creditId: UUID,
+  data: CreateEarlyPaymentRequest
+): Promise<EarlyPayment> {
+  return await apiClient.post<EarlyPayment>(`${BASE_URL}/${creditId}/early-payments`, data)
+}
+
+/**
+ * Удалить частично-досрочный платёж
+ */
+export async function deleteEarlyPayment(
+  creditId: UUID,
+  earlyPaymentId: UUID
+): Promise<void> {
+  await apiClient.delete(`${BASE_URL}/${creditId}/early-payments/${earlyPaymentId}`)
 }

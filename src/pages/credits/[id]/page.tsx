@@ -10,6 +10,10 @@ import {
   Wallet,
   CheckCircle2,
   AlertCircle,
+  Pencil,
+  PiggyBank,
+  RefreshCw,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,6 +21,12 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   Table,
   TableBody,
@@ -26,9 +36,20 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { useCredit, useCreditSummary, useCreditPayments } from '@/features/credits'
-import { ConfirmPaymentDialog } from '@/features/credits/components'
-import type { ScheduleItem, PaymentHistoryItem } from '@/lib/api/credits'
+import {
+  useCredit,
+  useCreditSummary,
+  useCreditPayments,
+  useEarlyPayments,
+  useDeleteEarlyPayment,
+  useRegenerateCreditSchedule,
+} from '@/features/credits'
+import {
+  ConfirmPaymentDialog,
+  EarlyPaymentDialog,
+  EditScheduleItemDialog,
+} from '@/features/credits/components'
+import type { ScheduleItem, PaymentHistoryItem, EarlyPayment } from '@/lib/api/credits'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -94,79 +115,110 @@ function SummaryCard({
 function ScheduleTable({
   schedule,
   onConfirmPayment,
+  onEditPayment,
 }: {
   schedule: ScheduleItem[]
   onConfirmPayment: (item: ScheduleItem) => void
+  onEditPayment: (item: ScheduleItem) => void
 }) {
   return (
-    <div className="border rounded-xl overflow-hidden bg-card/50 backdrop-blur-sm">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-b-2 hover:bg-transparent">
-            <TableHead className="w-[80px] font-bold">#</TableHead>
-            <TableHead className="font-bold">Дата</TableHead>
-            <TableHead className="text-right font-bold">Основной долг</TableHead>
-            <TableHead className="text-right font-bold">Проценты</TableHead>
-            <TableHead className="text-right font-bold">Всего</TableHead>
-            <TableHead className="text-right font-bold">Остаток</TableHead>
-            <TableHead className="w-[130px] text-center font-bold">Действие</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {schedule.map((item, index) => (
-            <TableRow
-              key={item.id}
-              className={cn(
-                'transition-all duration-200',
-                item.isPaid
-                  ? 'opacity-50 bg-muted/30'
-                  : 'hover:bg-accent/50',
-                index === 0 && !item.isPaid && 'bg-primary/5'
-              )}
-            >
-              <TableCell className="font-bold text-base">
-                <span className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-lg',
-                  item.isPaid ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
-                )}>
-                  {item.paymentNumber}
-                </span>
-              </TableCell>
-              <TableCell className="font-medium">{formatDate(item.dueDate)}</TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
-                {formatMoney(item.principalPart)} ₽
-              </TableCell>
-              <TableCell className="text-right tabular-nums font-medium text-muted-foreground">
-                {formatMoney(item.interestPart)} ₽
-              </TableCell>
-              <TableCell className="text-right tabular-nums font-bold text-base">
-                {formatMoney(item.totalPayment)} ₽
-              </TableCell>
-              <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
-                {formatMoney(item.remainingBalance)} ₽
-              </TableCell>
-              <TableCell className="text-center">
-                {item.isPaid ? (
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600">
-                    <CheckCircle2 className="h-4 w-4" />
-                    <span className="text-xs font-medium">Оплачен</span>
-                  </div>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant={index === 0 ? 'default' : 'outline'}
-                    onClick={() => onConfirmPayment(item)}
-                    className="h-9 font-medium"
-                  >
-                    {index === 0 ? 'Оплатить сейчас' : 'Оплатить'}
-                  </Button>
-                )}
-              </TableCell>
+    <TooltipProvider>
+      <div className="border rounded-xl overflow-hidden bg-card/50 backdrop-blur-sm">
+        <Table>
+          <TableHeader>
+            <TableRow className="border-b-2 hover:bg-transparent">
+              <TableHead className="w-[80px] font-bold">#</TableHead>
+              <TableHead className="font-bold">Дата</TableHead>
+              <TableHead className="text-right font-bold">Основной долг</TableHead>
+              <TableHead className="text-right font-bold">Проценты</TableHead>
+              <TableHead className="text-right font-bold">Всего</TableHead>
+              <TableHead className="text-right font-bold">Остаток</TableHead>
+              <TableHead className="w-[180px] text-center font-bold">Действие</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+          </TableHeader>
+          <TableBody>
+            {schedule.map((item, index) => (
+              <TableRow
+                key={item.id}
+                className={cn(
+                  'transition-all duration-200',
+                  item.isPaid
+                    ? 'opacity-50 bg-muted/30'
+                    : 'hover:bg-accent/50',
+                  index === 0 && !item.isPaid && 'bg-primary/5'
+                )}
+              >
+                <TableCell className="font-bold text-base">
+                  <span className={cn(
+                    'flex h-8 w-8 items-center justify-center rounded-lg',
+                    item.isPaid ? 'bg-muted text-muted-foreground' : 'bg-primary/10 text-primary'
+                  )}>
+                    {item.paymentNumber}
+                  </span>
+                </TableCell>
+                <TableCell className="font-medium">{formatDate(item.dueDate)}</TableCell>
+                <TableCell className="text-right tabular-nums font-medium">
+                  {formatMoney(item.principalPart)} ₽
+                </TableCell>
+                <TableCell className="text-right tabular-nums font-medium text-muted-foreground">
+                  {formatMoney(item.interestPart)} ₽
+                </TableCell>
+                <TableCell className="text-right tabular-nums font-bold text-base">
+                  <div className="flex items-center justify-end gap-1">
+                    {formatMoney(item.totalPayment)} ₽
+                    {item.isManual && (
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Pencil className="h-3 w-3 text-amber-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Изменён вручную</p>
+                          {item.originalTotalPayment && (
+                            <p className="text-xs text-muted-foreground">
+                              Было: {formatMoney(item.originalTotalPayment)} ₽
+                            </p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right tabular-nums text-sm text-muted-foreground">
+                  {formatMoney(item.remainingBalance)} ₽
+                </TableCell>
+                <TableCell className="text-center">
+                  {item.isPaid ? (
+                    <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500/10 text-green-600">
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span className="text-xs font-medium">Оплачен</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onEditPayment(item)}
+                        className="h-9 w-9 p-0"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant={index === 0 ? 'default' : 'outline'}
+                        onClick={() => onConfirmPayment(item)}
+                        className="h-9 font-medium"
+                      >
+                        {index === 0 ? 'Оплатить' : 'Оплатить'}
+                      </Button>
+                    </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    </TooltipProvider>
   )
 }
 
@@ -220,19 +272,103 @@ function PaymentsTable({ payments }: { payments: PaymentHistoryItem[] }) {
   )
 }
 
+function EarlyPaymentsTable({
+  earlyPayments,
+  onDelete,
+  isDeleting,
+}: {
+  earlyPayments: EarlyPayment[]
+  onDelete: (id: string) => void
+  isDeleting: boolean
+}) {
+  return (
+    <div className="border rounded-xl overflow-hidden bg-card/50 backdrop-blur-sm">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-b-2 hover:bg-transparent">
+            <TableHead className="font-bold">Дата</TableHead>
+            <TableHead className="text-right font-bold">Сумма</TableHead>
+            <TableHead className="font-bold">Тип</TableHead>
+            <TableHead className="text-right font-bold">Остаток до</TableHead>
+            <TableHead className="text-right font-bold">Остаток после</TableHead>
+            <TableHead className="font-bold">Комментарий</TableHead>
+            <TableHead className="w-[80px]"></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {earlyPayments.map((payment) => (
+            <TableRow key={payment.id} className="hover:bg-accent/50 transition-colors">
+              <TableCell className="font-medium">{formatDate(payment.paymentDate)}</TableCell>
+              <TableCell className="text-right tabular-nums font-bold text-green-600">
+                {formatMoney(payment.amount)} ₽
+              </TableCell>
+              <TableCell>
+                <Badge variant={payment.reductionType === 'reduce_term' ? 'default' : 'secondary'}>
+                  {payment.reductionType === 'reduce_term' ? 'Срок' : 'Платёж'}
+                </Badge>
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {formatMoney(payment.balanceBefore)} ₽
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatMoney(payment.balanceAfter)} ₽
+              </TableCell>
+              <TableCell className="text-muted-foreground text-sm max-w-[200px] truncate">
+                {payment.notes || '—'}
+              </TableCell>
+              <TableCell>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                  onClick={() => onDelete(payment.id)}
+                  disabled={isDeleting}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
 export default function CreditDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const [selectedPayment, setSelectedPayment] = useState<ScheduleItem | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [earlyPaymentDialogOpen, setEarlyPaymentDialogOpen] = useState(false)
+  const [editScheduleItem, setEditScheduleItem] = useState<ScheduleItem | null>(null)
+  const [editScheduleDialogOpen, setEditScheduleDialogOpen] = useState(false)
 
   const { data: credit, isLoading, error } = useCredit(id!)
   const { data: summary, isLoading: isSummaryLoading } = useCreditSummary(id!)
   const { data: payments, isLoading: isPaymentsLoading } = useCreditPayments(id!)
+  const { data: earlyPayments, isLoading: isEarlyPaymentsLoading } = useEarlyPayments(id!)
+  const deleteEarlyPayment = useDeleteEarlyPayment()
+  const regenerateSchedule = useRegenerateCreditSchedule()
 
   const handleConfirmPayment = (item: ScheduleItem) => {
     setSelectedPayment(item)
     setConfirmDialogOpen(true)
+  }
+
+  const handleEditPayment = (item: ScheduleItem) => {
+    setEditScheduleItem(item)
+    setEditScheduleDialogOpen(true)
+  }
+
+  const handleDeleteEarlyPayment = (earlyPaymentId: string) => {
+    if (!id) return
+    deleteEarlyPayment.mutate({ creditId: id, earlyPaymentId })
+  }
+
+  const handleRegenerateSchedule = () => {
+    if (!id) return
+    regenerateSchedule.mutate(id)
   }
 
   if (!id) {
@@ -304,10 +440,29 @@ export default function CreditDetailsPage() {
                 <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
               </div>
               <p className="text-muted-foreground">
-                {credit.category_name} • {credit.account_name}
+                {credit.category_name ? `${credit.category_name} • ` : ''}{credit.account_name || 'Без счёта'}
               </p>
             </div>
           </div>
+          {credit.status === 'active' && (
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={() => setEarlyPaymentDialogOpen(true)}
+              >
+                <PiggyBank className="mr-2 h-4 w-4" />
+                Внести ЧДП
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleRegenerateSchedule}
+                disabled={regenerateSchedule.isPending}
+              >
+                <RefreshCw className={cn("mr-2 h-4 w-4", regenerateSchedule.isPending && "animate-spin")} />
+                Пересчитать
+              </Button>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -395,6 +550,31 @@ export default function CreditDetailsPage() {
         </motion.div>
       )}
 
+      {/* Early Payments */}
+      {!isEarlyPaymentsLoading && earlyPayments && earlyPayments.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.35 }}
+        >
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <PiggyBank className="h-5 w-5" />
+                Частично-досрочные погашения
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <EarlyPaymentsTable
+                earlyPayments={earlyPayments}
+                onDelete={handleDeleteEarlyPayment}
+                isDeleting={deleteEarlyPayment.isPending}
+              />
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
+
       {/* Payment Schedule */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
@@ -407,7 +587,11 @@ export default function CreditDetailsPage() {
           </CardHeader>
           <CardContent>
             {credit.schedule && credit.schedule.length > 0 ? (
-              <ScheduleTable schedule={credit.schedule} onConfirmPayment={handleConfirmPayment} />
+              <ScheduleTable
+                schedule={credit.schedule}
+                onConfirmPayment={handleConfirmPayment}
+                onEditPayment={handleEditPayment}
+              />
             ) : (
               <p className="text-muted-foreground text-center py-8">
                 График платежей отсутствует
@@ -443,6 +627,23 @@ export default function CreditDetailsPage() {
         plannedExpenseId={selectedPayment?.id}
         creditId={id!}
         defaultAccountId={credit?.account_id}
+      />
+
+      {/* Early Payment Dialog */}
+      <EarlyPaymentDialog
+        open={earlyPaymentDialogOpen}
+        onOpenChange={setEarlyPaymentDialogOpen}
+        creditId={id!}
+        creditName={credit.name}
+        currentBalance={credit.current_balance}
+      />
+
+      {/* Edit Schedule Item Dialog */}
+      <EditScheduleItemDialog
+        open={editScheduleDialogOpen}
+        onOpenChange={setEditScheduleDialogOpen}
+        creditId={id!}
+        scheduleItem={editScheduleItem}
       />
     </div>
   )

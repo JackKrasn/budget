@@ -28,18 +28,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { FileText, Building2, CalendarDays, FileEdit } from 'lucide-react'
+import { FileText, Building2, CalendarDays, FileEdit, Banknote, Info, Calendar } from 'lucide-react'
+import { Calendar as CalendarComponent } from '@/components/ui/calendar'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import { format } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { cn } from '@/lib/utils'
 import { useUpdateCredit } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 import { useExpenseCategories } from '@/features/expenses'
 import { CategoryIcon } from '@/components/common'
 import type { CreditListRow } from '@/lib/api/credits'
 
+function formatDateToString(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseDateString(dateStr: string): Date {
+  const [year, month, day] = dateStr.split('-').map(Number)
+  return new Date(year, month - 1, day)
+}
+
 const formSchema = z.object({
   name: z.string().min(1, 'Введите название кредита'),
   accountId: z.string().min(1, 'Выберите счёт'),
   categoryId: z.string().min(1, 'Выберите категорию'),
   paymentDay: z.string().min(1, 'Введите день платежа'),
+  endDate: z.string().optional(),
+  monthlyPayment: z.string().optional(),
   status: z.enum(['active', 'completed', 'cancelled']),
   notes: z.string().optional(),
 })
@@ -71,6 +100,8 @@ export function EditCreditDialog({
       accountId: '',
       categoryId: '',
       paymentDay: '1',
+      endDate: '',
+      monthlyPayment: '',
       status: 'active',
       notes: '',
     },
@@ -84,6 +115,8 @@ export function EditCreditDialog({
         accountId: credit.account_id,
         categoryId: credit.category_id,
         paymentDay: String(credit.payment_day),
+        endDate: credit.end_date || '',
+        monthlyPayment: credit.monthly_payment ? String(credit.monthly_payment) : '',
         status: credit.status,
         notes: credit.notes || '',
       })
@@ -101,6 +134,8 @@ export function EditCreditDialog({
           accountId: values.accountId,
           categoryId: values.categoryId,
           paymentDay: parseInt(values.paymentDay, 10),
+          endDate: values.endDate || undefined,
+          monthlyPayment: values.monthlyPayment ? parseFloat(values.monthlyPayment) : undefined,
           status: values.status,
           notes: values.notes || undefined,
         },
@@ -277,27 +312,132 @@ export function EditCreditDialog({
                 </div>
                 <div>
                   <h3 className="font-semibold text-base">Настройки платежей</h3>
-                  <p className="text-xs text-muted-foreground">День ежемесячного платежа</p>
+                  <p className="text-xs text-muted-foreground">День платежа и дата окончания</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="paymentDay"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>День платежа</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          min="1"
+                          max="31"
+                          placeholder="15"
+                          className="h-11 text-base tabular-nums"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>Число месяца (1-31)</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Дата последнего платежа</FormLabel>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <FormControl>
+                            <Button
+                              variant="outline"
+                              className={cn(
+                                'h-11 justify-start text-left font-normal',
+                                !field.value && 'text-muted-foreground'
+                              )}
+                            >
+                              <Calendar className="mr-2 h-4 w-4" />
+                              {field.value ? (
+                                format(parseDateString(field.value), 'd MMMM yyyy', { locale: ru })
+                              ) : (
+                                <span>Выберите дату</span>
+                              )}
+                            </Button>
+                          </FormControl>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <CalendarComponent
+                            mode="single"
+                            selected={field.value ? parseDateString(field.value) : undefined}
+                            onSelect={(date) => {
+                              if (date) {
+                                field.onChange(formatDateToString(date))
+                              }
+                            }}
+                            locale={ru}
+                            captionLayout="dropdown"
+                            startMonth={new Date(2020, 0)}
+                            endMonth={new Date(2060, 11)}
+                          />
+                        </PopoverContent>
+                      </Popover>
+                      <FormDescription>Дата окончания кредита</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Bank Payment Section */}
+            <div className="space-y-5 rounded-xl border border-border/50 bg-muted/30 p-5">
+              <div className="flex items-center gap-3 pb-3 border-b border-border/50">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-purple-500/10">
+                  <Banknote className="h-5 w-5 text-purple-500" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Платёж от банка</h3>
+                  <p className="text-xs text-muted-foreground">Если у кредита были ЧДП</p>
                 </div>
               </div>
 
               <FormField
                 control={form.control}
-                name="paymentDay"
+                name="monthlyPayment"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>День платежа</FormLabel>
+                    <FormLabel className="flex items-center gap-1.5">
+                      Ежемесячный платёж от банка
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="h-3.5 w-3.5 text-muted-foreground/50 cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-[280px]">
+                            <p className="text-xs">
+                              Укажите текущий платёж из банка, если у кредита были частично-досрочные погашения.
+                              Это позволит точнее отображать график.
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        min="1"
-                        max="31"
-                        placeholder="15"
-                        className="h-11 text-base tabular-nums"
-                        {...field}
-                      />
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="65 440"
+                          className="h-11 text-base tabular-nums pr-8"
+                          {...field}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          ₽
+                        </span>
+                      </div>
                     </FormControl>
-                    <FormDescription>Число месяца (1-31)</FormDescription>
+                    <FormDescription>
+                      Опционально. Используется вместо расчётного аннуитета
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

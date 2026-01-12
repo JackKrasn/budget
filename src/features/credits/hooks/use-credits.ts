@@ -12,6 +12,7 @@ const QUERY_KEYS = {
   creditSchedule: (id: UUID) => ['credits', id, 'schedule'] as const,
   creditPayments: (id: UUID) => ['credits', id, 'payments'] as const,
   creditSummary: (id: UUID) => ['credits', id, 'summary'] as const,
+  earlyPayments: (id: UUID) => ['credits', id, 'early-payments'] as const,
   upcomingPayments: (limit: number) => ['credits', 'upcoming', limit] as const,
   allSummary: () => ['credits', 'summary'] as const,
 }
@@ -202,6 +203,99 @@ export function useRegenerateCreditSchedule() {
     },
     onError: (error: Error) => {
       toast.error(`Ошибка при пересчёте графика: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Hook для обновления платежа в графике (ручная корректировка)
+ */
+export function useUpdateScheduleItem() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      creditId,
+      scheduleId,
+      data,
+    }: {
+      creditId: UUID
+      scheduleId: UUID
+      data: creditsApi.UpdateScheduleItemRequest
+    }) => creditsApi.updateScheduleItem(creditId, scheduleId, data),
+    onSuccess: (_, { creditId }) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credit(creditId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.creditSchedule(creditId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.creditSummary(creditId) })
+      toast.success('Платёж обновлён')
+    },
+    onError: (error: Error) => {
+      toast.error(`Ошибка при обновлении платежа: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Hook для получения списка частично-досрочных платежей
+ */
+export function useEarlyPayments(creditId: UUID) {
+  return useQuery({
+    queryKey: QUERY_KEYS.earlyPayments(creditId),
+    queryFn: () => creditsApi.getEarlyPayments(creditId),
+    enabled: !!creditId,
+  })
+}
+
+/**
+ * Hook для создания частично-досрочного платежа
+ */
+export function useCreateEarlyPayment() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      creditId,
+      data,
+    }: {
+      creditId: UUID
+      data: creditsApi.CreateEarlyPaymentRequest
+    }) => creditsApi.createEarlyPayment(creditId, data),
+    onSuccess: (_, { creditId }) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credit(creditId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.creditSchedule(creditId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.creditSummary(creditId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.earlyPayments(creditId) })
+      queryClient.invalidateQueries({ queryKey: ['credits'] })
+      toast.success('Частично-досрочный платёж внесён')
+    },
+    onError: (error: Error) => {
+      toast.error(`Ошибка при внесении ЧДП: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Hook для удаления частично-досрочного платежа
+ */
+export function useDeleteEarlyPayment() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      creditId,
+      earlyPaymentId,
+    }: {
+      creditId: UUID
+      earlyPaymentId: UUID
+    }) => creditsApi.deleteEarlyPayment(creditId, earlyPaymentId),
+    onSuccess: (_, { creditId }) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.credit(creditId) })
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.earlyPayments(creditId) })
+      queryClient.invalidateQueries({ queryKey: ['credits'] })
+      toast.success('Частично-досрочный платёж удалён. Не забудьте пересчитать график.')
+    },
+    onError: (error: Error) => {
+      toast.error(`Ошибка при удалении ЧДП: ${error.message}`)
     },
   })
 }

@@ -10,6 +10,7 @@ import {
   RefreshCw,
   Calendar,
   PiggyBank,
+  Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,6 +42,7 @@ interface PlannedExpensesSectionProps {
     }
   ) => Promise<void>
   onSkip: (id: string) => Promise<void>
+  onDelete?: (id: string) => Promise<void>
   onGenerate?: () => Promise<void>
   isGenerating?: boolean
   isPending?: boolean
@@ -64,6 +66,7 @@ export function PlannedExpensesSection({
   accounts,
   onConfirm,
   onSkip,
+  onDelete,
   onGenerate,
   isGenerating,
   isPending,
@@ -130,6 +133,18 @@ export function PlannedExpensesSection({
     setProcessingId(id)
     try {
       await onSkip(id)
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!onDelete) return
+    if (!confirm('Удалить этот запланированный расход?')) return
+
+    setProcessingId(id)
+    try {
+      await onDelete(id)
     } finally {
       setProcessingId(null)
     }
@@ -322,6 +337,18 @@ export function PlannedExpensesSection({
                         >
                           <X className="h-4 w-4 text-muted-foreground" />
                         </Button>
+                        {onDelete && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => handleDelete(expense.id)}
+                            disabled={isPending || isProcessing}
+                            title="Удалить"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        )}
                       </div>
                     )}
                   </TableCell>

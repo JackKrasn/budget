@@ -31,6 +31,7 @@ import {
   usePlannedExpenses,
   useConfirmPlannedExpenseWithExpense,
   useSkipPlannedExpense,
+  useDeletePlannedExpense,
   useGeneratePlannedExpenses,
   useCreatePlannedExpense,
   usePlannedIncomes,
@@ -133,6 +134,7 @@ export default function BudgetPage() {
   const copyBudget = useCopyBudget()
   const confirmPlannedWithExpense = useConfirmPlannedExpenseWithExpense()
   const skipPlanned = useSkipPlannedExpense()
+  const deletePlanned = useDeletePlannedExpense()
   const generatePlanned = useGeneratePlannedExpenses()
   const createPlanned = useCreatePlannedExpense()
   const createIncomeAndReceive = useCreateIncomeAndReceive()
@@ -404,6 +406,14 @@ export default function BudgetPage() {
       await skipPlanned.mutateAsync(id)
     } catch {
       toast.error('Ошибка')
+    }
+  }
+
+  const handleDeletePlanned = async (id: string) => {
+    try {
+      await deletePlanned.mutateAsync(id)
+    } catch {
+      toast.error('Ошибка удаления')
     }
   }
 
@@ -858,9 +868,10 @@ export default function BudgetPage() {
               accounts={accounts}
               onConfirm={handleConfirmPlanned}
               onSkip={handleSkipPlanned}
+              onDelete={handleDeletePlanned}
               onGenerate={handleGeneratePlanned}
               isGenerating={generatePlanned.isPending || createBudget.isPending}
-              isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending}
+              isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
               hideWrapper
             />
           </CollapsibleSection>
