@@ -74,6 +74,7 @@ const formSchema = z.object({
   bankName: z.string().optional(),
   icon: z.string().optional(),
   color: z.string().optional(),
+  initialBalance: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -96,11 +97,16 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
       bankName: '',
       icon: 'credit-card',
       color: '#10b981',
+      initialBalance: '',
     },
   })
 
   async function onSubmit(values: FormValues) {
     try {
+      const initialBalance = values.initialBalance
+        ? parseFloat(values.initialBalance)
+        : undefined
+
       await createAccount.mutateAsync({
         name: values.name,
         accountTypeId: values.accountTypeId,
@@ -108,6 +114,7 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
         bankName: values.bankName || undefined,
         icon: values.icon || undefined,
         color: values.color || undefined,
+        initialBalance: initialBalance && !isNaN(initialBalance) ? initialBalance : undefined,
       })
       form.reset()
       setOpen(false)
@@ -215,6 +222,28 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
                   </FormControl>
                   <FormDescription>
                     Название банка или платформы
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Initial Balance */}
+            <FormField
+              control={form.control}
+              name="initialBalance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Начальный баланс (опционально)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    Текущий баланс на счёте
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

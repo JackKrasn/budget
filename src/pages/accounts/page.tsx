@@ -10,6 +10,7 @@ import {
   AccountCard,
   CreateAccountDialog,
   EditAccountDialog,
+  SyncBalanceDialog,
 } from '@/features/accounts'
 import type { AccountWithType } from '@/lib/api/types'
 
@@ -31,6 +32,8 @@ const item = {
 export default function AccountsPage() {
   const [editAccount, setEditAccount] = useState<AccountWithType | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [syncAccount, setSyncAccount] = useState<AccountWithType | null>(null)
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false)
 
   const { data, isLoading, error } = useAccounts()
   const deleteAccount = useDeleteAccount()
@@ -57,6 +60,11 @@ export default function AccountsPage() {
     if (confirm('Вы уверены, что хотите удалить этот счёт?')) {
       deleteAccount.mutate(id)
     }
+  }
+
+  const handleSyncBalance = (account: AccountWithType) => {
+    setSyncAccount(account)
+    setSyncDialogOpen(true)
   }
 
   return (
@@ -163,6 +171,7 @@ export default function AccountsPage() {
                     onEdit={() => handleEdit(account)}
                     onArchive={() => handleArchive(account.id, account.is_archived)}
                     onDelete={() => handleDelete(account.id)}
+                    onSyncBalance={() => handleSyncBalance(account)}
                   />
                 </motion.div>
               ))}
@@ -224,6 +233,7 @@ export default function AccountsPage() {
                       onEdit={() => handleEdit(account)}
                       onArchive={() => handleArchive(account.id, account.is_archived)}
                       onDelete={() => handleDelete(account.id)}
+                      onSyncBalance={() => handleSyncBalance(account)}
                     />
                   </motion.div>
                 ))}
@@ -238,6 +248,13 @@ export default function AccountsPage() {
         account={editAccount}
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
+      />
+
+      {/* Sync Balance Dialog */}
+      <SyncBalanceDialog
+        account={syncAccount}
+        open={syncDialogOpen}
+        onOpenChange={setSyncDialogOpen}
       />
     </div>
   )

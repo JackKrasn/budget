@@ -10,6 +10,7 @@ import {
   Archive,
   Pencil,
   Trash2,
+  RefreshCw,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -47,6 +48,7 @@ interface AccountCardProps {
   onEdit?: () => void
   onArchive?: () => void
   onDelete?: () => void
+  onSyncBalance?: () => void
 }
 
 export function AccountCard({
@@ -54,6 +56,7 @@ export function AccountCard({
   onEdit,
   onArchive,
   onDelete,
+  onSyncBalance,
 }: AccountCardProps) {
   const Icon = ACCOUNT_ICONS[account.type_code || 'default'] || ACCOUNT_ICONS.default
   const currencySymbol = CURRENCY_SYMBOLS[account.currency] || account.currency
@@ -119,6 +122,10 @@ export function AccountCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={onSyncBalance}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Синхронизировать баланс
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onEdit}>
                   <Pencil className="mr-2 h-4 w-4" />
                   Редактировать
