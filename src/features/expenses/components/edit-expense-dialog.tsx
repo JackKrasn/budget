@@ -54,41 +54,9 @@ import {
 import { useUpdateExpense, useExpenseCategories } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 import { TagSelector } from './tag-selector'
-import {
-  Wallet,
-  ShoppingCart,
-  Home,
-  Car,
-  Utensils,
-  Plane,
-  Heart,
-  Gift,
-  GraduationCap,
-  Smartphone,
-  Zap,
-  Coffee,
-  Film,
-  ShoppingBag,
-  CalendarIcon,
-} from 'lucide-react'
+import { CalendarIcon } from 'lucide-react'
+import { getIconByName } from '@/lib/icon-registry'
 import type { ExpenseListRow } from '@/lib/api/types'
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  food: Utensils,
-  transport: Car,
-  housing: Home,
-  utilities: Zap,
-  health: Heart,
-  education: GraduationCap,
-  entertainment: Film,
-  shopping: ShoppingBag,
-  travel: Plane,
-  gifts: Gift,
-  phone: Smartphone,
-  coffee: Coffee,
-  groceries: ShoppingCart,
-  default: Wallet,
-}
 
 const formSchema = z.object({
   categoryId: z.string().min(1, 'Выберите категорию'),
@@ -269,7 +237,7 @@ export function EditExpenseDialog({
                     </FormControl>
                     <SelectContent>
                       {categories.map((cat) => {
-                        const Icon = CATEGORY_ICONS[cat.code] || CATEGORY_ICONS.default
+                        const Icon = getIconByName(cat.icon)
                         return (
                           <SelectItem key={cat.id} value={cat.id}>
                             <div className="flex items-center gap-2">

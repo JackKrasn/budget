@@ -58,42 +58,8 @@ import { useCreateExpense, useExpenseCategories } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 import { useFunds } from '@/features/funds'
 import { TagSelector } from './tag-selector'
-import {
-  Wallet,
-  Plus,
-  X,
-  ShoppingCart,
-  Home,
-  Car,
-  Utensils,
-  Plane,
-  Heart,
-  Gift,
-  GraduationCap,
-  Smartphone,
-  Zap,
-  Coffee,
-  Film,
-  ShoppingBag,
-  CalendarIcon,
-} from 'lucide-react'
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  food: Utensils,
-  transport: Car,
-  housing: Home,
-  utilities: Zap,
-  health: Heart,
-  education: GraduationCap,
-  entertainment: Film,
-  shopping: ShoppingBag,
-  travel: Plane,
-  gifts: Gift,
-  phone: Smartphone,
-  coffee: Coffee,
-  groceries: ShoppingCart,
-  default: Wallet,
-}
+import { Wallet, Plus, X, CalendarIcon } from 'lucide-react'
+import { getIconByName } from '@/lib/icon-registry'
 
 const formSchema = z.object({
   categoryId: z.string().min(1, 'Выберите категорию'),
@@ -320,7 +286,7 @@ export function CreateExpenseDialog({ children, defaultAccountId }: CreateExpens
                     </FormControl>
                     <SelectContent>
                       {categories.map((cat) => {
-                        const Icon = CATEGORY_ICONS[cat.code] || CATEGORY_ICONS.default
+                        const Icon = getIconByName(cat.icon)
                         return (
                           <SelectItem key={cat.id} value={cat.id}>
                             <div className="flex items-center gap-2">
