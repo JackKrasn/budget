@@ -24,6 +24,7 @@ export interface CategorySummary {
   categoryColor: string
   actualAmount: number
   plannedAmount: number
+  plannedExpensesSum?: number // Обязательные платежи (кредиты и т.д.)
 }
 
 interface CategoryCardProps {
@@ -32,16 +33,20 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category, onClick }: CategoryCardProps) {
+  // Total planned includes manual budget + mandatory payments (credits, etc.)
+  const totalPlanned = category.plannedAmount + (category.plannedExpensesSum || 0)
+
   const progress =
-    category.plannedAmount > 0
-      ? Math.min((category.actualAmount / category.plannedAmount) * 100, 100)
+    totalPlanned > 0
+      ? Math.min((category.actualAmount / totalPlanned) * 100, 100)
       : 0
-  const diff = category.plannedAmount - category.actualAmount
-  const isOverBudget = diff < 0
-  const isUnderBudget = diff > 0 && category.actualAmount > 0
+  const diff = totalPlanned - category.actualAmount
+  // Перерасход только если есть план И расходы превысили план
+  const isOverBudget = totalPlanned > 0 && diff < 0
+  const isUnderBudget = totalPlanned > 0 && diff > 0 && category.actualAmount > 0
   const progressPercent =
-    category.plannedAmount > 0
-      ? Math.round((category.actualAmount / category.plannedAmount) * 100)
+    totalPlanned > 0
+      ? Math.round((category.actualAmount / totalPlanned) * 100)
       : 0
 
   return (
@@ -55,7 +60,7 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
       <Card
         className={cn(
           'group relative cursor-pointer overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-xl hover:shadow-primary/5',
-          isOverBudget && 'border-destructive/30 hover:border-destructive/50'
+          isOverBudget && 'border-destructive/50 bg-destructive/5 hover:border-destructive/70 hover:shadow-destructive/10'
         )}
         onClick={onClick}
       >
@@ -63,7 +68,9 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
         <div
           className="absolute inset-0 opacity-[0.05] transition-opacity group-hover:opacity-[0.1]"
           style={{
-            background: `linear-gradient(135deg, ${category.categoryColor} 0%, transparent 60%)`,
+            background: isOverBudget
+              ? 'linear-gradient(135deg, hsl(var(--destructive)) 0%, transparent 60%)'
+              : `linear-gradient(135deg, ${category.categoryColor} 0%, transparent 60%)`,
           }}
         />
 
@@ -126,42 +133,43 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
               </span>
               <span className="ml-1 text-sm text-muted-foreground">₽</span>
             </div>
-            {category.plannedAmount > 0 && (
+            {totalPlanned > 0 && (
               <div className="text-right">
                 <span className="text-sm text-muted-foreground">из </span>
                 <span className="text-sm font-medium tabular-nums">
-                  {formatMoney(category.plannedAmount)} ₽
+                  {formatMoney(totalPlanned)} ₽
                 </span>
               </div>
             )}
           </div>
 
           {/* Progress bar */}
-          {category.plannedAmount > 0 && (
+          {totalPlanned > 0 && (
             <div className="mt-3 space-y-1.5">
               <Progress
-                value={progress}
-                className={cn(
-                  'h-2',
-                  isOverBudget && '[&>div]:bg-destructive'
-                )}
-                style={
-                  !isOverBudget
-                    ? { ['--progress-color' as string]: category.categoryColor }
-                    : undefined
-                }
+                value={isOverBudget ? 100 : progress}
+                className="h-2"
+                indicatorColor={category.categoryColor}
               />
-              <div className="flex justify-between text-xs text-muted-foreground">
-                <span>{progressPercent}% использовано</span>
-                {category.plannedAmount > 0 && !isOverBudget && (
-                  <span>осталось {formatMoney(diff)} ₽</span>
+              <div className="flex justify-between text-xs">
+                <span className={cn(isOverBudget ? 'text-destructive font-medium' : 'text-muted-foreground')}>
+                  {progressPercent}% использовано
+                </span>
+                {isOverBudget ? (
+                  <span className="text-destructive font-medium">
+                    перерасход {formatMoney(Math.abs(diff))} ₽
+                  </span>
+                ) : (
+                  <span className="text-muted-foreground">
+                    осталось {formatMoney(diff)} ₽
+                  </span>
                 )}
               </div>
             </div>
           )}
 
           {/* No plan indicator */}
-          {category.plannedAmount === 0 && category.actualAmount > 0 && (
+          {totalPlanned === 0 && category.actualAmount > 0 && (
             <p className="mt-3 text-xs text-muted-foreground">
               План не установлен
             </p>

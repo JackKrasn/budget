@@ -34,8 +34,9 @@ import {
   type CategorySummary,
   type TagSummary,
 } from '@/features/expenses'
-import type { ExpenseListRow } from '@/lib/api/types'
-import { useCurrentBudget } from '@/features/budget'
+import { ExpenseCategoryChart, ExpenseTagChart } from '@/features/analytics'
+import type { ExpenseListRow, BudgetItemWithCategory } from '@/lib/api/types'
+import { useBudgetByMonth } from '@/features/budget'
 import { useAccounts } from '@/features/accounts'
 import { DateRangePicker } from '@/components/common'
 
@@ -129,7 +130,10 @@ export default function ExpensesPage() {
   const { data: categoriesData } = useExpenseCategories()
   const { data: tagsData } = useExpenseTags()
   const { data: accountsData } = useAccounts()
-  const { data: currentBudget, isLoading: isBudgetLoading } = useCurrentBudget()
+  // Используем бюджет для выбранного месяца (из dateRange)
+  const budgetYear = dateRange.from.getFullYear()
+  const budgetMonth = dateRange.from.getMonth() + 1
+  const { data: currentBudget, isLoading: isBudgetLoading } = useBudgetByMonth(budgetYear, budgetMonth)
   const deleteExpense = useDeleteExpense()
 
   const expenses = expensesData?.data ?? []
@@ -137,7 +141,7 @@ export default function ExpensesPage() {
   const categories = categoriesData?.data ?? []
   const tags = tagsData?.data ?? []
   const accounts = accountsData?.data ?? []
-  const budgetItems = currentBudget?.items ?? []
+  const budgetItems: BudgetItemWithCategory[] = currentBudget?.items ?? []
 
   // Aggregate expenses by category and merge with budget data
   const categorySummaries = useMemo<CategorySummary[]>(() => {
@@ -161,6 +165,7 @@ export default function ExpensesPage() {
         categoryColor: item.categoryColor,
         actualAmount: expensesByCategory[item.categoryId] || 0,
         plannedAmount: item.plannedAmount,
+        plannedExpensesSum: item.plannedExpensesSum,
       }
     })
 
@@ -588,12 +593,29 @@ export default function ExpensesPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              className="space-y-6"
             >
               {categorySummaries.length > 0 ? (
-                <CategoryGrid
-                  categories={categorySummaries}
-                  onCategoryClick={handleCategoryClick}
-                />
+                <>
+                  {/* Pie Chart */}
+                  <ExpenseCategoryChart
+                    data={categorySummaries.map(c => ({
+                      categoryId: c.categoryId,
+                      categoryName: c.categoryName,
+                      categoryColor: c.categoryColor,
+                      amount: c.actualAmount,
+                    }))}
+                    title="Распределение расходов"
+                    description="Нажмите на категорию для просмотра деталей"
+                    onCategoryClick={handleCategoryClick}
+                  />
+
+                  {/* Category Grid */}
+                  <CategoryGrid
+                    categories={categorySummaries}
+                    onCategoryClick={handleCategoryClick}
+                  />
+                </>
               ) : (
                 <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
                   <Receipt className="h-12 w-12 text-muted-foreground/50" />
@@ -618,12 +640,30 @@ export default function ExpensesPage() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              className="space-y-6"
             >
               {tagSummaries.length > 0 ? (
-                <TagGrid
-                  tags={tagSummaries}
-                  onTagClick={handleTagClick}
-                />
+                <>
+                  {/* Pie Chart */}
+                  <ExpenseTagChart
+                    data={tagSummaries.map(t => ({
+                      tagId: t.tagId,
+                      tagName: t.tagName,
+                      tagColor: t.tagColor,
+                      totalAmount: t.totalAmount,
+                      expenseCount: t.expenseCount,
+                    }))}
+                    title="Распределение по меткам"
+                    description="Нажмите на метку для просмотра деталей"
+                    onTagClick={handleTagClick}
+                  />
+
+                  {/* Tag Grid */}
+                  <TagGrid
+                    tags={tagSummaries}
+                    onTagClick={handleTagClick}
+                  />
+                </>
               ) : (
                 <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
                   <Tag className="h-12 w-12 text-muted-foreground/50" />
