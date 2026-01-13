@@ -67,6 +67,7 @@ export interface CreateAccountRequest {
   bankName?: string
   icon?: string
   color?: string
+  initialBalance?: number
 }
 
 export interface UpdateAccountRequest {
@@ -77,6 +78,7 @@ export interface UpdateAccountRequest {
   icon?: string
   color?: string
   isArchived?: boolean
+  currentBalance?: number
 }
 
 export interface AccountsListResponse {
@@ -1144,5 +1146,42 @@ export interface DepositAccrualsResponse {
 
 export interface MaturingDepositsParams {
   days?: number
+  [key: string]: string | number | boolean | undefined
+}
+
+// === Balance Adjustments (Корректировки баланса) ===
+
+export interface BalanceAdjustment {
+  id: UUID
+  account_id: UUID
+  amount: number
+  reason: string
+  date: ISODate
+  created_at: ISODate
+}
+
+export interface CreateBalanceAdjustmentRequest {
+  accountId: string
+  amount: number
+  reason: string
+  date: string
+}
+
+export interface SetBalanceRequest {
+  accountId: string
+  currentBalance: number
+  reason?: string
+  date?: string
+}
+
+export interface BalanceAdjustmentsListResponse {
+  data: BalanceAdjustment[]
+  total: number
+}
+
+export interface BalanceAdjustmentsListParams {
+  accountId?: string
+  from?: string
+  to?: string
   [key: string]: string | number | boolean | undefined
 }

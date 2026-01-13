@@ -74,6 +74,7 @@ const formSchema = z.object({
   bankName: z.string().optional(),
   icon: z.string().optional(),
   color: z.string().optional(),
+  currentBalance: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -101,6 +102,7 @@ export function EditAccountDialog({
       bankName: '',
       icon: 'credit-card',
       color: '#10b981',
+      currentBalance: '',
     },
   })
 
@@ -114,6 +116,7 @@ export function EditAccountDialog({
         bankName: account.bank_name || '',
         icon: account.icon || 'credit-card',
         color: account.color || '#10b981',
+        currentBalance: String(account.current_balance),
       })
     }
   }, [account, form])
@@ -122,6 +125,15 @@ export function EditAccountDialog({
     if (!account) return
 
     try {
+      // Parse and check if balance changed
+      const newBalance = values.currentBalance
+        ? parseFloat(values.currentBalance)
+        : undefined
+      const balanceChanged =
+        newBalance !== undefined &&
+        !isNaN(newBalance) &&
+        newBalance !== account.current_balance
+
       await updateAccount.mutateAsync({
         id: account.id,
         data: {
@@ -131,6 +143,7 @@ export function EditAccountDialog({
           bankName: values.bankName || undefined,
           icon: values.icon || undefined,
           color: values.color || undefined,
+          currentBalance: balanceChanged ? newBalance : undefined,
         },
       })
       onOpenChange(false)
@@ -234,6 +247,28 @@ export function EditAccountDialog({
                   </FormControl>
                   <FormDescription>
                     Название банка или платформы
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Current Balance */}
+            <FormField
+              control={form.control}
+              name="currentBalance"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Текущий баланс</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="0"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    При изменении создаётся корректировка баланса
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
