@@ -48,11 +48,12 @@ import {
 } from '@/features/accounts'
 import { DateRangePicker, ViewModeTabs, type ViewMode } from '@/components/common'
 
-function formatMoney(amount: number): string {
+function formatMoney(amount: number | undefined | null): string {
+  const value = Number(amount) || 0
   return new Intl.NumberFormat('ru-RU', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount)
+  }).format(value)
 }
 
 const container = {

@@ -153,11 +153,17 @@ export function useBudgetByMonth(year: number, month: number) {
     queryKey: budgetKeys.byMonth(year, month),
     queryFn: async () => {
       const response = await budgetsApi.list({ year })
-      const budget = response.data.find((b) => b.month === month)
-      if (!budget) return null
+      const budgetFromList = response.data.find((b) => b.month === month)
+      if (!budgetFromList) return null
 
-      // Бэкенд возвращает items прямо в ответе /budgets/{id}
-      return budgetsApi.get(budget.id)
+      // Получаем детальную информацию о бюджете
+      const budgetDetail = await budgetsApi.get(budgetFromList.id)
+
+      // Используем total_planned из списка (там он вычисляется корректно)
+      return {
+        ...budgetDetail,
+        total_planned: budgetFromList.total_planned,
+      }
     },
   })
 }
