@@ -4,19 +4,6 @@ import {
   Trash2,
   Pencil,
   Wallet,
-  ShoppingCart,
-  Home,
-  Car,
-  Utensils,
-  Plane,
-  Heart,
-  Gift,
-  GraduationCap,
-  Smartphone,
-  Zap,
-  Coffee,
-  Film,
-  ShoppingBag,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -27,24 +14,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { getIconByName } from '@/lib/icon-registry'
 import type { ExpenseListRow } from '@/lib/api/types'
-
-const CATEGORY_ICONS: Record<string, React.ElementType> = {
-  food: Utensils,
-  transport: Car,
-  housing: Home,
-  utilities: Zap,
-  health: Heart,
-  education: GraduationCap,
-  entertainment: Film,
-  shopping: ShoppingBag,
-  travel: Plane,
-  gifts: Gift,
-  phone: Smartphone,
-  coffee: Coffee,
-  groceries: ShoppingCart,
-  default: Wallet,
-}
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -67,7 +38,7 @@ interface ExpenseCardProps {
 }
 
 export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
-  const Icon = CATEGORY_ICONS[expense.categoryCode] || CATEGORY_ICONS.default
+  const Icon = getIconByName(expense.categoryIcon)
   const hasFundAllocation = expense.fundedAmount > 0
 
   return (
@@ -195,7 +166,7 @@ interface ExpenseRowProps {
 }
 
 export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
-  const Icon = CATEGORY_ICONS[expense.categoryCode] || CATEGORY_ICONS.default
+  const Icon = getIconByName(expense.categoryIcon)
   const hasFundAllocation = expense.fundedAmount > 0
 
   return (
@@ -252,13 +223,13 @@ export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
       </div>
 
       {/* Date */}
-      <span className="text-sm text-muted-foreground shrink-0">
+      <span className="text-sm text-muted-foreground shrink-0 w-16 text-right">
         {formatDate(expense.date)}
       </span>
 
       {/* Amount */}
-      <span className="font-semibold tabular-nums shrink-0">
-        -{formatMoney(expense.amount)} {expense.currency}
+      <span className="font-semibold tabular-nums shrink-0 w-28 text-right">
+        -{formatMoney(expense.amount)} ₽
       </span>
 
       {/* Actions */}

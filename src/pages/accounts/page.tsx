@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, CreditCard, AlertCircle, Loader2 } from 'lucide-react'
+import { Plus, CreditCard, AlertCircle, Loader2, ArrowLeftRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -11,6 +11,7 @@ import {
   CreateAccountDialog,
   EditAccountDialog,
   SyncBalanceDialog,
+  TransferDialog,
 } from '@/features/accounts'
 import type { AccountWithType } from '@/lib/api/types'
 
@@ -84,12 +85,20 @@ export default function AccountsPage() {
             Банковские карты, наличные и депозиты
           </p>
         </div>
-        <CreateAccountDialog>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Новый счёт
-          </Button>
-        </CreateAccountDialog>
+        <div className="flex gap-2">
+          <TransferDialog>
+            <Button variant="outline">
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Перевод
+            </Button>
+          </TransferDialog>
+          <CreateAccountDialog>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Новый счёт
+            </Button>
+          </CreateAccountDialog>
+        </div>
       </motion.div>
 
       {/* Stats */}

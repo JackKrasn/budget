@@ -8,15 +8,14 @@ import {
   Loader2,
   TrendingDown,
   Wallet,
-  LayoutGrid,
-  List,
   ChevronLeft,
   Target,
+  ArrowLeftRight,
+  RefreshCw,
   Tag,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Progress } from '@/components/ui/progress'
 import {
   useExpenses,
@@ -35,16 +34,26 @@ import {
   type TagSummary,
 } from '@/features/expenses'
 import { ExpenseCategoryChart, ExpenseTagChart } from '@/features/analytics'
-import type { ExpenseListRow, BudgetItemWithCategory } from '@/lib/api/types'
+import type { ExpenseListRow, BudgetItemWithCategory, TransferWithAccounts, BalanceAdjustmentWithAccount } from '@/lib/api/types'
 import { useBudgetByMonth } from '@/features/budget'
-import { useAccounts } from '@/features/accounts'
-import { DateRangePicker } from '@/components/common'
+import {
+  useAccounts,
+  TransferDialog,
+  TransferRow,
+  BalanceAdjustmentRow,
+  useTransfers,
+  useDeleteTransfer,
+  useBalanceAdjustments,
+  useDeleteBalanceAdjustment,
+} from '@/features/accounts'
+import { DateRangePicker, ViewModeTabs, type ViewMode } from '@/components/common'
 
-function formatMoney(amount: number): string {
+function formatMoney(amount: number | undefined | null): string {
+  const value = Number(amount) || 0
   return new Intl.NumberFormat('ru-RU', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  }).format(amount)
+  }).format(value)
 }
 
 const container = {
@@ -69,7 +78,7 @@ export default function ExpensesPage() {
   const categoryFromUrl = searchParams.get('category')
   const tagFromUrl = searchParams.get('tag')
 
-  const [viewMode, setViewMode] = useState<'categories' | 'tags' | 'list'>(
+  const [viewMode, setViewMode] = useState<ViewMode>(
     categoryFromUrl || tagFromUrl ? 'list' : 'categories'
   )
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
@@ -136,12 +145,29 @@ export default function ExpensesPage() {
   const { data: currentBudget, isLoading: isBudgetLoading } = useBudgetByMonth(budgetYear, budgetMonth)
   const deleteExpense = useDeleteExpense()
 
+  // Transfers and balance adjustments
+  const { data: transfersData, isLoading: isTransfersLoading } = useTransfers({
+    from: dateRange.from.toISOString().split('T')[0],
+    to: dateRange.to.toISOString().split('T')[0],
+    accountId: selectedAccountId || undefined,
+  })
+  const deleteTransfer = useDeleteTransfer()
+
+  const { data: adjustmentsData, isLoading: isAdjustmentsLoading } = useBalanceAdjustments({
+    from: dateRange.from.toISOString().split('T')[0],
+    to: dateRange.to.toISOString().split('T')[0],
+    accountId: selectedAccountId || undefined,
+  })
+  const deleteAdjustment = useDeleteBalanceAdjustment()
+
   const expenses = expensesData?.data ?? []
   const summary = expensesData?.summary
   const categories = categoriesData?.data ?? []
   const tags = tagsData?.data ?? []
   const accounts = accountsData?.data ?? []
   const budgetItems: BudgetItemWithCategory[] = currentBudget?.items ?? []
+  const transfers = transfersData?.data ?? []
+  const adjustments = adjustmentsData?.data ?? []
 
   // Aggregate expenses by category and merge with budget data
   const categorySummaries = useMemo<CategorySummary[]>(() => {
@@ -225,6 +251,57 @@ export default function ExpensesPage() {
     })
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
   }, [expenses])
+
+  // Group all operations by date for "all" view
+  type OperationType = 'expense' | 'transfer' | 'adjustment'
+  interface Operation {
+    id: string
+    type: OperationType
+    date: string
+    data: ExpenseListRow | TransferWithAccounts | BalanceAdjustmentWithAccount
+  }
+  interface DayGroup {
+    date: string
+    operations: Operation[]
+    totalExpenses: number
+    totalTransfers: number
+  }
+
+  const allOperationsByDate = useMemo<DayGroup[]>(() => {
+    const operations: Operation[] = [
+      ...expenses.map((e) => ({ id: e.id, type: 'expense' as const, date: e.date, data: e })),
+      ...transfers.map((t) => ({ id: t.id, type: 'transfer' as const, date: t.date, data: t })),
+      ...adjustments.map((a) => ({ id: a.id, type: 'adjustment' as const, date: a.date, data: a })),
+    ]
+
+    const groups: Record<string, Operation[]> = {}
+    operations.forEach((op) => {
+      const dateKey = op.date.split('T')[0]
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
+      }
+      groups[dateKey].push(op)
+    })
+
+    return Object.entries(groups)
+      .map(([date, ops]) => {
+        ops.sort((a, b) => {
+          const typeOrder = { expense: 0, transfer: 1, adjustment: 2 }
+          return typeOrder[a.type] - typeOrder[b.type]
+        })
+
+        const totalExpenses = ops
+          .filter((op) => op.type === 'expense')
+          .reduce((sum, op) => sum + (op.data as ExpenseListRow).amount, 0)
+
+        const totalTransfers = ops
+          .filter((op) => op.type === 'transfer')
+          .reduce((sum, op) => sum + (op.data as TransferWithAccounts).amount, 0)
+
+        return { date, operations: ops, totalExpenses, totalTransfers }
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [expenses, transfers, adjustments])
 
   const handleEdit = (expense: ExpenseListRow) => {
     setEditingExpense(expense)
@@ -353,12 +430,20 @@ export default function ExpensesPage() {
             </p>
           </div>
         </div>
-        <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Добавить расход
-          </Button>
-        </CreateExpenseDialog>
+        <div className="flex gap-2">
+          <TransferDialog>
+            <Button variant="outline">
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Перевод
+            </Button>
+          </TransferDialog>
+          <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Добавить расход
+            </Button>
+          </CreateExpenseDialog>
+        </div>
       </motion.div>
 
       {/* Summary Stats */}
@@ -528,35 +613,22 @@ export default function ExpensesPage() {
           <div className="flex-1" />
 
           {/* View Mode */}
-          <Tabs
+          <ViewModeTabs
             value={viewMode}
-            onValueChange={(v) => {
-              setViewMode(v as 'categories' | 'tags' | 'list')
-              if (v === 'categories') {
-                setSelectedCategoryId(null)
-                setSelectedTagId(null)
-              }
-              if (v === 'tags') {
+            onChange={(v) => {
+              setViewMode(v)
+              if (v === 'all' || v === 'categories' || v === 'tags' || v === 'transfers' || v === 'adjustments') {
                 setSelectedCategoryId(null)
                 setSelectedTagId(null)
               }
             }}
-          >
-            <TabsList>
-              <TabsTrigger value="categories" className="gap-2">
-                <LayoutGrid className="h-4 w-4" />
-                <span className="hidden sm:inline">Категории</span>
-              </TabsTrigger>
-              <TabsTrigger value="tags" className="gap-2">
-                <Tag className="h-4 w-4" />
-                <span className="hidden sm:inline">Метки</span>
-              </TabsTrigger>
-              <TabsTrigger value="list" className="gap-2">
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">Список</span>
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+            allCount={expenses.length + transfers.length + adjustments.length}
+            expenseCount={expenses.length}
+            transferCount={transfers.length}
+            adjustmentCount={adjustments.length}
+            categoryCount={categorySummaries.length}
+            tagCount={tagSummaries.length}
+          />
         </div>
       </motion.div>
 
@@ -587,7 +659,107 @@ export default function ExpensesPage() {
       {/* Content */}
       {!isLoading && !isBudgetLoading && !error && (
         <AnimatePresence mode="wait">
-          {viewMode === 'categories' ? (
+          {viewMode === 'all' ? (
+            <motion.div
+              key="all"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {allOperationsByDate.length > 0 ? (
+                allOperationsByDate.map((group) => (
+                  <div key={group.date} className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-medium text-muted-foreground capitalize">
+                        {formatDateHeader(group.date)}
+                      </h3>
+                      <div className="flex items-center gap-3 text-xs">
+                        {group.totalExpenses > 0 && (
+                          <span className="text-rose-500 font-medium tabular-nums">
+                            −{formatMoney(group.totalExpenses)} ₽
+                          </span>
+                        )}
+                        {group.totalTransfers > 0 && (
+                          <span className="text-blue-500 font-medium tabular-nums">
+                            ↔ {formatMoney(group.totalTransfers)} ₽
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <motion.div
+                      className="space-y-2"
+                      variants={container}
+                      initial="hidden"
+                      animate="show"
+                    >
+                      {group.operations.map((op) => {
+                        if (op.type === 'expense') {
+                          const expense = op.data as ExpenseListRow
+                          return (
+                            <motion.div key={op.id} variants={item}>
+                              <ExpenseRow
+                                expense={expense}
+                                onEdit={() => handleEdit(expense)}
+                                onDelete={() => handleDelete(expense.id)}
+                              />
+                            </motion.div>
+                          )
+                        }
+                        if (op.type === 'transfer') {
+                          const transfer = op.data as TransferWithAccounts
+                          return (
+                            <motion.div key={op.id} variants={item}>
+                              <TransferRow
+                                transfer={transfer}
+                                onDelete={() => {
+                                  if (confirm('Удалить этот перевод?')) {
+                                    deleteTransfer.mutate(transfer.id)
+                                  }
+                                }}
+                              />
+                            </motion.div>
+                          )
+                        }
+                        if (op.type === 'adjustment') {
+                          const adjustment = op.data as BalanceAdjustmentWithAccount
+                          return (
+                            <motion.div key={op.id} variants={item}>
+                              <BalanceAdjustmentRow
+                                adjustment={adjustment}
+                                onDelete={() => {
+                                  if (confirm('Удалить эту корректировку?')) {
+                                    deleteAdjustment.mutate(adjustment.id)
+                                  }
+                                }}
+                              />
+                            </motion.div>
+                          )
+                        }
+                        return null
+                      })}
+                    </motion.div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
+                  <Receipt className="h-12 w-12 text-muted-foreground/50" />
+                  <div className="text-center">
+                    <p className="font-medium">Нет операций</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      За этот период операции не найдены
+                    </p>
+                  </div>
+                  <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Добавить расход
+                    </Button>
+                  </CreateExpenseDialog>
+                </div>
+              )}
+            </motion.div>
+          ) : viewMode === 'categories' ? (
             <motion.div
               key="categories"
               initial={{ opacity: 0 }}
@@ -682,7 +854,7 @@ export default function ExpensesPage() {
                 </div>
               )}
             </motion.div>
-          ) : (
+          ) : viewMode === 'list' ? (
             <motion.div
               key="list"
               initial={{ opacity: 0 }}
@@ -744,7 +916,101 @@ export default function ExpensesPage() {
                 </div>
               )}
             </motion.div>
-          )}
+          ) : viewMode === 'transfers' ? (
+            <motion.div
+              key="transfers"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {isTransfersLoading ? (
+                <div className="flex h-[300px] items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : transfers.length > 0 ? (
+                <motion.div
+                  className="space-y-2"
+                  variants={container}
+                  initial="hidden"
+                  animate="show"
+                >
+                  {transfers.map((transfer) => (
+                    <motion.div key={transfer.id} variants={item}>
+                      <TransferRow
+                        transfer={transfer}
+                        onDelete={() => {
+                          if (confirm('Удалить этот перевод?')) {
+                            deleteTransfer.mutate(transfer.id)
+                          }
+                        }}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : (
+                <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
+                  <ArrowLeftRight className="h-12 w-12 text-muted-foreground/50" />
+                  <div className="text-center">
+                    <p className="font-medium">Нет переводов</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      За этот период переводы не найдены
+                    </p>
+                  </div>
+                  <TransferDialog>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Новый перевод
+                    </Button>
+                  </TransferDialog>
+                </div>
+              )}
+            </motion.div>
+          ) : viewMode === 'adjustments' ? (
+            <motion.div
+              key="adjustments"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              {isAdjustmentsLoading ? (
+                <div className="flex h-[300px] items-center justify-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : adjustments.length > 0 ? (
+                <motion.div
+                  className="space-y-2"
+                  variants={container}
+                  initial="hidden"
+                  animate="show"
+                >
+                  {adjustments.map((adjustment) => (
+                    <motion.div key={adjustment.id} variants={item}>
+                      <BalanceAdjustmentRow
+                        adjustment={adjustment}
+                        onDelete={() => {
+                          if (confirm('Удалить эту корректировку?')) {
+                            deleteAdjustment.mutate(adjustment.id)
+                          }
+                        }}
+                      />
+                    </motion.div>
+                  ))}
+                </motion.div>
+              ) : (
+                <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
+                  <RefreshCw className="h-12 w-12 text-muted-foreground/50" />
+                  <div className="text-center">
+                    <p className="font-medium">Нет корректировок</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      За этот период корректировки баланса не найдены
+                    </p>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          ) : null}
         </AnimatePresence>
       )}
 

@@ -656,7 +656,7 @@ export default function BudgetPage() {
           </CardContent>
         </Card>
 
-        {/* По категориям */}
+        {/* Общее запланированное */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -664,9 +664,9 @@ export default function BudgetPage() {
                 <LayoutGrid className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">По категориям</p>
+                <p className="text-xs text-muted-foreground">Общее запланированное</p>
                 <p className="text-lg font-bold tabular-nums">
-                  {formatMoney(stats.totalPlanned)} ₽
+                  {formatMoney(budgetData?.total_planned ?? 0)} ₽
                 </p>
                 <p className="text-xs text-muted-foreground">
                   потрачено {formatMoney(stats.totalActual)} ₽
