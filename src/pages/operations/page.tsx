@@ -5,7 +5,6 @@ import {
   AlertCircle,
   Receipt,
   ArrowLeftRight,
-  RefreshCw,
   TrendingDown,
   Plus,
 } from 'lucide-react'
