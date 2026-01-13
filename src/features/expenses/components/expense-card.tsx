@@ -252,13 +252,13 @@ export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
       </div>
 
       {/* Date */}
-      <span className="text-sm text-muted-foreground shrink-0">
+      <span className="text-sm text-muted-foreground shrink-0 w-16 text-right">
         {formatDate(expense.date)}
       </span>
 
       {/* Amount */}
-      <span className="font-semibold tabular-nums shrink-0">
-        -{formatMoney(expense.amount)} {expense.currency}
+      <span className="font-semibold tabular-nums shrink-0 w-28 text-right">
+        -{formatMoney(expense.amount)} ₽
       </span>
 
       {/* Actions */}

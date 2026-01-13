@@ -1160,6 +1160,10 @@ export interface BalanceAdjustment {
   created_at: ISODate
 }
 
+export interface BalanceAdjustmentWithAccount extends BalanceAdjustment {
+  account_name: string
+}
+
 export interface CreateBalanceAdjustmentRequest {
   accountId: string
   amount: number
@@ -1175,7 +1179,7 @@ export interface SetBalanceRequest {
 }
 
 export interface BalanceAdjustmentsListResponse {
-  data: BalanceAdjustment[]
+  data: BalanceAdjustmentWithAccount[]
   total: number
 }
 
@@ -1183,5 +1187,44 @@ export interface BalanceAdjustmentsListParams {
   accountId?: string
   from?: string
   to?: string
+  [key: string]: string | number | boolean | undefined
+}
+
+// === Transfers (Переводы между счетами) ===
+
+export interface Transfer {
+  id: UUID
+  from_account_id: UUID
+  to_account_id: UUID
+  amount: number
+  currency: string
+  date: ISODate
+  description?: string
+  created_at: ISODate
+}
+
+export interface TransferWithAccounts extends Transfer {
+  from_account_name: string
+  to_account_name: string
+}
+
+export interface CreateTransferRequest {
+  fromAccountId: string
+  toAccountId: string
+  amount: number
+  currency: string
+  date: string
+  description?: string
+}
+
+export interface TransfersListResponse {
+  data: TransferWithAccounts[]
+  total: number
+}
+
+export interface TransfersListParams {
+  from?: string
+  to?: string
+  accountId?: string
   [key: string]: string | number | boolean | undefined
 }

@@ -53,6 +53,7 @@ const navGroups = [
     label: 'Операции',
     icon: ArrowUpDown,
     items: [
+      { title: 'Все операции', icon: ArrowUpDown, href: '/operations' },
       { title: 'Расходы', icon: Receipt, href: '/expenses' },
       { title: 'Доходы', icon: Banknote, href: '/incomes' },
     ],
