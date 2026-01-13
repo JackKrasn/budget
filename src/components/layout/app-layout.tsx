@@ -1,6 +1,5 @@
 import { Outlet, useLocation, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   CalendarRange,
@@ -81,25 +80,6 @@ const navGroups = [
 ]
 
 function Logo({ collapsed }: { collapsed: boolean }) {
-  const [theme, setTheme] = useState<'light' | 'dark'>('dark')
-
-  useEffect(() => {
-    const checkTheme = () => {
-      const isDark = document.documentElement.classList.contains('dark')
-      setTheme(isDark ? 'dark' : 'light')
-    }
-
-    checkTheme()
-
-    const observer = new MutationObserver(checkTheme)
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class'],
-    })
-
-    return () => observer.disconnect()
-  }, [])
-
   return (
     <Link to="/" className="flex items-center gap-3 px-1">
       <motion.div
@@ -108,8 +88,8 @@ function Logo({ collapsed }: { collapsed: boolean }) {
         whileTap={{ scale: 0.95 }}
       >
         <img
-          src={theme === 'light' ? '/logo-light.png' : '/logo.png'}
-          alt="Budget Planner Logo"
+          src="/logo.png"
+          alt="Бюджет"
           className="h-full w-full object-cover"
         />
       </motion.div>
@@ -123,10 +103,7 @@ function Logo({ collapsed }: { collapsed: boolean }) {
             className="flex flex-col"
           >
             <span className="text-sm font-semibold tracking-tight text-foreground">
-              Budget
-            </span>
-            <span className="text-[10px] font-medium uppercase tracking-widest text-muted-foreground">
-              Planner
+              Бюджет
             </span>
           </motion.div>
         )}
@@ -351,7 +328,7 @@ function AppSidebar() {
               className="mt-2 flex items-center justify-center"
             >
               <span className="text-[9px] font-medium tracking-wider text-muted-foreground/40">
-                v1.0.0 BETA
+                v{__APP_VERSION__}
               </span>
             </motion.div>
           )}

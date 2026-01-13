@@ -1,73 +1,124 @@
-# React + TypeScript + Vite
+# Бюджет
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Приложение для управления личными финансами.
 
-Currently, two official plugins are available:
+## Технологии
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **Frontend**: React 19, TypeScript, Tailwind CSS 4, shadcn/ui
+- **Desktop**: Tauri 2 (Rust)
+- **State**: Zustand
+- **Charts**: Recharts
 
-## React Compiler
+## Требования
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Node.js 20+
+- Rust (для desktop-приложения)
 
-## Expanding the ESLint configuration
+## Установка
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+```bash
+# Клонирование репозитория
+git clone <repo-url>
+cd budget
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+# Установка зависимостей
+npm install
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+# Установка Rust (если не установлен)
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Запуск
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+### Веб-версия (браузер)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run dev
 ```
+
+Откроется на http://localhost:5273
+
+### Desktop-приложение (Tauri)
+
+```bash
+npm run tauri:dev
+```
+
+Запустит приложение как отдельное окно macOS.
+
+## Сборка
+
+### Веб-версия
+
+```bash
+npm run build
+npm run preview  # Предпросмотр production-сборки
+```
+
+### Desktop-приложение
+
+```bash
+npm run tauri:build
+```
+
+Собранное приложение будет в `src-tauri/target/release/bundle/`:
+- `macos/budget.app` — приложение для macOS
+- `dmg/budget_<version>_aarch64.dmg` — установщик для macOS
+
+### Установка на macOS
+
+1. **Через .app**: Перетащи `budget.app` в папку `/Applications`
+2. **Через .dmg**: Открой dmg файл и перетащи приложение в Applications
+
+После установки можно запускать через Launchpad или Spotlight (Cmd+Space → "budget").
+
+## Обновление версии
+
+При выпуске новой версии нужно обновить версию в двух файлах:
+
+1. `package.json`:
+```json
+"version": "1.1.0"
+```
+
+2. `src-tauri/tauri.conf.json`:
+```json
+"version": "1.1.0"
+```
+
+Затем пересобрать приложение:
+```bash
+npm run tauri:build
+```
+
+И заменить старое приложение в `/Applications` новым.
+
+Текущая версия отображается внизу sidebar в приложении.
+
+## Структура проекта
+
+```
+├── src/                    # Frontend код
+│   ├── components/         # UI компоненты
+│   ├── features/           # Фичи (expenses, budget, etc.)
+│   ├── lib/                # Утилиты
+│   ├── pages/              # Страницы
+│   └── stores/             # Zustand stores
+├── src-tauri/              # Tauri (Rust) код
+│   ├── icons/              # Иконки приложения
+│   └── tauri.conf.json     # Конфигурация Tauri
+├── public/                 # Статические файлы
+└── index.html              # HTML entry point
+```
+
+## Скрипты
+
+| Команда | Описание |
+|---------|----------|
+| `npm run dev` | Запуск dev-сервера (порт 5273) |
+| `npm run build` | Сборка для production |
+| `npm run preview` | Предпросмотр сборки |
+| `npm run lint` | Проверка ESLint |
+| `npm run tauri:dev` | Запуск Tauri в dev-режиме |
+| `npm run tauri:build` | Сборка Tauri приложения |
