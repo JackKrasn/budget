@@ -17,6 +17,8 @@ import {
   ArrowUpDown,
   Landmark,
   PieChart,
+  Repeat,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import {
@@ -74,8 +76,16 @@ const navGroups = [
     label: 'Аналитика',
     icon: PieChart,
     items: [
-      { title: 'Категории', icon: FolderOpen, href: '/categories' },
       { title: 'Отчёты', icon: BarChart3, href: '/analytics' },
+    ],
+  },
+  {
+    id: 'management',
+    label: 'Управление',
+    icon: SlidersHorizontal,
+    items: [
+      { title: 'Категории', icon: FolderOpen, href: '/categories' },
+      { title: 'Шаблоны', icon: Repeat, href: '/templates' },
     ],
   },
 ]

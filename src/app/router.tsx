@@ -15,6 +15,7 @@ import CreditDetailsPage from '@/pages/credits/[id]/page'
 import DepositDetailsPage from '@/pages/deposits/[id]/page'
 import CategoriesPage from '@/pages/categories/page'
 import AnalyticsPage from '@/pages/analytics/page'
+import TemplatesPage from '@/pages/templates/page'
 import SettingsPage from '@/pages/settings/page'
 
 export const router = createBrowserRouter([
@@ -85,6 +86,10 @@ export const router = createBrowserRouter([
       {
         path: 'analytics',
         element: <AnalyticsPage />,
+      },
+      {
+        path: 'templates',
+        element: <TemplatesPage />,
       },
       {
         path: 'settings',

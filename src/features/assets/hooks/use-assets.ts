@@ -13,7 +13,8 @@ import { toast } from 'sonner'
 export const assetKeys = {
   all: ['assets'] as const,
   lists: () => [...assetKeys.all, 'list'] as const,
-  list: (params?: AssetsListParams) => [...assetKeys.lists(), params] as const,
+  list: (params?: AssetsListParams) =>
+    params ? [...assetKeys.lists(), params] : assetKeys.lists(),
   details: () => [...assetKeys.all, 'detail'] as const,
   detail: (id: string) => [...assetKeys.details(), id] as const,
 }
