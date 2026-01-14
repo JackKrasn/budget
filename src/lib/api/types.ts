@@ -212,19 +212,21 @@ export interface AssetInfo {
 export interface FundAssetBalance {
   asset: AssetInfo
   amount: number
-  valueRub: number
+  valueBase: number
   valueOriginal: number
 }
 
 export interface FundBalance {
   fund: Fund
   assets: FundAssetBalance[]
-  totalRub: number
+  totalBase: number
+  baseCurrency: string
   progress?: number
 }
 
 export interface FundsSummary {
-  totalRub: number
+  totalBase: number
+  baseCurrency: string
   totalDistributionPercentage: number
 }
 
@@ -236,6 +238,7 @@ export interface FundsListResponse {
 
 export interface FundsListParams {
   status?: FundStatus
+  baseCurrency?: string
   [key: string]: string | number | boolean | undefined
 }
 
@@ -415,9 +418,8 @@ export interface CreateExchangeRateRequest {
   source?: string
 }
 
-export interface ExchangeRatesResponse {
-  rates: Record<string, number>
-  updatedAt: ISODate
+export interface ExchangeRatesListResponse {
+  data: ExchangeRate[]
 }
 
 // === Expense Tags ===

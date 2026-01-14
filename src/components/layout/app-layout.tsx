@@ -5,6 +5,7 @@ import {
   CalendarRange,
   Wallet,
   TrendingUp,
+  TrendingDown,
   CreditCard,
   BarChart3,
   Settings,
@@ -86,6 +87,7 @@ const navGroups = [
     items: [
       { title: 'Категории', icon: FolderOpen, href: '/categories' },
       { title: 'Шаблоны', icon: Repeat, href: '/templates' },
+      { title: 'Курсы валют', icon: TrendingDown, href: '/exchange-rates' },
     ],
   },
 ]

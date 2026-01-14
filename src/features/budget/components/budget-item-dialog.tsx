@@ -256,7 +256,7 @@ export function BudgetItemDialog({
                             <SelectContent>
                               {funds.map((fb) => {
                                 const allocationAmt = parseFloat(fundAllocationValue || '0') || 0
-                                const remaining = fb.totalRub - allocationAmt
+                                const remaining = fb.totalBase - allocationAmt
                                 return (
                                   <SelectItem
                                     key={fb.fund.id}
@@ -273,7 +273,7 @@ export function BudgetItemDialog({
                                         {fb.fund.name}
                                       </span>
                                       <span className="text-xs text-muted-foreground ml-8">
-                                        Доступно: {formatMoney(fb.totalRub)} ₽
+                                        Доступно: {formatMoney(fb.totalBase)} ₽
                                         {allocationAmt > 0 && (
                                           <span className={remaining < 0 ? ' text-destructive' : ''}>
                                             {' → после: '}{formatMoney(remaining)} ₽
@@ -315,18 +315,18 @@ export function BudgetItemDialog({
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Доступно в фонде:</span>
                           <span className="tabular-nums font-medium">
-                            {formatMoney(selectedFundBalance.totalRub)} ₽
+                            {formatMoney(selectedFundBalance.totalBase)} ₽
                           </span>
                         </div>
                         {parseFloat(fundAllocationValue || '0') > 0 && (
                           <div className="flex justify-between mt-1">
                             <span className="text-muted-foreground">Останется после:</span>
                             <span className={`tabular-nums font-medium ${
-                              selectedFundBalance.totalRub - parseFloat(fundAllocationValue || '0') < 0
+                              selectedFundBalance.totalBase - parseFloat(fundAllocationValue || '0') < 0
                                 ? 'text-destructive'
                                 : 'text-emerald-500'
                             }`}>
-                              {formatMoney(selectedFundBalance.totalRub - parseFloat(fundAllocationValue || '0'))} ₽
+                              {formatMoney(selectedFundBalance.totalBase - parseFloat(fundAllocationValue || '0'))} ₽
                             </span>
                           </div>
                         )}

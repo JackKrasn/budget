@@ -21,6 +21,13 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -30,11 +37,13 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover'
 import { cn } from '@/lib/utils'
+import { useAccounts } from '@/features/accounts/hooks'
 import type { PlannedIncome } from '@/lib/api/types'
 
 const formSchema = z.object({
   actualAmount: z.string().min(1, 'Введите сумму'),
   actualDate: z.date(),
+  accountId: z.string().min(1, 'Выберите счёт'),
 })
 
 type FormData = z.infer<typeof formSchema>
@@ -43,7 +52,7 @@ interface ReceiveIncomeDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   income: PlannedIncome | null
-  onSubmit: (data: { actualAmount: number; actualDate: string }) => Promise<void>
+  onSubmit: (data: { actualAmount: number; actualDate: string; accountId: string }) => Promise<void>
   isPending?: boolean
 }
 
@@ -54,11 +63,15 @@ export function ReceiveIncomeDialog({
   onSubmit,
   isPending,
 }: ReceiveIncomeDialogProps) {
+  const { data: accountsData } = useAccounts()
+  const accounts = accountsData?.data ?? []
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       actualAmount: '',
       actualDate: new Date(),
+      accountId: '',
     },
   })
 
@@ -68,14 +81,16 @@ export function ReceiveIncomeDialog({
       form.reset({
         actualAmount: String(income.expected_amount),
         actualDate: new Date(),
+        accountId: accounts[0]?.id ?? '',
       })
     }
-  }, [income, form])
+  }, [income, form, accounts])
 
   const handleSubmit = async (data: FormData) => {
     await onSubmit({
       actualAmount: parseFloat(data.actualAmount),
       actualDate: format(data.actualDate, 'yyyy-MM-dd'),
+      accountId: data.accountId,
     })
     form.reset()
     onOpenChange(false)
@@ -152,6 +167,31 @@ export function ReceiveIncomeDialog({
                       {formatMoney(diff)} ₽ от ожидаемой суммы
                     </p>
                   )}
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="accountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Счёт зачисления</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите счёт" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          {account.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
                 </FormItem>
               )}
             />

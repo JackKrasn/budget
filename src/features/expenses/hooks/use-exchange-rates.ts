@@ -7,34 +7,34 @@ import { toast } from 'sonner'
 
 export const exchangeRateKeys = {
   all: ['exchange-rates'] as const,
-  rates: () => [...exchangeRateKeys.all, 'rates'] as const,
+  list: () => [...exchangeRateKeys.all, 'list'] as const,
 }
 
 // === Hooks ===
 
 /**
- * Получить текущие курсы валют
+ * Получить список курсов валют
  */
 export function useExchangeRates() {
   return useQuery({
-    queryKey: exchangeRateKeys.rates(),
-    queryFn: () => exchangeRatesApi.getRates(),
+    queryKey: exchangeRateKeys.list(),
+    queryFn: () => exchangeRatesApi.list(),
     staleTime: 5 * 60 * 1000, // 5 минут
   })
 }
 
 /**
- * Обновить курс валюты
+ * Добавить/обновить курс валюты
  */
-export function useUpdateExchangeRate() {
+export function useCreateExchangeRate() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (data: CreateExchangeRateRequest) =>
-      exchangeRatesApi.updateRate(data),
+      exchangeRatesApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: exchangeRateKeys.rates() })
-      toast.success('Курс валюты обновлён')
+      queryClient.invalidateQueries({ queryKey: exchangeRateKeys.list() })
+      toast.success('Курс валюты сохранён')
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)

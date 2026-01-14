@@ -432,7 +432,7 @@ export function AddPlannedExpenseDialog({
                                 <SelectContent>
                                   {funds.map((fb) => {
                                     const fundedAmt = parseFloat(fundedAmount || '0') || 0
-                                    const remaining = fb.totalRub - fundedAmt
+                                    const remaining = fb.totalBase - fundedAmt
                                     return (
                                       <SelectItem key={fb.fund.id} value={fb.fund.id}>
                                         <div className="flex flex-col gap-0.5">
@@ -446,7 +446,7 @@ export function AddPlannedExpenseDialog({
                                             {fb.fund.name}
                                           </span>
                                           <span className="text-xs text-muted-foreground ml-8">
-                                            Доступно: {formatMoney(fb.totalRub)} ₽
+                                            Доступно: {formatMoney(fb.totalBase)} ₽
                                             {fundedAmt > 0 && (
                                               <span className={remaining < 0 ? ' text-destructive' : ''}>
                                                 {' → после: '}{formatMoney(remaining)} ₽
@@ -507,7 +507,7 @@ export function AddPlannedExpenseDialog({
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{selectedFundBalance.fund.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              Доступно: {formatMoney(selectedFundBalance.totalRub)} ₽
+                              Доступно: {formatMoney(selectedFundBalance.totalBase)} ₽
                             </p>
                           </div>
                           {fundedAmount && (
@@ -517,11 +517,11 @@ export function AddPlannedExpenseDialog({
                               </p>
                               <p className={cn(
                                 "text-xs tabular-nums",
-                                selectedFundBalance.totalRub - parseFloat(fundedAmount || '0') < 0
+                                selectedFundBalance.totalBase - parseFloat(fundedAmount || '0') < 0
                                   ? "text-destructive"
                                   : "text-muted-foreground"
                               )}>
-                                Останется: {formatMoney(selectedFundBalance.totalRub - parseFloat(fundedAmount || '0'))} ₽
+                                Останется: {formatMoney(selectedFundBalance.totalBase - parseFloat(fundedAmount || '0'))} ₽
                               </p>
                             </div>
                           )}

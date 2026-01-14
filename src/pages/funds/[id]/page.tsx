@@ -47,6 +47,7 @@ import {
   BarChart3,
   ArrowLeft,
   AlertCircle,
+  Trash2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -57,6 +58,7 @@ import {
   useCreateDistributionRule,
   useUpdateDistributionRule,
   useDeleteDistributionRule,
+  useDeleteContribution,
   ContributionDialog,
   WithdrawalDialog,
 } from '@/features/funds'
@@ -129,6 +131,7 @@ export default function FundDetailsPage() {
   const [isEditingRule, setIsEditingRule] = useState(false)
   const [contributionOpen, setContributionOpen] = useState(false)
   const [withdrawalOpen, setWithdrawalOpen] = useState(false)
+  const [deletingContributionId, setDeletingContributionId] = useState<string | null>(null)
 
   const { data: fund, isLoading, error } = useFund(id!)
   const updateFund = useUpdateFund()
@@ -137,11 +140,13 @@ export default function FundDetailsPage() {
   const createRule = useCreateDistributionRule()
   const updateRule = useUpdateDistributionRule()
   const deleteRule = useDeleteDistributionRule()
+  const deleteContribution = useDeleteContribution()
 
   const activeRule = rulesData?.data?.find((r) => r.is_active)
 
   const fundData = fund?.fund
-  const totalRub = fund?.totalRub ?? 0
+  const totalBase = fund?.totalBase ?? 0
+  const baseCurrency = fund?.baseCurrency ?? 'RUB'
   const assets = fund?.assets ?? []
 
   const Icon = FUND_ICONS.find((i) => i.value === fundData?.icon)?.icon || Wallet
@@ -279,7 +284,8 @@ export default function FundDetailsPage() {
   // Create a FundBalance object for dialogs
   const fundBalance: FundBalance = {
     fund: fundData,
-    totalRub,
+    totalBase,
+    baseCurrency,
     assets,
   }
 
@@ -367,7 +373,7 @@ export default function FundDetailsPage() {
                 <p className="text-sm text-muted-foreground">Баланс</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-bold tabular-nums tracking-tight">
-                    {formatMoney(totalRub)}
+                    {formatMoney(totalBase)}
                   </span>
                   <span className="text-2xl font-medium text-muted-foreground">₽</span>
                 </div>
@@ -446,16 +452,16 @@ export default function FundDetailsPage() {
                                 {formatMoney(asset.amount)} {asset.asset.currency}
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                ≈ {formatMoney(asset.valueRub)} ₽
+                                ≈ {formatMoney(asset.valueBase)} ₽
                               </p>
                             </>
                           ) : (
                             <>
                               <p className="font-semibold tabular-nums">
-                                {formatMoney(asset.valueRub)} ₽
+                                {formatMoney(asset.valueBase)} ₽
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {asset.amount} шт. × {formatMoney(asset.amount > 0 ? asset.valueRub / asset.amount : 0)} ₽
+                                {asset.amount} шт. × {formatMoney(asset.amount > 0 ? asset.valueBase / asset.amount : 0)} ₽
                               </p>
                             </>
                           )}
@@ -533,7 +539,7 @@ export default function FundDetailsPage() {
                       initial={{ opacity: 0, x: -10 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05 }}
-                      className="flex items-center gap-3 rounded-xl bg-emerald-500/10 p-4"
+                      className="group flex items-center gap-3 rounded-xl bg-emerald-500/10 p-4"
                     >
                       <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
                         <ArrowUpRight className="h-5 w-5 text-emerald-500" />
@@ -547,6 +553,27 @@ export default function FundDetailsPage() {
                           {c.note && ` • ${c.note}`}
                         </p>
                       </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 text-muted-foreground hover:text-destructive"
+                        disabled={deletingContributionId === c.id}
+                        onClick={() => {
+                          if (confirm('Удалить это пополнение? Баланс фонда будет уменьшен.')) {
+                            setDeletingContributionId(c.id)
+                            deleteContribution.mutate(
+                              { fundId: id!, contributionId: c.id },
+                              { onSettled: () => setDeletingContributionId(null) }
+                            )
+                          }
+                        }}
+                      >
+                        {deletingContributionId === c.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="h-4 w-4" />
+                        )}
+                      </Button>
                     </motion.div>
                   ))}
 

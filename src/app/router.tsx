@@ -16,6 +16,7 @@ import DepositDetailsPage from '@/pages/deposits/[id]/page'
 import CategoriesPage from '@/pages/categories/page'
 import AnalyticsPage from '@/pages/analytics/page'
 import TemplatesPage from '@/pages/templates/page'
+import ExchangeRatesPage from '@/pages/exchange-rates/page'
 import SettingsPage from '@/pages/settings/page'
 
 export const router = createBrowserRouter([
@@ -90,6 +91,10 @@ export const router = createBrowserRouter([
       {
         path: 'templates',
         element: <TemplatesPage />,
+      },
+      {
+        path: 'exchange-rates',
+        element: <ExchangeRatesPage />,
       },
       {
         path: 'settings',

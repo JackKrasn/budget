@@ -104,6 +104,14 @@ export const fundsApi = {
       data
     ),
 
+  /**
+   * Удалить пополнение фонда
+   */
+  deleteContribution: (fundId: string, contributionId: string) =>
+    apiClient.delete<void>(
+      `${ENDPOINT}/${fundId}/contributions/${contributionId}`
+    ),
+
   // === Fund Withdrawals ===
 
   /**

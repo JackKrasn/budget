@@ -15,6 +15,7 @@ export {
   // Fund Contributions
   useFundContributions,
   useCreateContribution,
+  useDeleteContribution,
   // Fund Withdrawals
   useFundWithdrawals,
   useCreateWithdrawal,

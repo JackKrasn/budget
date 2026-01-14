@@ -459,6 +459,7 @@ export default function BudgetPage() {
   const handleConfirmReceiveIncome = async (data: {
     actualAmount: number
     actualDate: string
+    accountId: string
   }) => {
     if (!receivingIncome) return
 
@@ -471,6 +472,7 @@ export default function BudgetPage() {
           currency: receivingIncome.currency || 'RUB',
           date: data.actualDate,
           description: receivingIncome.notes || undefined,
+          accountId: data.accountId,
         },
         plannedIncomeId: receivingIncome.id,
       })

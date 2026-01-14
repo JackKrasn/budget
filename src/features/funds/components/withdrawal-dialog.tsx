@@ -234,7 +234,7 @@ export function WithdrawalDialog({
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Доступно в фонде:</span>
-                <span className="font-medium">{formatMoney(fund.totalRub)} ₽</span>
+                <span className="font-medium">{formatMoney(fund.totalBase)} ₽</span>
               </div>
             </div>
 

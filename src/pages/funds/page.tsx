@@ -4,6 +4,13 @@ import { Plus, Wallet, AlertCircle, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   useFunds,
   useDeleteFund,
   FundCard,
@@ -12,6 +19,14 @@ import {
   WithdrawalDialog,
 } from '@/features/funds'
 import type { FundBalance } from '@/lib/api/types'
+
+const CURRENCY_OPTIONS = [
+  { value: 'RUB', label: 'RUB', symbol: '₽' },
+  { value: 'USD', label: 'USD', symbol: '$' },
+  { value: 'EUR', label: 'EUR', symbol: '€' },
+  { value: 'GEL', label: 'GEL', symbol: '₾' },
+  { value: 'TRY', label: 'TRY', symbol: '₺' },
+]
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -36,7 +51,8 @@ const item = {
 }
 
 export default function FundsPage() {
-  const { data, isLoading, error } = useFunds()
+  const [baseCurrency, setBaseCurrency] = useState('RUB')
+  const { data, isLoading, error } = useFunds({ baseCurrency })
   const deleteFund = useDeleteFund()
   const [selectedFund, setSelectedFund] = useState<FundBalance | null>(null)
   const [contributionOpen, setContributionOpen] = useState(false)
@@ -44,6 +60,7 @@ export default function FundsPage() {
 
   const funds = data?.data ?? []
   const summary = data?.summary
+  const currencySymbol = CURRENCY_OPTIONS.find(c => c.value === baseCurrency)?.symbol ?? '₽'
   const activeFunds = funds.filter((f) => f.fund.status === 'active')
   const pausedFunds = funds.filter((f) => f.fund.status === 'paused')
   const completedFunds = funds.filter((f) => f.fund.status === 'completed')
@@ -81,12 +98,26 @@ export default function FundsPage() {
             Распределение средств по целевым фондам
           </p>
         </div>
-        <CreateFundDialog>
-          <Button>
-            <Plus className="mr-2 h-4 w-4" />
-            Новый фонд
-          </Button>
-        </CreateFundDialog>
+        <div className="flex items-center gap-3">
+          <Select value={baseCurrency} onValueChange={setBaseCurrency}>
+            <SelectTrigger className="w-[100px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {CURRENCY_OPTIONS.map((currency) => (
+                <SelectItem key={currency.value} value={currency.value}>
+                  {currency.label} {currency.symbol}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <CreateFundDialog>
+            <Button>
+              <Plus className="mr-2 h-4 w-4" />
+              Новый фонд
+            </Button>
+          </CreateFundDialog>
+        </div>
       </motion.div>
 
       {/* Stats */}
@@ -105,7 +136,7 @@ export default function FundsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Всего в фондах</p>
                 <p className="text-xl font-bold tabular-nums">
-                  {formatMoney(summary?.totalRub ?? 0)} ₽
+                  {formatMoney(summary?.totalBase ?? 0)} {currencySymbol}
                 </p>
               </div>
             </div>
