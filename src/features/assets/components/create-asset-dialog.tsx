@@ -68,13 +68,19 @@ export function CreateAssetDialog({ children }: CreateAssetDialogProps) {
     },
   })
 
+  // Check if selected asset type is currency
+  const selectedTypeId = form.watch('assetTypeId')
+  const selectedType = assetTypesData?.data.find((t) => t.id === selectedTypeId)
+  const isCurrencyType = selectedType?.code === 'currency'
+
   async function onSubmit(values: FormValues) {
     try {
       await createAsset.mutateAsync({
         name: values.name,
         assetTypeId: values.assetTypeId,
         ticker: values.ticker || undefined,
-        currency: values.currency,
+        // For currency assets, always use RUB as the quote currency
+        currency: isCurrencyType ? 'RUB' : values.currency,
         currentPrice: values.currentPrice
           ? parseFloat(values.currentPrice)
           : undefined,
@@ -162,45 +168,49 @@ export function CreateAssetDialog({ children }: CreateAssetDialogProps) {
               )}
             />
 
-            {/* Currency */}
-            <FormField
-              control={form.control}
-              name="currency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Валюта котировки</FormLabel>
-                  <Select
-                    onValueChange={field.onChange}
-                    defaultValue={field.value}
-                  >
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите валюту" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {CURRENCIES.map((currency) => (
-                        <SelectItem key={currency.value} value={currency.value}>
-                          {currency.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    В какой валюте указана цена актива
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Currency - hide for currency assets */}
+            {!isCurrencyType && (
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Валюта котировки</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите валюту" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CURRENCIES.map((currency) => (
+                          <SelectItem key={currency.value} value={currency.value}>
+                            {currency.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      В какой валюте указана цена актива
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Current Price */}
+            {/* Current Price / Exchange Rate */}
             <FormField
               control={form.control}
               name="currentPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Текущая цена (опционально)</FormLabel>
+                  <FormLabel>
+                    {isCurrencyType ? 'Курс к рублю (опционально)' : 'Текущая цена (опционально)'}
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -210,7 +220,7 @@ export function CreateAssetDialog({ children }: CreateAssetDialogProps) {
                     />
                   </FormControl>
                   <FormDescription>
-                    Цена за единицу актива
+                    {isCurrencyType ? 'Текущий курс валюты к рублю' : 'Цена за единицу актива'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

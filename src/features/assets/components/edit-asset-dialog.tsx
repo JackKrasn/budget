@@ -83,6 +83,11 @@ export function EditAssetDialog({
     },
   })
 
+  // Check if selected asset type is currency
+  const selectedTypeId = form.watch('assetTypeId')
+  const selectedType = assetTypesData?.data.find((t) => t.id === selectedTypeId)
+  const isCurrencyType = selectedType?.code === 'currency'
+
   useEffect(() => {
     if (asset) {
       const priceValue = extractPrice(asset.current_price)
@@ -106,7 +111,8 @@ export function EditAssetDialog({
           name: values.name,
           assetTypeId: values.assetTypeId,
           ticker: values.ticker || undefined,
-          currency: values.currency,
+          // For currency assets, always use RUB as the quote currency
+          currency: isCurrencyType ? 'RUB' : values.currency,
           currentPrice: values.currentPrice
             ? parseFloat(values.currentPrice)
             : undefined,
@@ -191,42 +197,46 @@ export function EditAssetDialog({
               )}
             />
 
-            {/* Currency */}
-            <FormField
-              control={form.control}
-              name="currency"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Валюта котировки</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите валюту" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {CURRENCIES.map((currency) => (
-                        <SelectItem key={currency.value} value={currency.value}>
-                          {currency.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription>
-                    В какой валюте указана цена актива
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Currency - hide for currency assets */}
+            {!isCurrencyType && (
+              <FormField
+                control={form.control}
+                name="currency"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Валюта котировки</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите валюту" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {CURRENCIES.map((currency) => (
+                          <SelectItem key={currency.value} value={currency.value}>
+                            {currency.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      В какой валюте указана цена актива
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
-            {/* Current Price */}
+            {/* Current Price / Exchange Rate */}
             <FormField
               control={form.control}
               name="currentPrice"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Текущая цена (опционально)</FormLabel>
+                  <FormLabel>
+                    {isCurrencyType ? 'Курс к рублю (опционально)' : 'Текущая цена (опционально)'}
+                  </FormLabel>
                   <FormControl>
                     <Input
                       type="number"
@@ -235,7 +245,9 @@ export function EditAssetDialog({
                       {...field}
                     />
                   </FormControl>
-                  <FormDescription>Цена за единицу актива</FormDescription>
+                  <FormDescription>
+                    {isCurrencyType ? 'Текущий курс валюты к рублю' : 'Цена за единицу актива'}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
