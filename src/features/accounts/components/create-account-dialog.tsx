@@ -266,9 +266,10 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
                           type="button"
                           onClick={() => field.onChange(item.value)}
                           className={cn(
-                            'flex h-10 w-10 items-center justify-center rounded-lg border border-border/50 transition-all hover:border-border hover:bg-muted/50',
-                            field.value === item.value &&
-                              'border-primary bg-primary/10'
+                            'flex h-10 w-10 items-center justify-center rounded-lg border transition-all focus:outline-none',
+                            field.value === item.value
+                              ? 'border-primary bg-primary/10'
+                              : 'border-border/50 hover:border-border hover:bg-muted/50'
                           )}
                           title={item.label}
                         >
@@ -296,7 +297,7 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
                         type="button"
                         onClick={() => field.onChange(color)}
                         className={cn(
-                          'h-8 w-8 rounded-full border-2 transition-all',
+                          'h-8 w-8 rounded-full border-2 transition-all focus:outline-none',
                           field.value === color
                             ? 'border-foreground scale-110'
                             : 'border-transparent hover:scale-105'

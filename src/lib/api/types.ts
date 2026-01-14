@@ -1009,7 +1009,7 @@ export interface CreateIncomeRequest {
   currency: string
   date: string
   description?: string
-  accountId?: string
+  accountId: string
 }
 
 export interface UpdateIncomeRequest {

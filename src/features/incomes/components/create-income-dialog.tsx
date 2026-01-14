@@ -4,7 +4,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { CalendarIcon, Banknote } from 'lucide-react'
+import { CalendarIcon, Banknote, Plus } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import {
   Dialog,
   DialogContent,
@@ -33,7 +34,9 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
@@ -57,7 +60,7 @@ function parseDateString(dateStr: string): Date {
 
 const formSchema = z.object({
   source: z.string().min(1, 'Введите источник дохода'),
-  accountId: z.string().optional(),
+  accountId: z.string().min(1, 'Выберите счёт'),
   amount: z.string().min(1, 'Введите сумму'),
   currency: z.string().min(1, 'Выберите валюту'),
   date: z.string().min(1, 'Введите дату'),
@@ -70,8 +73,11 @@ interface CreateIncomeDialogProps {
   children: React.ReactNode
 }
 
+const CREATE_NEW_ACCOUNT = '__create_new__'
+
 export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
   const [open, setOpen] = useState(false)
+  const navigate = useNavigate()
 
   const createIncome = useCreateIncome()
   const { data: accountsData } = useAccounts()
@@ -98,7 +104,7 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
         currency: values.currency,
         date: values.date,
         description: values.description || undefined,
-        accountId: values.accountId || undefined,
+        accountId: values.accountId,
       })
 
       form.reset()
@@ -118,26 +124,27 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Banknote className="h-5 w-5 text-emerald-500" />
+      <DialogContent className="sm:max-w-[520px]">
+        <DialogHeader className="pb-2">
+          <DialogTitle className="flex items-center gap-2.5 text-xl">
+            <Banknote className="h-6 w-6 text-emerald-500" />
             Новый доход
           </DialogTitle>
-          <DialogDescription>Добавьте информацию о полученном доходе</DialogDescription>
+          <DialogDescription className="text-base">Добавьте информацию о полученном доходе</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
             {/* Source */}
             <FormField
               control={form.control}
               name="source"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Источник</FormLabel>
+                  <FormLabel className="text-sm font-medium">Источник</FormLabel>
                   <FormControl>
                     <Input
+                      className="h-11 text-base"
                       placeholder="Зарплата, Фриланс, Подарок..."
                       {...field}
                     />
@@ -148,15 +155,16 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
             />
 
             {/* Amount and Currency */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-5">
               <FormField
                 control={form.control}
                 name="amount"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Сумма</FormLabel>
+                    <FormLabel className="text-sm font-medium">Сумма</FormLabel>
                     <FormControl>
                       <Input
+                        className="h-11 text-base"
                         type="number"
                         step="0.01"
                         placeholder="0.00"
@@ -173,10 +181,10 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
                 name="currency"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Валюта</FormLabel>
+                    <FormLabel className="text-sm font-medium">Валюта</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-11 text-base">
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
@@ -200,14 +208,14 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
               name="date"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Дата</FormLabel>
+                  <FormLabel className="text-sm font-medium">Дата</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button
                           variant="outline"
                           className={cn(
-                            'w-full pl-3 text-left font-normal',
+                            'w-full h-11 pl-3 text-left text-base font-normal',
                             !field.value && 'text-muted-foreground'
                           )}
                         >
@@ -216,7 +224,7 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
                           ) : (
                             <span>Выберите дату</span>
                           )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          <CalendarIcon className="ml-auto h-5 w-5 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
@@ -242,34 +250,55 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
               )}
             />
 
-            {/* Account (optional) */}
-            {accounts.length > 0 && (
-              <FormField
-                control={form.control}
-                name="accountId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Счёт (необязательно)</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите счёт" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="">Не указывать</SelectItem>
-                        {accounts.map((acc) => (
-                          <SelectItem key={acc.id} value={acc.id}>
-                            {acc.name} ({acc.currency})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
+            {/* Account */}
+            <FormField
+              control={form.control}
+              name="accountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-sm font-medium">Счёт</FormLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      if (value === CREATE_NEW_ACCOUNT) {
+                        setOpen(false)
+                        navigate('/accounts')
+                      } else {
+                        field.onChange(value)
+                      }
+                    }}
+                    value={field.value}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="h-11 text-base">
+                        <SelectValue placeholder="Выберите счёт" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {accounts.length > 0 && (
+                        <SelectGroup>
+                          {accounts.map((acc) => (
+                            <SelectItem key={acc.id} value={acc.id}>
+                              {acc.name} ({acc.currency})
+                            </SelectItem>
+                          ))}
+                        </SelectGroup>
+                      )}
+                      {accounts.length > 0 && <SelectSeparator />}
+                      <SelectItem
+                        value={CREATE_NEW_ACCOUNT}
+                        className="text-primary focus:text-primary"
+                      >
+                        <span className="flex items-center gap-2">
+                          <Plus className="h-4 w-4" />
+                          Создать новый счёт
+                        </span>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             {/* Description */}
             <FormField
@@ -277,11 +306,11 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
               name="description"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Описание (необязательно)</FormLabel>
+                  <FormLabel className="text-sm font-medium">Описание (необязательно)</FormLabel>
                   <FormControl>
                     <Textarea
                       placeholder="Комментарий к доходу..."
-                      className="resize-none"
+                      className="resize-none text-base min-h-[100px]"
                       {...field}
                     />
                   </FormControl>
@@ -290,18 +319,18 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
               )}
             />
 
-            <div className="flex gap-3 pt-4">
+            <div className="flex gap-4 pt-5">
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-11 text-base"
                 onClick={() => setOpen(false)}
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
-                className="flex-1"
+                className="flex-1 h-11 text-base"
                 disabled={createIncome.isPending}
               >
                 {createIncome.isPending ? 'Добавление...' : 'Добавить доход'}
