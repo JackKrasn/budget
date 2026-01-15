@@ -6,6 +6,7 @@ import type {
   IncomesListParams,
   CreateIncomeRequest,
   UpdateIncomeRequest,
+  CreateIncomeDistributionRequest,
   UpdateDistributionRequest,
   ConfirmDistributionRequest,
 } from './types'
@@ -41,6 +42,15 @@ export const incomesApi = {
    * Delete income
    */
   delete: (id: string) => apiClient.delete<void>(`${ENDPOINT}/${id}`),
+
+  /**
+   * Create distribution for income (manually add fund distribution)
+   */
+  createDistribution: (incomeId: string, data: CreateIncomeDistributionRequest) =>
+    apiClient.post<IncomeDistribution>(
+      `${ENDPOINT}/${incomeId}/distributions`,
+      data
+    ),
 
   /**
    * Update distribution planned amount

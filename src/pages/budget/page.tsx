@@ -55,6 +55,7 @@ import {
 import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
+import { useIncomes } from '@/features/incomes'
 import { budgetsApi } from '@/lib/api/budgets'
 import type { PlannedIncome, BudgetItemWithCategory } from '@/lib/api/types'
 
@@ -116,6 +117,12 @@ export default function BudgetPage() {
     to: dateTo,
   })
 
+  // Фактические доходы за выбранный месяц
+  const { data: incomesData } = useIncomes({
+    from: dateFrom,
+    to: dateTo,
+  })
+
   // Запланированные расходы
   const { data: plannedData } = usePlannedExpenses({
     budgetId: budgetData?.id,
@@ -147,7 +154,8 @@ export default function BudgetPage() {
   const categories = categoriesData?.data ?? []
   const plannedExpenses = useMemo(() => plannedData?.data ?? [], [plannedData?.data])
   const plannedIncomes = useMemo(() => plannedIncomesData?.data ?? [], [plannedIncomesData?.data])
-  const expenses = expensesData?.data ?? []
+  const expenses = useMemo(() => expensesData?.data ?? [], [expensesData?.data])
+  const actualIncomes = useMemo(() => incomesData?.data ?? [], [incomesData?.data])
   const fundsRaw = useMemo(() => fundsData?.data ?? [], [fundsData?.data])
   const accounts = accountsData?.data ?? []
 
@@ -205,12 +213,12 @@ export default function BudgetPage() {
 
     // Статистика доходов
     const expectedIncome = plannedIncomes.reduce((sum, i) => sum + i.expected_amount, 0)
-    const receivedIncome = plannedIncomes
-      .filter((i) => i.status === 'received')
-      .reduce((sum, i) => sum + (getActualAmount(i.actual_amount) ?? i.expected_amount), 0)
     const pendingIncome = plannedIncomes
       .filter((i) => i.status === 'pending')
       .reduce((sum, i) => sum + i.expected_amount, 0)
+
+    // Фактические доходы (все реально полученные доходы за месяц)
+    const receivedIncome = actualIncomes.reduce((sum, i) => sum + i.amount, 0)
 
     // Распределения в фонды (входящие)
     const expectedFundDistributions = budget?.distributionSummary?.totalExpectedDistribution ?? 0
@@ -245,7 +253,7 @@ export default function BudgetPage() {
       availableForPlanning,
       actuallyAvailable,
     }
-  }, [items, plannedExpenses, plannedIncomes, actualByCategory, budget?.distributionSummary])
+  }, [items, plannedExpenses, plannedIncomes, actualIncomes, actualByCategory, budget?.distributionSummary])
 
   // Данные для секции финансирования из фондов
   const fundFinancingData = useMemo(() => {
@@ -607,7 +615,7 @@ export default function BudgetPage() {
         transition={{ delay: 0.1 }}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       >
-        {/* Ожидаемый доход */}
+        {/* Доходы */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
@@ -615,12 +623,12 @@ export default function BudgetPage() {
                 <Banknote className="h-4 w-4 text-emerald-500" />
               </div>
               <div>
-                <p className="text-xs text-muted-foreground">Ожидаемый доход</p>
+                <p className="text-xs text-muted-foreground">Доходы</p>
                 <p className="text-lg font-bold tabular-nums text-emerald-500">
-                  {formatMoney(stats.expectedIncome)} ₽
+                  {formatMoney(stats.receivedIncome)} ₽
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  получено {formatMoney(stats.receivedIncome)} ₽
+                  ожидается {formatMoney(stats.expectedIncome)} ₽
                 </p>
               </div>
             </div>
