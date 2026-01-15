@@ -820,6 +820,7 @@ export interface CreatePlannedExpenseRequest {
   categoryId: string
   accountId?: string
   fundId?: string
+  fundAssetId?: string
   fundedAmount?: number
   name: string
   plannedAmount: number
@@ -832,6 +833,7 @@ export interface UpdatePlannedExpenseRequest {
   categoryId?: string
   accountId?: string
   fundId?: string
+  fundAssetId?: string
   fundedAmount?: number
   name?: string
   plannedAmount?: number
@@ -1043,6 +1045,11 @@ export interface IncomesListParams {
 }
 
 // === Income Distribution Operations ===
+
+export interface CreateIncomeDistributionRequest {
+  fundId: string
+  plannedAmount: number
+}
 
 export interface UpdateDistributionRequest {
   plannedAmount: number
