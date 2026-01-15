@@ -33,8 +33,8 @@ interface CategoryCardProps {
 }
 
 export function CategoryCard({ category, onClick }: CategoryCardProps) {
-  // Total planned includes manual budget + mandatory payments (credits, etc.)
-  const totalPlanned = category.plannedAmount + (category.plannedExpensesSum || 0)
+  // plannedAmount already includes plannedExpensesSum (formula: plannedAmount = plannedExpensesSum + bufferAmount)
+  const totalPlanned = category.plannedAmount
 
   const progress =
     totalPlanned > 0

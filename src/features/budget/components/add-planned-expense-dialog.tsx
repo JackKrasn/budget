@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { Plus, PiggyBank, CalendarIcon, Sparkles, Banknote } from 'lucide-react'
+import { Plus, PiggyBank, CalendarIcon, Sparkles, Banknote, Coins } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -59,10 +59,22 @@ function parseDateString(dateStr: string): Date {
   return new Date(year, month - 1, day)
 }
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  RUB: '₽',
+  USD: '$',
+  EUR: '€',
+  GEL: '₾',
+  TRY: '₺',
+  CNY: '¥',
+  GBP: '£',
+  AED: 'د.إ',
+}
+
 const formSchema = z.object({
   name: z.string().min(1, 'Введите название'),
   categoryId: z.string().min(1, 'Выберите категорию'),
   fundId: z.string().optional(),
+  fundAssetId: z.string().optional(),
   fundedAmount: z.string().optional(),
   plannedAmount: z.string().min(1, 'Введите сумму'),
   plannedDate: z.string().min(1, 'Выберите дату'),
@@ -81,6 +93,7 @@ interface AddPlannedExpenseDialogProps {
     budgetId: string
     categoryId: string
     fundId?: string
+    fundAssetId?: string
     fundedAmount?: number
     name: string
     plannedAmount: number
@@ -117,6 +130,7 @@ export function AddPlannedExpenseDialog({
       name: '',
       categoryId: '',
       fundId: '',
+      fundAssetId: '',
       fundedAmount: '',
       plannedAmount: '',
       plannedDate: defaultDate,
@@ -127,12 +141,21 @@ export function AddPlannedExpenseDialog({
   const plannedAmount = form.watch('plannedAmount')
   const fundedAmount = form.watch('fundedAmount')
   const selectedFundId = form.watch('fundId')
+  const selectedFundAssetId = form.watch('fundAssetId')
   const selectedFundBalance = funds.find(f => f.fund.id === selectedFundId)
+  const selectedAsset = selectedFundBalance?.assets.find(a => a.asset.id === selectedFundAssetId)
+
+  // При смене фонда сбрасываем выбранный актив
+  const handleFundChange = (fundId: string) => {
+    form.setValue('fundId', fundId)
+    form.setValue('fundAssetId', '')
+  }
 
   const handleUseFundChange = (checked: boolean) => {
     setUseFundFinancing(checked)
     if (!checked) {
       form.setValue('fundId', '')
+      form.setValue('fundAssetId', '')
       form.setValue('fundedAmount', '')
     } else if (plannedAmount) {
       form.setValue('fundedAmount', plannedAmount)
@@ -140,14 +163,19 @@ export function AddPlannedExpenseDialog({
   }
 
   const handleSubmit = async (data: FormData) => {
+    // Определяем валюту: если выбран актив - берём его валюту, иначе RUB
+    const fundAsset = selectedFundBalance?.assets.find(a => a.asset.id === data.fundAssetId)
+    const currency = fundAsset?.asset.currency || 'RUB'
+
     await onAdd({
       budgetId,
       categoryId: data.categoryId,
       fundId: useFundFinancing && data.fundId ? data.fundId : undefined,
+      fundAssetId: useFundFinancing && data.fundAssetId ? data.fundAssetId : undefined,
       fundedAmount: useFundFinancing && data.fundedAmount ? parseFloat(data.fundedAmount) : undefined,
       name: data.name,
       plannedAmount: parseFloat(data.plannedAmount),
-      currency: 'RUB',
+      currency,
       plannedDate: data.plannedDate,
       notes: data.notes || undefined,
     })
@@ -395,7 +423,8 @@ export function AddPlannedExpenseDialog({
                       transition={{ duration: 0.2 }}
                       className="overflow-hidden"
                     >
-                      <div className="grid grid-cols-2 gap-3 pt-4">
+                      {/* Fund selection */}
+                      <div className="pt-4">
                         <FormField
                           control={form.control}
                           name="fundId"
@@ -405,12 +434,12 @@ export function AddPlannedExpenseDialog({
                                 Фонд
                               </FormLabel>
                               <Select
-                                onValueChange={field.onChange}
+                                onValueChange={handleFundChange}
                                 value={field.value}
                               >
                                 <FormControl>
                                   <SelectTrigger className="h-10 bg-background border-border/50">
-                                    <SelectValue placeholder="Выберите">
+                                    <SelectValue placeholder="Выберите фонд">
                                       {field.value && (() => {
                                         const fb = funds.find(f => f.fund.id === field.value)
                                         if (!fb) return null
@@ -430,102 +459,170 @@ export function AddPlannedExpenseDialog({
                                   </SelectTrigger>
                                 </FormControl>
                                 <SelectContent>
-                                  {funds.map((fb) => {
-                                    const fundedAmt = parseFloat(fundedAmount || '0') || 0
-                                    const remaining = fb.totalRub - fundedAmt
-                                    return (
-                                      <SelectItem key={fb.fund.id} value={fb.fund.id}>
-                                        <div className="flex flex-col gap-0.5">
-                                          <span className="flex items-center gap-2">
-                                            <FundIcon
-                                              name={fb.fund.name}
-                                              iconName={fb.fund.icon}
-                                              color={fb.fund.color}
-                                              size="sm"
-                                            />
-                                            {fb.fund.name}
-                                          </span>
-                                          <span className="text-xs text-muted-foreground ml-8">
-                                            Доступно: {formatMoney(fb.totalRub)} ₽
-                                            {fundedAmt > 0 && (
-                                              <span className={remaining < 0 ? ' text-destructive' : ''}>
-                                                {' → после: '}{formatMoney(remaining)} ₽
-                                              </span>
-                                            )}
-                                          </span>
-                                        </div>
-                                      </SelectItem>
-                                    )
-                                  })}
+                                  {funds.map((fb) => (
+                                    <SelectItem key={fb.fund.id} value={fb.fund.id}>
+                                      <span className="flex items-center gap-2">
+                                        <FundIcon
+                                          name={fb.fund.name}
+                                          iconName={fb.fund.icon}
+                                          color={fb.fund.color}
+                                          size="sm"
+                                        />
+                                        {fb.fund.name}
+                                      </span>
+                                    </SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                               <FormMessage />
                             </FormItem>
                           )}
                         />
-
-                        <FormField
-                          control={form.control}
-                          name="fundedAmount"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-xs font-medium text-muted-foreground">
-                                Сумма из фонда
-                              </FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    type="number"
-                                    placeholder="0"
-                                    className="h-10 pr-8 bg-background border-border/50 transition-colors tabular-nums"
-                                    {...field}
-                                  />
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
-                                    ₽
-                                  </span>
-                                </div>
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
                       </div>
 
-                      {/* Selected fund preview */}
-                      {selectedFundBalance && (
+                      {/* Asset and Amount selection - shown after fund is selected */}
+                      {selectedFundBalance && selectedFundBalance.assets.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="grid grid-cols-2 gap-3 pt-3"
+                        >
+                          <FormField
+                            control={form.control}
+                            name="fundAssetId"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs font-medium text-muted-foreground">
+                                  Валюта / Актив
+                                </FormLabel>
+                                <Select
+                                  onValueChange={field.onChange}
+                                  value={field.value}
+                                >
+                                  <FormControl>
+                                    <SelectTrigger className="h-10 bg-background border-border/50">
+                                      <SelectValue placeholder="Выберите">
+                                        {field.value && (() => {
+                                          const asset = selectedFundBalance.assets.find(a => a.asset.id === field.value)
+                                          if (!asset) return null
+                                          const symbol = CURRENCY_SYMBOLS[asset.asset.currency] || asset.asset.currency
+                                          return (
+                                            <span className="flex items-center gap-2">
+                                              <Coins className="h-4 w-4 text-muted-foreground" />
+                                              {asset.asset.name}
+                                              <span className="text-muted-foreground">({symbol})</span>
+                                            </span>
+                                          )
+                                        })()}
+                                      </SelectValue>
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {selectedFundBalance.assets.map((assetBalance) => {
+                                      const symbol = CURRENCY_SYMBOLS[assetBalance.asset.currency] || assetBalance.asset.currency
+                                      return (
+                                        <SelectItem key={assetBalance.asset.id} value={assetBalance.asset.id}>
+                                          <div className="flex flex-col gap-0.5">
+                                            <span className="flex items-center gap-2">
+                                              <Coins className="h-4 w-4 text-muted-foreground" />
+                                              {assetBalance.asset.name}
+                                              <span className="text-muted-foreground font-medium">({symbol})</span>
+                                            </span>
+                                            <span className="text-xs text-muted-foreground ml-6">
+                                              Баланс: {formatMoney(assetBalance.amount)} {symbol}
+                                            </span>
+                                          </div>
+                                        </SelectItem>
+                                      )
+                                    })}
+                                  </SelectContent>
+                                </Select>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="fundedAmount"
+                            render={({ field }) => {
+                              const symbol = selectedAsset
+                                ? CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency
+                                : '₽'
+                              return (
+                                <FormItem>
+                                  <FormLabel className="text-xs font-medium text-muted-foreground">
+                                    Сумма из фонда
+                                  </FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <Input
+                                        type="number"
+                                        placeholder="0"
+                                        className="h-10 pr-10 bg-background border-border/50 transition-colors tabular-nums"
+                                        {...field}
+                                      />
+                                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">
+                                        {symbol}
+                                      </span>
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )
+                            }}
+                          />
+                        </motion.div>
+                      )}
+
+                      {/* Selected asset preview */}
+                      {selectedAsset && (
                         <motion.div
                           initial={{ opacity: 0, y: -10 }}
                           animate={{ opacity: 1, y: 0 }}
                           className="flex items-center gap-3 mt-3 p-3 rounded-lg bg-muted/50 border border-border/50"
                         >
-                          <FundIcon
-                            name={selectedFundBalance.fund.name}
-                            iconName={selectedFundBalance.fund.icon}
-                            color={selectedFundBalance.fund.color}
-                            size="md"
-                          />
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                            <Coins className="h-5 w-5 text-primary" />
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{selectedFundBalance.fund.name}</p>
+                            <p className="text-sm font-medium truncate">
+                              {selectedAsset.asset.name}
+                              <span className="text-muted-foreground ml-1">
+                                ({CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency})
+                              </span>
+                            </p>
                             <p className="text-xs text-muted-foreground">
-                              Доступно: {formatMoney(selectedFundBalance.totalRub)} ₽
+                              Баланс: {formatMoney(selectedAsset.amount)} {CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency}
                             </p>
                           </div>
                           {fundedAmount && (
                             <div className="text-right">
                               <p className="text-sm font-semibold tabular-nums">
-                                −{formatMoney(parseFloat(fundedAmount || '0'))} ₽
+                                −{formatMoney(parseFloat(fundedAmount || '0'))} {CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency}
                               </p>
                               <p className={cn(
                                 "text-xs tabular-nums",
-                                selectedFundBalance.totalRub - parseFloat(fundedAmount || '0') < 0
-                                  ? "text-destructive"
+                                selectedAsset.amount - parseFloat(fundedAmount || '0') < 0
+                                  ? "text-amber-500"
                                   : "text-muted-foreground"
                               )}>
-                                Останется: {formatMoney(selectedFundBalance.totalRub - parseFloat(fundedAmount || '0'))} ₽
+                                Останется: {formatMoney(selectedAsset.amount - parseFloat(fundedAmount || '0'))} {CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency}
                               </p>
                             </div>
                           )}
                         </motion.div>
+                      )}
+
+                      {/* Warning for negative balance */}
+                      {selectedAsset && fundedAmount && selectedAsset.amount - parseFloat(fundedAmount || '0') < 0 && (
+                        <motion.p
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          className="text-xs text-amber-500 mt-2 px-1"
+                        >
+                          Баланс актива станет отрицательным — это допустимо
+                        </motion.p>
                       )}
                     </motion.div>
                   )}

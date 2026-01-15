@@ -500,7 +500,7 @@ export function CreateExpenseDialog({ children, defaultAccountId }: CreateExpens
                               />
                               {fund.fund.name}
                               <span className="text-muted-foreground ml-1">
-                                ({fund.totalRub.toLocaleString('ru-RU')} ₽)
+                                ({fund.totalBase.toLocaleString('ru-RU')} ₽)
                               </span>
                             </div>
                           </SelectItem>

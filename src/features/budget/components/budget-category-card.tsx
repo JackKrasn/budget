@@ -17,8 +17,8 @@ export function BudgetCategoryCard({
   onEdit,
   isFixed = false,
 }: BudgetCategoryCardProps) {
-  // Total planned includes manual budget + mandatory payments (credits, etc.)
-  const totalPlanned = item.plannedAmount + item.plannedExpensesSum
+  // plannedAmount already includes plannedExpensesSum (formula: plannedAmount = plannedExpensesSum + bufferAmount)
+  const totalPlanned = item.plannedAmount
 
   const progress =
     totalPlanned > 0

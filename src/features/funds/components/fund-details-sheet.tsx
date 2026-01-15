@@ -236,7 +236,7 @@ export function FundDetailsSheet({
 
   if (!fund) return null
 
-  const { fund: fundData, totalRub, assets } = fund
+  const { fund: fundData, totalBase, assets } = fund
   const Icon =
     FUND_ICONS.find((i) => i.value === fundData.icon)?.icon || Wallet
 
@@ -315,7 +315,7 @@ export function FundDetailsSheet({
               <p className="text-sm text-muted-foreground">Баланс</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold tabular-nums tracking-tight">
-                  {formatMoney(totalRub)}
+                  {formatMoney(totalBase)}
                 </span>
                 <span className="text-2xl font-medium text-muted-foreground">
                   ₽
@@ -383,7 +383,7 @@ export function FundDetailsSheet({
                             {formatMoney(asset.amount)} {asset.asset.currency}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            ≈ {formatMoney(asset.valueRub)} ₽
+                            ≈ {formatMoney(asset.valueBase)} ₽
                           </p>
                         </div>
                       </motion.div>

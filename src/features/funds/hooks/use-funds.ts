@@ -232,6 +232,34 @@ export function useCreateContribution() {
   })
 }
 
+/**
+ * Удалить пополнение фонда
+ */
+export function useDeleteContribution() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      fundId,
+      contributionId,
+    }: {
+      fundId: string
+      contributionId: string
+    }) => fundsApi.deleteContribution(fundId, contributionId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.contributions(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.history(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      toast.success('Пополнение удалено')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
 // === Fund Withdrawals Hooks ===
 
 /**

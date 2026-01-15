@@ -365,7 +365,12 @@ export default function AssetsPage() {
             <div className="space-y-8">
               {Object.entries(assetsByType).map(([typeName, typeAssets]) => (
                 <div key={typeName} className="space-y-4">
-                  <h2 className="text-lg font-medium">{typeName}</h2>
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-lg font-medium">{typeName}</h2>
+                    <span className="text-sm text-muted-foreground">
+                      {typeAssets.length} {typeAssets.length === 1 ? 'актив' : typeAssets.length < 5 ? 'актива' : 'активов'}
+                    </span>
+                  </div>
                   <motion.div
                     className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
                     variants={container}
@@ -385,26 +390,6 @@ export default function AssetsPage() {
                   </motion.div>
                 </div>
               ))}
-
-              {/* Add New Asset Card */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <CreateAssetDialog>
-                  <Card className="flex h-[180px] cursor-pointer items-center justify-center border-dashed border-border/50 bg-card/30 transition-all hover:border-border hover:bg-card/50">
-                    <CardContent className="flex flex-col items-center gap-2 p-6 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                        <Plus className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <p className="font-medium text-muted-foreground">
-                        Добавить актив
-                      </p>
-                    </CardContent>
-                  </Card>
-                </CreateAssetDialog>
-              </motion.div>
             </div>
           ) : deposits.length === 0 ? (
             <motion.div

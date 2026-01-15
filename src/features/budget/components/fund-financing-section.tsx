@@ -405,7 +405,7 @@ export function mapFundBalanceToFinancing(
     fundName: fundBalance.fund.name,
     fundIcon: fundBalance.fund.icon,
     fundColor: fundBalance.fund.color,
-    availableAmount: fundBalance.totalRub,
+    availableAmount: fundBalance.totalBase,
     plannedAmount,
     usedAmount,
   }

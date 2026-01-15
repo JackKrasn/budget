@@ -68,6 +68,11 @@ export function CreateAssetDialog({ children }: CreateAssetDialogProps) {
     },
   })
 
+  // Check if selected asset type is currency
+  const selectedTypeId = form.watch('assetTypeId')
+  const selectedType = assetTypesData?.data.find((t) => t.id === selectedTypeId)
+  const isCurrencyType = selectedType?.code === 'currency'
+
   async function onSubmit(values: FormValues) {
     try {
       await createAsset.mutateAsync({
@@ -75,9 +80,11 @@ export function CreateAssetDialog({ children }: CreateAssetDialogProps) {
         assetTypeId: values.assetTypeId,
         ticker: values.ticker || undefined,
         currency: values.currency,
-        currentPrice: values.currentPrice
-          ? parseFloat(values.currentPrice)
-          : undefined,
+        currentPrice: isCurrencyType
+          ? 1.0
+          : values.currentPrice
+            ? parseFloat(values.currentPrice)
+            : undefined,
       })
       form.reset()
       setOpen(false)
@@ -187,35 +194,37 @@ export function CreateAssetDialog({ children }: CreateAssetDialogProps) {
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    В какой валюте указана цена актива
+                    {isCurrencyType
+                      ? 'К какой валюте привязан курс (например, RUB для пары USD/RUB)'
+                      : 'В какой валюте указана цена актива'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Current Price */}
-            <FormField
-              control={form.control}
-              name="currentPrice"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Текущая цена (опционально)</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormDescription>
-                    Цена за единицу актива
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            {/* Current Price - only for non-currency assets */}
+            {!isCurrencyType && (
+              <FormField
+                control={form.control}
+                name="currentPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Текущая цена (опционально)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>Цена за единицу актива</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button

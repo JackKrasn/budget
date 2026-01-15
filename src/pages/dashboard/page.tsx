@@ -328,7 +328,7 @@ export default function DashboardPage() {
     )
 
     // Общий баланс в фондах
-    const totalFundsBalance = funds.reduce((sum, fb) => sum + fb.totalRub, 0)
+    const totalFundsBalance = funds.reduce((sum, fb) => sum + fb.totalBase, 0)
 
     // Доходы за текущий месяц
     const now = new Date()
@@ -551,7 +551,7 @@ export default function DashboardPage() {
                       name={fb.fund.name}
                       icon={fb.fund.icon}
                       color={fb.fund.color}
-                      balance={fb.totalRub}
+                      balance={fb.totalBase}
                       target={undefined}
                       index={index}
                     />

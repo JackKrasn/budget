@@ -86,7 +86,9 @@ export function UpdatePriceDialog({
     }
   }
 
-  if (!asset) return null
+  // Don't render for currency assets - their price is always 1.0
+  // Exchange rates are managed via the Exchange Rates page
+  if (!asset || asset.type_code === 'currency') return null
 
   const currencySymbol = CURRENCY_SYMBOLS[asset.currency] || asset.currency
 

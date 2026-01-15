@@ -122,7 +122,7 @@ export function AssetCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {onUpdatePrice && (
+                {onUpdatePrice && asset.type_code !== 'currency' && (
                   <DropdownMenuItem onClick={onUpdatePrice}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Обновить цену
@@ -144,24 +144,41 @@ export function AssetCard({
             </DropdownMenu>
           </div>
 
-          {/* Price */}
-          <div className="rounded-lg bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground mb-1">Текущая цена</p>
-            <p className="text-2xl font-bold tabular-nums">
-              {formatPrice(priceValue)}{' '}
-              <span className="text-lg">{currencySymbol}</span>
-            </p>
-          </div>
-
-          {/* Details */}
-          <div className="mt-3 space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Валюта</span>
-              <span className="font-medium">
-                {currencyCode || '—'} {currencySymbol}
-              </span>
+          {/* Price - only for non-currency assets */}
+          {asset.type_code !== 'currency' && (
+            <div className="rounded-lg bg-background/50 p-3">
+              <p className="text-xs text-muted-foreground mb-1">Текущая цена</p>
+              <p className="text-2xl font-bold tabular-nums">
+                {formatPrice(priceValue)}{' '}
+                <span className="text-lg">{currencySymbol}</span>
+              </p>
             </div>
-          </div>
+          )}
+
+          {/* Currency info - for currency assets */}
+          {asset.type_code === 'currency' && (
+            <div className="rounded-lg bg-background/50 p-3">
+              <p className="text-xs text-muted-foreground mb-1">Код валюты</p>
+              <p className="text-2xl font-bold tabular-nums">
+                {asset.ticker || '—'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Курс задаётся в разделе «Курсы валют»
+              </p>
+            </div>
+          )}
+
+          {/* Details - only show for non-currency assets */}
+          {asset.type_code !== 'currency' && (
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Валюта</span>
+                <span className="font-medium">
+                  {currencyCode || '—'} {currencySymbol}
+                </span>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </motion.div>

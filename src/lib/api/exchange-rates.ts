@@ -1,7 +1,7 @@
 import { apiClient } from './client'
 import type {
   ExchangeRate,
-  ExchangeRatesResponse,
+  ExchangeRatesListResponse,
   CreateExchangeRateRequest,
 } from './types'
 
@@ -9,13 +9,19 @@ const ENDPOINT = '/exchange-rates'
 
 export const exchangeRatesApi = {
   /**
-   * Получить текущие курсы всех валют
+   * Получить список всех курсов валют
    */
-  getRates: () => apiClient.get<ExchangeRatesResponse>(ENDPOINT),
+  list: () => apiClient.get<ExchangeRatesListResponse>(ENDPOINT),
+
+  /**
+   * Добавить курс валюты
+   */
+  create: (data: CreateExchangeRateRequest) =>
+    apiClient.post<ExchangeRate>(ENDPOINT, data),
 
   /**
    * Обновить курс валюты
    */
-  updateRate: (data: CreateExchangeRateRequest) =>
-    apiClient.post<ExchangeRate>(ENDPOINT, data),
+  update: (id: string, data: { rate: number; source?: string }) =>
+    apiClient.patch<ExchangeRate>(`${ENDPOINT}/${id}`, data),
 }

@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock, Settings, ExternalLink } from 'lucide-react'
+import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock, Settings, ExternalLink, Pencil } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { FundIcon } from '@/components/common/category-icon'
 import { cn } from '@/lib/utils'
 import type { DistributionSummary, FundDistributionSummary } from '@/lib/api/types'
@@ -34,12 +39,17 @@ export function DistributionSummarySection({
   const navigate = useNavigate()
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
-  if (!summary || summary.totalExpectedDistribution === 0) {
+  // Вычисляем общую сумму плановых распределений (включая вручную добавленные)
+  const totalPlannedDistribution = fundDistributions?.reduce(
+    (sum, f) => sum + (f.plannedAmount || f.expectedAmount), 0
+  ) ?? summary?.totalExpectedDistribution ?? 0
+
+  if (!summary || totalPlannedDistribution === 0) {
     return null
   }
 
-  const confirmProgress = summary.totalExpectedDistribution > 0
-    ? Math.round((summary.totalActualDistribution / summary.totalExpectedDistribution) * 100)
+  const confirmProgress = totalPlannedDistribution > 0
+    ? Math.round((summary.totalActualDistribution / totalPlannedDistribution) * 100)
     : 0
 
   const isPositiveDiff = summary.distributionDifference >= 0
@@ -48,14 +58,14 @@ export function DistributionSummarySection({
     <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Expected Distribution */}
+        {/* Planned Distribution */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Ожидается в фонды</p>
+                <p className="text-xs text-muted-foreground">Запланировано в фонды</p>
                 <p className="text-lg font-bold tabular-nums">
-                  {formatMoney(summary.totalExpectedDistribution)} ₽
+                  {formatMoney(totalPlannedDistribution)} ₽
                 </p>
               </div>
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
@@ -157,7 +167,7 @@ export function DistributionSummarySection({
           <Progress value={confirmProgress} className="h-2" />
           <div className="flex justify-between mt-2 text-xs text-muted-foreground">
             <span>Подтверждено: {formatMoney(summary.totalActualDistribution)} ₽</span>
-            <span>Ожидается: {formatMoney(summary.totalExpectedDistribution)} ₽</span>
+            <span>Запланировано: {formatMoney(totalPlannedDistribution)} ₽</span>
           </div>
         </CardContent>
       </Card>
@@ -170,19 +180,21 @@ export function DistributionSummarySection({
           </CardHeader>
           <CardContent className="space-y-3">
             {fundDistributions.map((fund) => {
-              const fundProgress = fund.expectedAmount > 0
-                ? Math.round((fund.actualAmount / fund.expectedAmount) * 100)
+              // Используем plannedAmount (реальные распределения) вместо expectedAmount (по правилам)
+              const plannedAmount = fund.plannedAmount || fund.expectedAmount
+              const fundProgress = plannedAmount > 0
+                ? Math.round((fund.actualAmount / plannedAmount) * 100)
                 : 0
-              const isCompleted = fund.actualAmount >= fund.expectedAmount
+              const isCompleted = fund.actualAmount >= plannedAmount
 
               // Процент от дохода (сколько % от общего дохода идёт в этот фонд)
               const percentOfIncome = totalIncome > 0
-                ? Math.round((fund.expectedAmount / totalIncome) * 100)
+                ? Math.round((plannedAmount / totalIncome) * 100)
                 : 0
 
               // Процент от суммы на фонды (доля этого фонда среди всех распределений)
-              const percentOfFunds = summary.totalExpectedDistribution > 0
-                ? Math.round((fund.expectedAmount / summary.totalExpectedDistribution) * 100)
+              const percentOfFunds = totalPlannedDistribution > 0
+                ? Math.round((plannedAmount / totalPlannedDistribution) * 100)
                 : 0
 
               return (
@@ -210,14 +222,33 @@ export function DistributionSummarySection({
                         </span>
                       )}
                     </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-sm font-medium tabular-nums">
-                        {formatMoney(fund.actualAmount)}
-                      </span>
-                      <span className="text-xs text-muted-foreground">
-                        {' '}
-                        / {formatMoney(fund.expectedAmount)} ₽
-                      </span>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="text-right">
+                        <span className="text-sm font-medium tabular-nums">
+                          {formatMoney(fund.actualAmount)}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {' '}
+                          / {formatMoney(plannedAmount)} ₽
+                        </span>
+                      </div>
+                      {!isCompleted && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              onClick={() => navigate('/incomes')}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Изменить на странице доходов</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                   </div>
                   <Progress

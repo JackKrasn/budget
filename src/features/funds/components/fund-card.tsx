@@ -68,8 +68,9 @@ export function FundCard({
   onDelete,
 }: FundCardProps) {
   const navigate = useNavigate()
-  const { fund: fundData, totalRub, assets } = fund
+  const { fund: fundData, totalBase, baseCurrency, assets } = fund
   const Icon = FUND_ICONS[fundData.icon] || Wallet
+  const currencySymbol = { RUB: '₽', USD: '$', EUR: '€', GEL: '₾', TRY: '₺' }[baseCurrency] ?? '₽'
 
   const handleNavigate = () => {
     navigate(`/funds/${fundData.id}`)
@@ -166,8 +167,8 @@ export function FundCard({
           <div className="mb-4">
             <p className="text-sm text-muted-foreground">Баланс</p>
             <p className="text-2xl font-bold tabular-nums tracking-tight">
-              {formatMoney(totalRub)}{' '}
-              <span className="text-lg text-muted-foreground">₽</span>
+              {formatMoney(totalBase)}{' '}
+              <span className="text-lg text-muted-foreground">{currencySymbol}</span>
             </p>
           </div>
 
