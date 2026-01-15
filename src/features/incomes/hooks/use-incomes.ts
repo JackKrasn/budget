@@ -4,6 +4,7 @@ import type {
   IncomesListParams,
   CreateIncomeRequest,
   UpdateIncomeRequest,
+  CreateIncomeDistributionRequest,
   UpdateDistributionRequest,
   ConfirmDistributionRequest,
 } from '@/lib/api/types'
@@ -82,6 +83,28 @@ export function useDeleteIncome() {
       // Invalidate accounts to refresh balance
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Доход удалён')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+export function useCreateDistribution() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      incomeId,
+      data,
+    }: {
+      incomeId: string
+      data: CreateIncomeDistributionRequest
+    }) => incomesApi.createDistribution(incomeId, data),
+    onSuccess: (_, { incomeId }) => {
+      queryClient.invalidateQueries({ queryKey: incomeKeys.detail(incomeId) })
+      queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
+      toast.success('Распределение добавлено')
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)

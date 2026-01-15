@@ -8,6 +8,7 @@ import {
   PiggyBank,
   AlertCircle,
   Check,
+  Pencil,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,8 +16,10 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useIncome, useConfirmDistribution } from '@/features/incomes/hooks'
+import { useIncome, useConfirmDistribution, useUpdateDistribution, useCreateDistribution } from '@/features/incomes/hooks'
 import { ConfirmDistributionDialog } from '@/features/incomes/components/confirm-distribution-dialog'
+import { EditDistributionDialog } from '@/features/incomes/components/edit-distribution-dialog'
+import { AddDistributionDialog } from '@/features/incomes/components/add-distribution-dialog'
 import { FundIcon } from '@/components/common/category-icon'
 import { cn } from '@/lib/utils'
 import type { IncomeDistribution, ConfirmDistributionRequest } from '@/lib/api/types'
@@ -53,13 +56,22 @@ export default function IncomeDetailsPage() {
   const navigate = useNavigate()
   const { data: income, error, isLoading } = useIncome(id ?? '')
   const confirmDistribution = useConfirmDistribution()
+  const updateDistribution = useUpdateDistribution()
+  const createDistribution = useCreateDistribution()
 
   const [selectedDistribution, setSelectedDistribution] = useState<IncomeDistribution | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingDistribution, setEditingDistribution] = useState<IncomeDistribution | null>(null)
 
   const handleConfirmClick = (distribution: IncomeDistribution) => {
     setSelectedDistribution(distribution)
     setConfirmDialogOpen(true)
+  }
+
+  const handleEditClick = (distribution: IncomeDistribution) => {
+    setEditingDistribution(distribution)
+    setEditDialogOpen(true)
   }
 
   const handleConfirm = (data: ConfirmDistributionRequest) => {
@@ -78,6 +90,33 @@ export default function IncomeDetailsPage() {
         },
       }
     )
+  }
+
+  const handleUpdateDistribution = (plannedAmount: number) => {
+    if (!id || !editingDistribution) return
+
+    updateDistribution.mutate(
+      {
+        incomeId: id,
+        fundId: editingDistribution.fund_id,
+        data: { plannedAmount },
+      },
+      {
+        onSuccess: () => {
+          setEditDialogOpen(false)
+          setEditingDistribution(null)
+        },
+      }
+    )
+  }
+
+  const handleAddDistribution = (fundId: string, plannedAmount: number) => {
+    if (!id) return
+
+    createDistribution.mutate({
+      incomeId: id,
+      data: { fundId, plannedAmount },
+    })
   }
 
   if (!id) {
@@ -281,9 +320,17 @@ export default function IncomeDetailsPage() {
       {/* Pending Distributions */}
       {pendingDistributions.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Ожидают подтверждения
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              Ожидают подтверждения
+            </h3>
+            <AddDistributionDialog
+              incomeAmount={income.amount}
+              existingDistributions={distributions}
+              onAdd={handleAddDistribution}
+              isAdding={createDistribution.isPending}
+            />
+          </div>
           <div className="space-y-3">
             {pendingDistributions.map((distribution) => (
               <DistributionCard
@@ -291,6 +338,7 @@ export default function IncomeDetailsPage() {
                 distribution={distribution}
                 incomeAmount={income.amount}
                 onConfirm={() => handleConfirmClick(distribution)}
+                onEdit={() => handleEditClick(distribution)}
                 isConfirming={
                   confirmDistribution.isPending &&
                   selectedDistribution?.id === distribution.id
@@ -304,9 +352,19 @@ export default function IncomeDetailsPage() {
       {/* Completed Distributions */}
       {completedDistributions.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Подтверждённые
-          </h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-muted-foreground">
+              Подтверждённые
+            </h3>
+            {pendingDistributions.length === 0 && (
+              <AddDistributionDialog
+                incomeAmount={income.amount}
+                existingDistributions={distributions}
+                onAdd={handleAddDistribution}
+                isAdding={createDistribution.isPending}
+              />
+            )}
+          </div>
           <div className="space-y-3">
             {completedDistributions.map((distribution) => (
               <DistributionCard
@@ -314,6 +372,7 @@ export default function IncomeDetailsPage() {
                 distribution={distribution}
                 incomeAmount={income.amount}
                 onConfirm={() => {}}
+                onEdit={() => {}}
               />
             ))}
           </div>
@@ -331,9 +390,15 @@ export default function IncomeDetailsPage() {
               <div>
                 <p className="font-medium">Нет распределений по фондам</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Добавьте правила распределения для автоматического распределения доходов
+                  Добавьте распределение вручную или настройте правила для автоматического распределения
                 </p>
               </div>
+              <AddDistributionDialog
+                incomeAmount={income.amount}
+                existingDistributions={distributions}
+                onAdd={handleAddDistribution}
+                isAdding={createDistribution.isPending}
+              />
             </CardContent>
           </Card>
         </div>
@@ -347,6 +412,16 @@ export default function IncomeDetailsPage() {
         onConfirm={handleConfirm}
         isConfirming={confirmDistribution.isPending}
       />
+
+      {/* Edit Distribution Dialog */}
+      <EditDistributionDialog
+        distribution={editingDistribution}
+        incomeAmount={income.amount}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        onSave={handleUpdateDistribution}
+        isSaving={updateDistribution.isPending}
+      />
     </div>
   )
 }
@@ -356,6 +431,7 @@ interface DistributionCardProps {
   distribution: IncomeDistribution
   incomeAmount: number
   onConfirm: () => void
+  onEdit: () => void
   isConfirming?: boolean
 }
 
@@ -363,6 +439,7 @@ function DistributionCard({
   distribution,
   incomeAmount,
   onConfirm,
+  onEdit,
   isConfirming,
 }: DistributionCardProps) {
   const isCompleted = distribution.is_completed
@@ -438,16 +515,26 @@ function DistributionCard({
         )}
       </div>
 
-      {/* Confirm Button */}
+      {/* Action Buttons */}
       {!isCompleted && (
-        <Button
-          size="sm"
-          onClick={onConfirm}
-          disabled={isConfirming}
-          className="shrink-0"
-        >
-          {isConfirming ? 'Подтверждение...' : 'Подтвердить'}
-        </Button>
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onEdit}
+            className="h-8 w-8 p-0"
+            title="Изменить сумму"
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            size="sm"
+            onClick={onConfirm}
+            disabled={isConfirming}
+          >
+            {isConfirming ? 'Подтверждение...' : 'Подтвердить'}
+          </Button>
+        </div>
       )}
     </div>
   )
