@@ -122,7 +122,7 @@ export function AssetCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {onUpdatePrice && (
+                {onUpdatePrice && asset.type_code !== 'currency' && (
                   <DropdownMenuItem onClick={onUpdatePrice}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Обновить цену
@@ -144,18 +144,29 @@ export function AssetCard({
             </DropdownMenu>
           </div>
 
-          {/* Price */}
-          <div className="rounded-lg bg-background/50 p-3">
-            <p className="text-xs text-muted-foreground mb-1">
-              {asset.type_code === 'currency' ? 'Курс' : 'Текущая цена'}
-            </p>
-            <p className="text-2xl font-bold tabular-nums">
-              {formatPrice(priceValue)}{' '}
-              <span className="text-lg">
-                {asset.type_code === 'currency' ? '₽' : currencySymbol}
-              </span>
-            </p>
-          </div>
+          {/* Price - only for non-currency assets */}
+          {asset.type_code !== 'currency' && (
+            <div className="rounded-lg bg-background/50 p-3">
+              <p className="text-xs text-muted-foreground mb-1">Текущая цена</p>
+              <p className="text-2xl font-bold tabular-nums">
+                {formatPrice(priceValue)}{' '}
+                <span className="text-lg">{currencySymbol}</span>
+              </p>
+            </div>
+          )}
+
+          {/* Currency info - for currency assets */}
+          {asset.type_code === 'currency' && (
+            <div className="rounded-lg bg-background/50 p-3">
+              <p className="text-xs text-muted-foreground mb-1">Код валюты</p>
+              <p className="text-2xl font-bold tabular-nums">
+                {asset.ticker || '—'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Курс задаётся в разделе «Курсы валют»
+              </p>
+            </div>
+          )}
 
           {/* Details - only show for non-currency assets */}
           {asset.type_code !== 'currency' && (

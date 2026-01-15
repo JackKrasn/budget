@@ -111,11 +111,12 @@ export function EditAssetDialog({
           name: values.name,
           assetTypeId: values.assetTypeId,
           ticker: values.ticker || undefined,
-          // For currency assets, always use RUB as the quote currency
-          currency: isCurrencyType ? 'RUB' : values.currency,
-          currentPrice: values.currentPrice
-            ? parseFloat(values.currentPrice)
-            : undefined,
+          currency: values.currency,
+          currentPrice: isCurrencyType
+            ? 1.0
+            : values.currentPrice
+              ? parseFloat(values.currentPrice)
+              : undefined,
         },
       })
       onOpenChange(false)
@@ -197,61 +198,59 @@ export function EditAssetDialog({
               )}
             />
 
-            {/* Currency - hide for currency assets */}
-            {!isCurrencyType && (
-              <FormField
-                control={form.control}
-                name="currency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Валюта котировки</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Выберите валюту" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {CURRENCIES.map((currency) => (
-                          <SelectItem key={currency.value} value={currency.value}>
-                            {currency.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      В какой валюте указана цена актива
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Current Price / Exchange Rate */}
+            {/* Currency */}
             <FormField
               control={form.control}
-              name="currentPrice"
+              name="currency"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    {isCurrencyType ? 'Курс к рублю (опционально)' : 'Текущая цена (опционально)'}
-                  </FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      step="0.01"
-                      placeholder="0.00"
-                      {...field}
-                    />
-                  </FormControl>
+                  <FormLabel>Валюта котировки</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите валюту" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {CURRENCIES.map((currency) => (
+                        <SelectItem key={currency.value} value={currency.value}>
+                          {currency.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <FormDescription>
-                    {isCurrencyType ? 'Текущий курс валюты к рублю' : 'Цена за единицу актива'}
+                    {isCurrencyType
+                      ? 'К какой валюте привязан курс (например, RUB для пары USD/RUB)'
+                      : 'В какой валюте указана цена актива'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Current Price - only for non-currency assets */}
+            {!isCurrencyType && (
+              <FormField
+                control={form.control}
+                name="currentPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Текущая цена (опционально)</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>Цена за единицу актива</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             <div className="flex gap-3 pt-4">
               <Button

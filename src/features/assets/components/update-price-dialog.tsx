@@ -86,21 +86,19 @@ export function UpdatePriceDialog({
     }
   }
 
-  if (!asset) return null
+  // Don't render for currency assets - their price is always 1.0
+  // Exchange rates are managed via the Exchange Rates page
+  if (!asset || asset.type_code === 'currency') return null
 
-  const isCurrencyType = asset.type_code === 'currency'
-  const currencySymbol = isCurrencyType ? '₽' : (CURRENCY_SYMBOLS[asset.currency] || asset.currency)
-  const priceLabel = isCurrencyType ? 'Курс' : 'Текущая цена'
+  const currencySymbol = CURRENCY_SYMBOLS[asset.currency] || asset.currency
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[400px]">
         <DialogHeader>
-          <DialogTitle>{isCurrencyType ? 'Обновить курс' : 'Обновить цену'}</DialogTitle>
+          <DialogTitle>Обновить цену</DialogTitle>
           <DialogDescription>
-            {isCurrencyType
-              ? `Обновите курс валюты ${asset.name} к рублю`
-              : `Обновите текущую цену для ${asset.name}`}
+            Обновите текущую цену для {asset.name}
           </DialogDescription>
         </DialogHeader>
 
@@ -108,7 +106,7 @@ export function UpdatePriceDialog({
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Current Price Info */}
             <div className="rounded-lg border border-border/50 bg-muted/30 p-4">
-              <p className="text-sm text-muted-foreground">{priceLabel}</p>
+              <p className="text-sm text-muted-foreground">Текущая цена</p>
               <p className="text-2xl font-bold tabular-nums">
                 {currentPrice?.toLocaleString('en-US', {
                   minimumFractionDigits: 2,
@@ -124,9 +122,7 @@ export function UpdatePriceDialog({
               name="price"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>
-                    {isCurrencyType ? `Новый курс (${currencySymbol})` : `Новая цена (${currencySymbol})`}
-                  </FormLabel>
+                  <FormLabel>Новая цена ({currencySymbol})</FormLabel>
                   <FormControl>
                     <Input
                       type="number"
