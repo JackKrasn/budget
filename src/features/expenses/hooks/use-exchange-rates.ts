@@ -24,7 +24,7 @@ export function useExchangeRates() {
 }
 
 /**
- * Добавить/обновить курс валюты
+ * Добавить курс валюты
  */
 export function useCreateExchangeRate() {
   const queryClient = useQueryClient()
@@ -34,7 +34,26 @@ export function useCreateExchangeRate() {
       exchangeRatesApi.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: exchangeRateKeys.list() })
-      toast.success('Курс валюты сохранён')
+      toast.success('Курс валюты добавлен')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Обновить курс валюты
+ */
+export function useUpdateExchangeRate() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: { rate: number; source?: string } }) =>
+      exchangeRatesApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: exchangeRateKeys.list() })
+      toast.success('Курс валюты обновлён')
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)

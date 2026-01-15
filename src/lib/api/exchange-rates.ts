@@ -14,8 +14,14 @@ export const exchangeRatesApi = {
   list: () => apiClient.get<ExchangeRatesListResponse>(ENDPOINT),
 
   /**
-   * Добавить/обновить курс валюты
+   * Добавить курс валюты
    */
   create: (data: CreateExchangeRateRequest) =>
     apiClient.post<ExchangeRate>(ENDPOINT, data),
+
+  /**
+   * Обновить курс валюты
+   */
+  update: (id: string, data: { rate: number; source?: string }) =>
+    apiClient.patch<ExchangeRate>(`${ENDPOINT}/${id}`, data),
 }

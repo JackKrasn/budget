@@ -43,6 +43,7 @@ import {
 import {
   useExchangeRates,
   useCreateExchangeRate,
+  useUpdateExchangeRate,
 } from '@/features/expenses/hooks/use-exchange-rates'
 import type { ExchangeRate } from '@/lib/api'
 
@@ -66,6 +67,7 @@ type FormValues = z.infer<typeof formSchema>
 export default function ExchangeRatesPage() {
   const { data, isLoading, error } = useExchangeRates()
   const createRate = useCreateExchangeRate()
+  const updateRate = useUpdateExchangeRate()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRate, setEditingRate] = useState<ExchangeRate | null>(null)
 
@@ -98,12 +100,24 @@ export default function ExchangeRatesPage() {
 
   async function onSubmit(values: FormValues) {
     try {
-      await createRate.mutateAsync({
-        fromCurrency: values.fromCurrency,
-        toCurrency: 'RUB',
-        rate: parseFloat(values.rate),
-        source: 'manual',
-      })
+      if (editingRate) {
+        // Update existing rate via PATCH
+        await updateRate.mutateAsync({
+          id: editingRate.id,
+          data: {
+            rate: parseFloat(values.rate),
+            source: 'manual',
+          },
+        })
+      } else {
+        // Create new rate via POST
+        await createRate.mutateAsync({
+          fromCurrency: values.fromCurrency,
+          toCurrency: 'RUB',
+          rate: parseFloat(values.rate),
+          source: 'manual',
+        })
+      }
       setDialogOpen(false)
       form.reset()
       setEditingRate(null)
@@ -111,6 +125,8 @@ export default function ExchangeRatesPage() {
       // Error handled in mutation
     }
   }
+
+  const isMutating = createRate.isPending || updateRate.isPending
 
   const getCurrencyLabel = (code: string) => {
     return CURRENCIES.find((c) => c.value === code)?.label ?? code
@@ -317,9 +333,9 @@ export default function ExchangeRatesPage() {
                 <Button
                   type="submit"
                   className="flex-1"
-                  disabled={createRate.isPending}
+                  disabled={isMutating}
                 >
-                  {createRate.isPending ? 'Сохранение...' : 'Сохранить'}
+                  {isMutating ? 'Сохранение...' : 'Сохранить'}
                 </Button>
               </div>
             </form>

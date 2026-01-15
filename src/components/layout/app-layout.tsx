@@ -22,6 +22,7 @@ import {
   SlidersHorizontal,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
+import { HeaderRates } from '@/components/layout/header-rates'
 import {
   Sidebar,
   SidebarContent,
@@ -375,6 +376,9 @@ function Header() {
       </motion.button>
 
       <div className="flex-1" />
+
+      {/* Exchange rates widget */}
+      <HeaderRates />
 
       {/* Theme toggle */}
       <ThemeToggle />
