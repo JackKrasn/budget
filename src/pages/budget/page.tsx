@@ -224,8 +224,11 @@ export default function BudgetPage() {
     const expectedFundDistributions = budget?.distributionSummary?.totalExpectedDistribution ?? 0
     const actualFundDistributions = budget?.distributionSummary?.totalActualDistribution ?? 0
 
-    // Доступно для планирования = Ожидаемый доход - План по категориям - Обязательные ИЗ БЮДЖЕТА - Распределения в фонды
-    const availableForPlanning = expectedIncome - totalPlanned - pendingPlannedFromBudget - expectedFundDistributions
+    // Общий доход для планирования = максимум из ожидаемого и реально полученного
+    const totalIncome = Math.max(expectedIncome, receivedIncome)
+
+    // Доступно для планирования = Общий доход - План по категориям - Обязательные ИЗ БЮДЖЕТА - Распределения в фонды
+    const availableForPlanning = totalIncome - totalPlanned - pendingPlannedFromBudget - expectedFundDistributions
 
     // Реально доступно = Полученный доход - Фактические расходы - Подтверждённые распределения
     const actuallyAvailable = receivedIncome - totalActual - actualFundDistributions
@@ -245,6 +248,7 @@ export default function BudgetPage() {
       pendingPlannedFromBudget,
       confirmedPlannedFromBudget,
       // Доходы
+      totalIncome,
       expectedIncome,
       receivedIncome,
       pendingIncome,
