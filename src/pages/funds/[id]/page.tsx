@@ -40,27 +40,29 @@ import {
   GraduationCap,
   Heart,
   Loader2,
-  ArrowUpRight,
   ArrowDownRight,
   Settings,
   History,
   BarChart3,
   ArrowLeft,
   AlertCircle,
-  Trash2,
+  Plus,
+  ArrowRightLeft,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   useFund,
   useUpdateFund,
-  useFundHistory,
   useFundDistributionRules,
   useCreateDistributionRule,
   useUpdateDistributionRule,
   useDeleteDistributionRule,
-  useDeleteContribution,
   ContributionDialog,
   WithdrawalDialog,
+  BuyAssetDialog,
+  DepositToFundDialog,
+  TransferAssetDialog,
+  FundTransactionsHistory,
 } from '@/features/funds'
 import type { FundStatus, RuleType, FundBalance } from '@/lib/api/types'
 
@@ -117,13 +119,6 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  })
-}
-
 export default function FundDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -131,16 +126,16 @@ export default function FundDetailsPage() {
   const [isEditingRule, setIsEditingRule] = useState(false)
   const [contributionOpen, setContributionOpen] = useState(false)
   const [withdrawalOpen, setWithdrawalOpen] = useState(false)
-  const [deletingContributionId, setDeletingContributionId] = useState<string | null>(null)
+  const [buyAssetOpen, setBuyAssetOpen] = useState(false)
+  const [depositFromAccountOpen, setDepositFromAccountOpen] = useState(false)
+  const [transferAssetOpen, setTransferAssetOpen] = useState(false)
 
   const { data: fund, isLoading, error } = useFund(id!)
   const updateFund = useUpdateFund()
-  const { data: historyData, isLoading: isLoadingHistory } = useFundHistory(id!)
   const { data: rulesData } = useFundDistributionRules(id!)
   const createRule = useCreateDistributionRule()
   const updateRule = useUpdateDistributionRule()
   const deleteRule = useDeleteDistributionRule()
-  const deleteContribution = useDeleteContribution()
 
   const activeRule = rulesData?.data?.find((r) => r.is_active)
 
@@ -378,15 +373,31 @@ export default function FundDetailsPage() {
                   <span className="text-2xl font-medium text-muted-foreground">₽</span>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  className="gap-1.5"
-                  style={{ backgroundColor: '#10b981' }}
-                  onClick={() => setContributionOpen(true)}
+                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  onClick={() => setBuyAssetOpen(true)}
                 >
-                  <ArrowUpRight className="h-4 w-4" />
+                  <ShoppingBag className="h-4 w-4" />
+                  Купить актив
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-green-600 hover:bg-green-700"
+                  onClick={() => setDepositFromAccountOpen(true)}
+                >
+                  <Plus className="h-4 w-4" />
                   Пополнить
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
+                  onClick={() => setTransferAssetOpen(true)}
+                >
+                  <ArrowRightLeft className="h-4 w-4" />
+                  Перевести
                 </Button>
                 <Button
                   size="sm"
@@ -522,92 +533,8 @@ export default function FundDetailsPage() {
         {/* History Tab */}
         <TabsContent value="history" className="mt-6">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">История операций</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {isLoadingHistory ? (
-                <div className="flex h-40 items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {/* Contributions */}
-                  {historyData?.contributions?.map((c, index) => (
-                    <motion.div
-                      key={c.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.05 }}
-                      className="group flex items-center gap-3 rounded-xl bg-emerald-500/10 p-4"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
-                        <ArrowUpRight className="h-5 w-5 text-emerald-500" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-emerald-600 dark:text-emerald-400">
-                          +{formatMoney(c.total_amount)} {c.currency}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(c.date)}
-                          {c.note && ` • ${c.note}`}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100 text-muted-foreground hover:text-destructive"
-                        disabled={deletingContributionId === c.id}
-                        onClick={() => {
-                          if (confirm('Удалить это пополнение? Баланс фонда будет уменьшен.')) {
-                            setDeletingContributionId(c.id)
-                            deleteContribution.mutate(
-                              { fundId: id!, contributionId: c.id },
-                              { onSettled: () => setDeletingContributionId(null) }
-                            )
-                          }
-                        }}
-                      >
-                        {deletingContributionId === c.id ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="h-4 w-4" />
-                        )}
-                      </Button>
-                    </motion.div>
-                  ))}
-
-                  {/* Withdrawals */}
-                  {historyData?.withdrawals?.map((w, index) => (
-                    <motion.div
-                      key={w.id}
-                      initial={{ opacity: 0, x: -10 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: 0.1 + index * 0.05 }}
-                      className="flex items-center gap-3 rounded-xl bg-red-500/10 p-4"
-                    >
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/20">
-                        <ArrowDownRight className="h-5 w-5 text-red-500" />
-                      </div>
-                      <div className="flex-1">
-                        <p className="font-medium text-red-600 dark:text-red-400">
-                          -{formatMoney(w.total_amount)} {w.currency}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {formatDate(w.date)} • {w.purpose}
-                        </p>
-                      </div>
-                    </motion.div>
-                  ))}
-
-                  {(!historyData?.contributions?.length && !historyData?.withdrawals?.length) && (
-                    <div className="flex h-40 flex-col items-center justify-center rounded-xl bg-muted/30 text-center">
-                      <History className="mb-2 h-8 w-8 text-muted-foreground/50" />
-                      <p className="text-sm text-muted-foreground">История операций пуста</p>
-                    </div>
-                  )}
-                </div>
-              )}
+            <CardContent className="pt-6">
+              <FundTransactionsHistory fundId={id!} />
             </CardContent>
           </Card>
         </TabsContent>
@@ -1004,6 +931,21 @@ export default function FundDetailsPage() {
         fund={fundBalance}
         open={withdrawalOpen}
         onOpenChange={setWithdrawalOpen}
+      />
+      <BuyAssetDialog
+        fund={fundBalance}
+        open={buyAssetOpen}
+        onOpenChange={setBuyAssetOpen}
+      />
+      <DepositToFundDialog
+        fund={fundBalance}
+        open={depositFromAccountOpen}
+        onOpenChange={setDepositFromAccountOpen}
+      />
+      <TransferAssetDialog
+        fund={fundBalance}
+        open={transferAssetOpen}
+        onOpenChange={setTransferAssetOpen}
       />
     </div>
   )

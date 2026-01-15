@@ -1237,3 +1237,103 @@ export interface TransfersListParams {
   accountId?: string
   [key: string]: string | number | boolean | undefined
 }
+
+// === Fund Asset Operations ===
+
+export type FundTransactionType =
+  | 'buy'
+  | 'sell'
+  | 'transfer_in'
+  | 'transfer_out'
+  | 'deposit'
+
+export interface BuyAssetRequest {
+  assetId: string
+  amount: number
+  pricePerUnit: number
+  currencyAssetId: string
+  date?: string
+  note?: string
+}
+
+export interface BuyAssetResponse {
+  success: boolean
+  assetId: string
+  amount: number
+  pricePerUnit: number
+  totalCost: number
+  currencyAssetId: string
+}
+
+export interface DepositToFundRequest {
+  accountId: string
+  assetId: string
+  amount: number
+  date?: string
+  note?: string
+}
+
+export interface DepositToFundResponse {
+  success: boolean
+  accountId: string
+  accountName: string
+  assetId: string
+  amount: number
+}
+
+export interface TransferAssetRequest {
+  toFundId: string
+  assetId: string
+  amount: number
+  date?: string
+  note?: string
+}
+
+export interface TransferAssetResponse {
+  success: boolean
+  fromFundId: string
+  toFundId: string
+  toFundName: string
+  assetId: string
+  amount: number
+}
+
+export interface FundTransaction {
+  id: UUID
+  fund_id: UUID
+  transaction_type: FundTransactionType
+  asset_id: UUID
+  amount: number
+  price_per_unit: NullFloat64
+  total_value: NullFloat64
+  currency: string | null
+  counterpart_fund_id: string | null
+  counterpart_asset_id: string | null
+  source_account_id: string | null
+  note: string | null
+  date: ISODate
+  created_at: ISODate
+  // Joined fields
+  asset_name: string
+  asset_ticker: string | null
+  asset_type: string
+  counterpart_fund_name: string | null
+  counterpart_asset_name: string | null
+  source_account_name: string | null
+}
+
+export interface FundTransactionsListResponse {
+  data: FundTransaction[]
+  total: number
+}
+
+export interface FundTransactionsListParams {
+  type?: FundTransactionType
+  from?: string
+  to?: string
+  [key: string]: string | number | boolean | undefined
+}
+
+export interface FundCurrencyAssetsResponse {
+  data: FundAssetBalance[]
+}

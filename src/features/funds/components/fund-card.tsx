@@ -15,8 +15,6 @@ import {
   GraduationCap,
   Heart,
   Trash2,
-  ArrowUpRight,
-  ArrowDownRight,
   ChevronRight,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -56,21 +54,15 @@ function formatMoney(amount: number): string {
 
 interface FundCardProps {
   fund: FundBalance
-  onDeposit?: () => void
-  onWithdraw?: () => void
   onDelete?: () => void
 }
 
-export function FundCard({
-  fund,
-  onDeposit,
-  onWithdraw,
-  onDelete,
-}: FundCardProps) {
+export function FundCard({ fund, onDelete }: FundCardProps) {
   const navigate = useNavigate()
   const { fund: fundData, totalBase, baseCurrency, assets } = fund
   const Icon = FUND_ICONS[fundData.icon] || Wallet
-  const currencySymbol = { RUB: '₽', USD: '$', EUR: '€', GEL: '₾', TRY: '₺' }[baseCurrency] ?? '₽'
+  const currencySymbol =
+    { RUB: '₽', USD: '$', EUR: '€', GEL: '₾', TRY: '₺' }[baseCurrency] ?? '₽'
 
   const handleNavigate = () => {
     navigate(`/funds/${fundData.id}`)
@@ -153,7 +145,10 @@ export function FundCard({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
-                  onClick={onDelete}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onDelete?.()
+                  }}
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
@@ -181,8 +176,7 @@ export function FundCard({
                   variant="outline"
                   className="text-xs font-normal"
                 >
-                  {asset.asset.name}: {formatMoney(asset.amount)}{' '}
-                  {asset.asset.currency}
+                  {asset.asset.name}: {formatMoney(asset.amount)} {asset.asset.currency}
                 </Badge>
               ))}
               {assets.length > 3 && (
@@ -193,44 +187,12 @@ export function FundCard({
             </div>
           )}
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 pt-2 border-t border-border/50">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-1 h-9 text-xs gap-1.5 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:text-emerald-400 dark:hover:text-emerald-300 dark:hover:bg-emerald-950/50"
-              onClick={(e) => {
-                e.stopPropagation()
-                onDeposit?.()
-              }}
-            >
-              <ArrowUpRight className="h-3.5 w-3.5" />
-              Пополнить
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="flex-1 h-9 text-xs gap-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
-              onClick={(e) => {
-                e.stopPropagation()
-                onWithdraw?.()
-              }}
-            >
-              <ArrowDownRight className="h-3.5 w-3.5" />
-              Списать
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-9 px-2 text-xs gap-1 text-muted-foreground hover:text-foreground"
-              onClick={(e) => {
-                e.stopPropagation()
-                handleNavigate()
-              }}
-            >
+          {/* Footer with navigation hint */}
+          <div className="flex items-center justify-end pt-2 border-t border-border/50">
+            <span className="flex items-center gap-1 text-xs text-muted-foreground group-hover:text-foreground transition-colors">
               Подробнее
               <ChevronRight className="h-3.5 w-3.5" />
-            </Button>
+            </span>
           </div>
         </CardContent>
       </Card>

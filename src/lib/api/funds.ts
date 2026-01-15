@@ -18,6 +18,15 @@ import type {
   CreateWithdrawalRequest,
   FundHistoryResponse,
   FundHistoryParams,
+  BuyAssetRequest,
+  BuyAssetResponse,
+  DepositToFundRequest,
+  DepositToFundResponse,
+  TransferAssetRequest,
+  TransferAssetResponse,
+  FundTransactionsListResponse,
+  FundTransactionsListParams,
+  FundCurrencyAssetsResponse,
 } from './types'
 
 const ENDPOINT = '/funds'
@@ -139,6 +148,46 @@ export const fundsApi = {
   getHistory: (fundId: string, params?: FundHistoryParams) =>
     apiClient.get<FundHistoryResponse>(
       `${ENDPOINT}/${fundId}/history`,
+      params
+    ),
+
+  // === Fund Asset Operations ===
+
+  /**
+   * Получить валютные активы фонда
+   */
+  listCurrencyAssets: (fundId: string) =>
+    apiClient.get<FundCurrencyAssetsResponse>(
+      `${ENDPOINT}/${fundId}/assets/currency`
+    ),
+
+  /**
+   * Купить актив за валюту фонда
+   */
+  buyAsset: (fundId: string, data: BuyAssetRequest) =>
+    apiClient.post<BuyAssetResponse>(`${ENDPOINT}/${fundId}/buy-asset`, data),
+
+  /**
+   * Пополнить валюту фонда с банковского счёта
+   */
+  depositFromAccount: (fundId: string, data: DepositToFundRequest) =>
+    apiClient.post<DepositToFundResponse>(`${ENDPOINT}/${fundId}/deposit`, data),
+
+  /**
+   * Перевести актив в другой фонд
+   */
+  transferAsset: (fundId: string, data: TransferAssetRequest) =>
+    apiClient.post<TransferAssetResponse>(
+      `${ENDPOINT}/${fundId}/transfer-asset`,
+      data
+    ),
+
+  /**
+   * Получить историю транзакций фонда
+   */
+  listTransactions: (fundId: string, params?: FundTransactionsListParams) =>
+    apiClient.get<FundTransactionsListResponse>(
+      `${ENDPOINT}/${fundId}/transactions`,
       params
     ),
 }

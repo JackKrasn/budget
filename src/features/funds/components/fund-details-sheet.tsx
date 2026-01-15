@@ -42,8 +42,6 @@ import {
   GraduationCap,
   Heart,
   Loader2,
-  ArrowUpRight,
-  ArrowDownRight,
   Settings,
   History,
   BarChart3,
@@ -51,12 +49,12 @@ import {
 import { cn } from '@/lib/utils'
 import {
   useUpdateFund,
-  useFundHistory,
   useFundDistributionRules,
   useCreateDistributionRule,
   useUpdateDistributionRule,
   useDeleteDistributionRule,
 } from '../hooks'
+import { FundTransactionsHistory } from './fund-transactions-history'
 import type { FundBalance, FundStatus, RuleType } from '@/lib/api/types'
 
 const FUND_ICONS = [
@@ -112,13 +110,6 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('ru-RU', {
-    day: 'numeric',
-    month: 'short',
-  })
-}
-
 interface FundDetailsSheetProps {
   fund: FundBalance | null
   open: boolean
@@ -138,9 +129,6 @@ export function FundDetailsSheet({
   const createRule = useCreateDistributionRule()
   const updateRule = useUpdateDistributionRule()
   const deleteRule = useDeleteDistributionRule()
-  const { data: historyData, isLoading: isLoadingHistory } = useFundHistory(
-    fund?.fund.id ?? '',
-  )
   const { data: rulesData } = useFundDistributionRules(fund?.fund.id ?? '')
   const activeRule = rulesData?.data?.find((r) => r.is_active)
 
@@ -405,92 +393,8 @@ export function FundDetailsSheet({
             </TabsContent>
 
             {/* History Tab */}
-            <TabsContent value="history" className="mt-6 space-y-4">
-              {isLoadingHistory ? (
-                <div className="flex h-40 items-center justify-center">
-                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <>
-                  {/* Contributions */}
-                  {historyData?.contributions && historyData.contributions.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-2"
-                    >
-                      {historyData.contributions.map((c, index) => (
-                        <motion.div
-                          key={c.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className="flex items-center gap-3 rounded-xl bg-emerald-500/10 p-3"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/20">
-                            <ArrowUpRight className="h-5 w-5 text-emerald-500" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-emerald-600 dark:text-emerald-400">
-                              +{formatMoney(c.total_amount)} {c.currency}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(c.date)}
-                              {c.note && ` • ${c.note}`}
-                            </p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </motion.div>
-                  )}
-
-                  {/* Withdrawals */}
-                  {historyData?.withdrawals && historyData.withdrawals.length > 0 && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.1 }}
-                      className="space-y-2"
-                    >
-                      {historyData.withdrawals.map((w, index) => (
-                        <motion.div
-                          key={w.id}
-                          initial={{ opacity: 0, x: -10 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: 0.1 + index * 0.05 }}
-                          className="flex items-center gap-3 rounded-xl bg-red-500/10 p-3"
-                        >
-                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/20">
-                            <ArrowDownRight className="h-5 w-5 text-red-500" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="font-medium text-red-600 dark:text-red-400">
-                              -{formatMoney(w.total_amount)} {w.currency}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDate(w.date)} • {w.purpose}
-                            </p>
-                          </div>
-                        </motion.div>
-                      ))}
-                    </motion.div>
-                  )}
-
-                  {(!historyData?.contributions?.length &&
-                    !historyData?.withdrawals?.length) && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      className="flex h-40 flex-col items-center justify-center rounded-xl bg-muted/30 text-center"
-                    >
-                      <History className="mb-2 h-8 w-8 text-muted-foreground/50" />
-                      <p className="text-sm text-muted-foreground">
-                        История операций пуста
-                      </p>
-                    </motion.div>
-                  )}
-                </>
-              )}
+            <TabsContent value="history" className="mt-6">
+              <FundTransactionsHistory fundId={fundData.id} />
             </TabsContent>
 
             {/* Settings Tab */}
