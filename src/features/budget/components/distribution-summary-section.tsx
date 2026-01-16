@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock, Settings, ExternalLink, Pencil, Wallet } from 'lucide-react'
+import { PiggyBank, TrendingUp, Check, Clock, Settings, ExternalLink, Pencil, Wallet } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { FundIcon } from '@/components/common/category-icon'
-import { cn } from '@/lib/utils'
 import type { DistributionSummary, FundDistributionSummary } from '@/lib/api/types'
 import { EditDistributionRulesDialog } from './edit-distribution-rules-dialog'
 
@@ -59,8 +58,6 @@ export function DistributionSummarySection({
   const confirmProgress = totalToDistribute > 0
     ? Math.round((summary.totalActualDistribution / totalToDistribute) * 100)
     : 0
-
-  const isPositiveDiff = summary.distributionDifference >= 0
 
   // Процент от дохода, который идёт в фонды
   const percentOfIncome = totalIncome > 0

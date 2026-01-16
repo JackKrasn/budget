@@ -39,8 +39,10 @@ interface PlannedIncomesSectionProps {
   addButton?: React.ReactNode
   /** Скрыть обёртку Card и заголовок (для использования внутри CollapsibleSection) */
   hideWrapper?: boolean
-  /** Callback при клике на доход (переход на страницу дохода) */
+  /** Callback при клике на полученный доход (переход на страницу дохода) */
   onIncomeClick?: (incomeId: string) => void
+  /** Callback при клике на запланированный доход (переход на страницу planned income) */
+  onPlannedIncomeClick?: (plannedIncomeId: string) => void
 }
 
 const STATUS_CONFIG: Record<
@@ -62,6 +64,7 @@ export function PlannedIncomesSection({
   addButton,
   hideWrapper = false,
   onIncomeClick,
+  onPlannedIncomeClick,
 }: PlannedIncomesSectionProps) {
   const [processingId, setProcessingId] = useState<string | null>(null)
 
@@ -281,7 +284,17 @@ export function PlannedIncomesSection({
               const StatusIcon = statusConfig.icon
               const isProcessing = processingId === income.id
               const actualAmount = getActualAmount(income.actual_amount)
-              const canNavigate = income.status === 'received' && income.actual_income_id && onIncomeClick
+              const canNavigateToIncome = income.status === 'received' && income.actual_income_id && onIncomeClick
+              const canNavigateToPlanned = (income.status === 'pending' || income.status === 'skipped') && onPlannedIncomeClick
+              const canNavigate = canNavigateToIncome || canNavigateToPlanned
+
+              const handleRowClick = () => {
+                if (canNavigateToIncome) {
+                  onIncomeClick(income.actual_income_id!)
+                } else if (canNavigateToPlanned) {
+                  onPlannedIncomeClick(income.id)
+                }
+              }
 
               return (
                 <TableRow
@@ -291,7 +304,7 @@ export function PlannedIncomesSection({
                     income.status === 'skipped' && 'opacity-50',
                     canNavigate && 'cursor-pointer hover:bg-muted/50'
                   )}
-                  onClick={canNavigate ? () => onIncomeClick(income.actual_income_id!) : undefined}
+                  onClick={canNavigate ? handleRowClick : undefined}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">
