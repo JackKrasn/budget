@@ -16,12 +16,14 @@ import {
   TrendingUp,
   Receipt,
   LayoutList,
+  RefreshCw,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { CollapsibleSection } from '@/components/ui/collapsible-section'
 import { toast } from 'sonner'
+import { cn } from '@/lib/utils'
 import {
   useBudgetByMonth,
   useBudgets,
@@ -948,17 +950,33 @@ export default function BudgetPage() {
               )
             }
             headerAction={
-              budget?.id && (
-                <AddPlannedExpenseDialog
-                  budgetId={budget.id}
-                  year={year}
-                  month={month}
-                  categories={categories}
-                  funds={fundsRaw}
-                  onAdd={handleAddPlannedExpense}
-                  isPending={createPlanned.isPending}
-                />
-              )
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeneratePlanned}
+                  disabled={generatePlanned.isPending || createBudget.isPending}
+                >
+                  <RefreshCw
+                    className={cn(
+                      'mr-2 h-4 w-4',
+                      generatePlanned.isPending && 'animate-spin'
+                    )}
+                  />
+                  Сгенерировать
+                </Button>
+                {budget?.id && (
+                  <AddPlannedExpenseDialog
+                    budgetId={budget.id}
+                    year={year}
+                    month={month}
+                    categories={categories}
+                    funds={fundsRaw}
+                    onAdd={handleAddPlannedExpense}
+                    isPending={createPlanned.isPending}
+                  />
+                )}
+              </div>
             }
           >
             <PlannedExpensesSection
