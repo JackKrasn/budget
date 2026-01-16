@@ -101,6 +101,9 @@ export function EditExpenseDialog({
     },
   })
 
+  const selectedAccountId = form.watch('accountId')
+  const selectedAccount = accounts.find((acc) => acc.id === selectedAccountId)
+
   // Load expense data into form
   useEffect(() => {
     if (expense) {
@@ -115,6 +118,13 @@ export function EditExpenseDialog({
       })
     }
   }, [expense, form])
+
+  // Автоматически устанавливаем валюту при смене счёта
+  useEffect(() => {
+    if (selectedAccount && selectedAccount.id !== expense?.accountId) {
+      form.setValue('currency', selectedAccount.currency)
+    }
+  }, [selectedAccount, expense?.accountId, form])
 
   async function onSubmit(values: FormValues) {
     if (!expense) return
@@ -165,7 +175,12 @@ export function EditExpenseDialog({
                     <SelectContent>
                       {accounts.map((acc) => (
                         <SelectItem key={acc.id} value={acc.id}>
-                          {acc.name} ({acc.currency})
+                          <div className="flex items-center justify-between gap-3 w-full">
+                            <span>{acc.name}</span>
+                            <span className="text-muted-foreground text-sm tabular-nums">
+                              {(acc.current_balance ?? 0).toLocaleString('ru-RU')} {acc.currency === 'RUB' ? '₽' : acc.currency}
+                            </span>
+                          </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -202,20 +217,11 @@ export function EditExpenseDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Валюта</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="RUB">₽ RUB</SelectItem>
-                        <SelectItem value="USD">$ USD</SelectItem>
-                        <SelectItem value="EUR">€ EUR</SelectItem>
-                        <SelectItem value="GEL">₾ GEL</SelectItem>
-                        <SelectItem value="TRY">₺ TRY</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <FormControl>
+                      <div className="flex h-10 items-center rounded-md border border-input bg-muted/50 px-3 text-sm">
+                        {field.value === 'RUB' ? '₽ RUB' : field.value === 'USD' ? '$ USD' : field.value === 'EUR' ? '€ EUR' : field.value === 'GEL' ? '₾ GEL' : field.value === 'TRY' ? '₺ TRY' : field.value}
+                      </div>
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

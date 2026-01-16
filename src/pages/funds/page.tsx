@@ -10,14 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  useFunds,
-  useDeleteFund,
-  FundCard,
-  CreateFundDialog,
-  ContributionDialog,
-  WithdrawalDialog,
-} from '@/features/funds'
+import { useFunds, useDeleteFund, FundCard, CreateFundDialog } from '@/features/funds'
 import type { FundBalance } from '@/lib/api/types'
 
 const CURRENCY_OPTIONS = [
@@ -54,13 +47,11 @@ export default function FundsPage() {
   const [baseCurrency, setBaseCurrency] = useState('RUB')
   const { data, isLoading, error } = useFunds({ baseCurrency })
   const deleteFund = useDeleteFund()
-  const [selectedFund, setSelectedFund] = useState<FundBalance | null>(null)
-  const [contributionOpen, setContributionOpen] = useState(false)
-  const [withdrawalOpen, setWithdrawalOpen] = useState(false)
 
   const funds = data?.data ?? []
   const summary = data?.summary
-  const currencySymbol = CURRENCY_OPTIONS.find(c => c.value === baseCurrency)?.symbol ?? '₽'
+  const currencySymbol =
+    CURRENCY_OPTIONS.find((c) => c.value === baseCurrency)?.symbol ?? '₽'
   const activeFunds = funds.filter((f) => f.fund.status === 'active')
   const pausedFunds = funds.filter((f) => f.fund.status === 'paused')
   const completedFunds = funds.filter((f) => f.fund.status === 'completed')
@@ -69,16 +60,6 @@ export default function FundsPage() {
     if (confirm(`Вы уверены, что хотите удалить фонд "${fund.fund.name}"?`)) {
       deleteFund.mutate(fund.fund.id)
     }
-  }
-
-  const handleDeposit = (fund: FundBalance) => {
-    setSelectedFund(fund)
-    setContributionOpen(true)
-  }
-
-  const handleWithdraw = (fund: FundBalance) => {
-    setSelectedFund(fund)
-    setWithdrawalOpen(true)
   }
 
   return (
@@ -91,9 +72,7 @@ export default function FundsPage() {
         className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-            Фонды
-          </h1>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">Фонды</h1>
           <p className="mt-1 text-muted-foreground">
             Распределение средств по целевым фондам
           </p>
@@ -169,9 +148,7 @@ export default function FundsPage() {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Активных фондов</p>
-                <p className="text-xl font-bold tabular-nums">
-                  {activeFunds.length}
-                </p>
+                <p className="text-xl font-bold tabular-nums">{activeFunds.length}</p>
               </div>
             </div>
           </CardContent>
@@ -192,11 +169,7 @@ export default function FundsPage() {
           <p className="text-sm text-muted-foreground">
             Ошибка загрузки: {error.message}
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
             Попробовать снова
           </Button>
         </div>
@@ -215,12 +188,7 @@ export default function FundsPage() {
             >
               {activeFunds.map((fund) => (
                 <motion.div key={fund.fund.id} variants={item}>
-                  <FundCard
-                    fund={fund}
-                    onDeposit={() => handleDeposit(fund)}
-                    onWithdraw={() => handleWithdraw(fund)}
-                    onDelete={() => handleDelete(fund)}
-                  />
+                  <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
                 </motion.div>
               ))}
 
@@ -232,9 +200,7 @@ export default function FundsPage() {
                       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
                         <Plus className="h-6 w-6 text-muted-foreground" />
                       </div>
-                      <p className="font-medium text-muted-foreground">
-                        Добавить фонд
-                      </p>
+                      <p className="font-medium text-muted-foreground">Добавить фонд</p>
                     </CardContent>
                   </Card>
                 </CreateFundDialog>
@@ -276,12 +242,7 @@ export default function FundsPage() {
               >
                 {pausedFunds.map((fund) => (
                   <motion.div key={fund.fund.id} variants={item}>
-                    <FundCard
-                      fund={fund}
-                      onDeposit={() => handleDeposit(fund)}
-                      onWithdraw={() => handleWithdraw(fund)}
-                      onDelete={() => handleDelete(fund)}
-                    />
+                    <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
                   </motion.div>
                 ))}
               </motion.div>
@@ -302,10 +263,7 @@ export default function FundsPage() {
               >
                 {completedFunds.map((fund) => (
                   <motion.div key={fund.fund.id} variants={item}>
-                    <FundCard
-                      fund={fund}
-                      onDelete={() => handleDelete(fund)}
-                    />
+                    <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
                   </motion.div>
                 ))}
               </motion.div>
@@ -313,20 +271,6 @@ export default function FundsPage() {
           )}
         </>
       )}
-
-      {/* Contribution Dialog */}
-      <ContributionDialog
-        fund={selectedFund}
-        open={contributionOpen}
-        onOpenChange={setContributionOpen}
-      />
-
-      {/* Withdrawal Dialog */}
-      <WithdrawalDialog
-        fund={selectedFund}
-        open={withdrawalOpen}
-        onOpenChange={setWithdrawalOpen}
-      />
     </div>
   )
 }

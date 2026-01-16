@@ -21,6 +21,12 @@ export {
   useCreateWithdrawal,
   // Fund History
   useFundHistory,
+  // Fund Asset Operations
+  useFundCurrencyAssets,
+  useBuyAsset,
+  useDepositToFund,
+  useTransferAsset,
+  useFundTransactions,
 } from './use-funds'
 
 export {

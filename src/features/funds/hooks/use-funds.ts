@@ -9,8 +9,13 @@ import type {
   CreateContributionRequest,
   CreateWithdrawalRequest,
   FundHistoryParams,
+  BuyAssetRequest,
+  DepositToFundRequest,
+  TransferAssetRequest,
+  FundTransactionsListParams,
 } from '@/lib/api'
 import { toast } from 'sonner'
+import { accountKeys } from '@/features/accounts'
 
 // === Query Keys ===
 
@@ -21,12 +26,16 @@ export const fundKeys = {
   details: () => [...fundKeys.all, 'detail'] as const,
   detail: (id: string) => [...fundKeys.details(), id] as const,
   assets: (fundId: string) => [...fundKeys.detail(fundId), 'assets'] as const,
+  currencyAssets: (fundId: string) =>
+    [...fundKeys.detail(fundId), 'currencyAssets'] as const,
   contributions: (fundId: string) =>
     [...fundKeys.detail(fundId), 'contributions'] as const,
   withdrawals: (fundId: string) =>
     [...fundKeys.detail(fundId), 'withdrawals'] as const,
   history: (fundId: string, params?: FundHistoryParams) =>
     [...fundKeys.detail(fundId), 'history', params] as const,
+  transactions: (fundId: string, params?: FundTransactionsListParams) =>
+    [...fundKeys.detail(fundId), 'transactions', params] as const,
 }
 
 // === Funds Hooks ===
@@ -309,6 +318,131 @@ export function useFundHistory(fundId: string, params?: FundHistoryParams) {
   return useQuery({
     queryKey: fundKeys.history(fundId, params),
     queryFn: () => fundsApi.getHistory(fundId, params),
+    enabled: !!fundId,
+  })
+}
+
+// === Fund Asset Operations Hooks ===
+
+/**
+ * Получить валютные активы фонда
+ */
+export function useFundCurrencyAssets(fundId: string) {
+  return useQuery({
+    queryKey: fundKeys.currencyAssets(fundId),
+    queryFn: () => fundsApi.listCurrencyAssets(fundId),
+    enabled: !!fundId,
+  })
+}
+
+/**
+ * Купить актив за валюту фонда
+ */
+export function useBuyAsset() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ fundId, data }: { fundId: string; data: BuyAssetRequest }) =>
+      fundsApi.buyAsset(fundId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.currencyAssets(variables.fundId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.transactions(variables.fundId),
+      })
+      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      toast.success('Актив куплен')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Пополнить валюту фонда с банковского счёта
+ */
+export function useDepositToFund() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      fundId,
+      data,
+    }: {
+      fundId: string
+      data: DepositToFundRequest
+    }) => fundsApi.depositFromAccount(fundId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.currencyAssets(variables.fundId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.transactions(variables.fundId),
+      })
+      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      toast.success('Фонд пополнен')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Перевести актив в другой фонд
+ */
+export function useTransferAsset() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      fundId,
+      data,
+    }: {
+      fundId: string
+      data: TransferAssetRequest
+    }) => fundsApi.transferAsset(fundId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.detail(variables.data.toFundId),
+      })
+      queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.assets(variables.data.toFundId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.transactions(variables.fundId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.transactions(variables.data.toFundId),
+      })
+      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      toast.success('Актив переведён')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Получить историю транзакций фонда
+ */
+export function useFundTransactions(
+  fundId: string,
+  params?: FundTransactionsListParams
+) {
+  return useQuery({
+    queryKey: fundKeys.transactions(fundId, params),
+    queryFn: () => fundsApi.listTransactions(fundId, params),
     enabled: !!fundId,
   })
 }

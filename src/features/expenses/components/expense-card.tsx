@@ -1,8 +1,10 @@
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   MoreHorizontal,
   Trash2,
   Pencil,
+  Landmark,
   Wallet,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -14,6 +16,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { getIconByName } from '@/lib/icon-registry'
 import type { ExpenseListRow } from '@/lib/api/types'
 
@@ -24,11 +32,125 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function formatExpenseAmount(expense: ExpenseListRow): { main: string; secondary?: string } {
+  const currency = expense.currency || 'RUB'
+
+  if (currency === 'RUB') {
+    return { main: `-${formatMoney(expense.amount)} ₽` }
+  }
+
+  // Для валютных расходов показываем сумму в валюте и в рублях
+  const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GEL' ? '₾' : currency === 'TRY' ? '₺' : currency
+  return {
+    main: `-${currencySymbol}${formatMoney(expense.amount)}`,
+    secondary: expense.amountBase ? `≈ ${formatMoney(expense.amountBase)} ₽` : undefined,
+  }
+}
+
 function formatDate(date: string): string {
   return new Date(date).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
   })
+}
+
+// Компонент для отображения финансирования из фондов с тултипом
+function FundingIndicator({ expense }: { expense: ExpenseListRow }) {
+  const navigate = useNavigate()
+  const allocations = expense.fundAllocations ?? []
+
+  if (allocations.length === 0 && expense.fundedAmount <= 0) {
+    return null
+  }
+
+  const isFullyFunded = expense.fundedAmount >= expense.amount
+
+  const handleFundClick = (e: React.MouseEvent, fundId: string) => {
+    e.stopPropagation()
+    navigate(`/funds/${fundId}`)
+  }
+
+  // Если есть детализация по фондам — показываем тултип
+  if (allocations.length > 0) {
+    return (
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div className="flex items-center gap-1.5 cursor-help">
+              <Landmark className="h-3.5 w-3.5 text-emerald-600" />
+              {allocations.length > 1 && (
+                <span className="text-xs text-muted-foreground">
+                  ×{allocations.length}
+                </span>
+              )}
+              {allocations.length === 1 && (
+                <button
+                  type="button"
+                  onClick={(e) => handleFundClick(e, allocations[0].fundId)}
+                  className="flex items-center gap-1 hover:underline"
+                >
+                  <span
+                    className="w-2 h-2 rounded-full"
+                    style={{ backgroundColor: allocations[0].fundColor }}
+                  />
+                  <span className="text-xs text-muted-foreground truncate max-w-[80px]">
+                    {allocations[0].fundName}
+                  </span>
+                </button>
+              )}
+            </div>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs">
+            <div className="space-y-2">
+              <p className="font-medium text-sm">Финансирование из фондов</p>
+              <p className="text-xs text-muted-foreground">Нажмите на фонд для подробностей</p>
+              {allocations.map((alloc) => (
+                <button
+                  key={alloc.id}
+                  type="button"
+                  onClick={(e) => handleFundClick(e, alloc.fundId)}
+                  className="flex items-center justify-between gap-4 w-full hover:bg-muted/50 rounded px-1 py-0.5 -mx-1 transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="w-2 h-2 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: alloc.fundColor }}
+                    />
+                    <span className="text-sm hover:underline">{alloc.fundName}</span>
+                  </div>
+                  <span className="font-mono text-sm">
+                    {formatMoney(alloc.amount)} ₽
+                  </span>
+                </button>
+              ))}
+              <div className="border-t border-border/50 pt-2 flex justify-between text-sm">
+                <span>Итого из фондов:</span>
+                <span className="font-medium">
+                  {formatMoney(expense.fundedAmount)} ₽
+                </span>
+              </div>
+              {!isFullyFunded && (
+                <div className="flex justify-between text-muted-foreground text-xs">
+                  <span>Из бюджета:</span>
+                  <span>
+                    {formatMoney(expense.amount - expense.fundedAmount)} ₽
+                  </span>
+                </div>
+              )}
+            </div>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+    )
+  }
+
+  // Если нет детализации, но есть fundedAmount — показываем простой бейдж
+  return (
+    <Badge variant="secondary" className="text-xs shrink-0 gap-1">
+      <Wallet className="h-3 w-3" />
+      {formatMoney(expense.fundedAmount)} ₽
+    </Badge>
+  )
 }
 
 interface ExpenseCardProps {
@@ -39,7 +161,6 @@ interface ExpenseCardProps {
 
 export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
   const Icon = getIconByName(expense.categoryIcon)
-  const hasFundAllocation = expense.fundedAmount > 0
 
   return (
     <motion.div
@@ -75,12 +196,7 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
                   <h3 className="font-medium truncate">
                     {expense.categoryName}
                   </h3>
-                  {hasFundAllocation && (
-                    <Badge variant="secondary" className="text-xs shrink-0">
-                      <Wallet className="mr-1 h-3 w-3" />
-                      {formatMoney(expense.fundedAmount)} ₽
-                    </Badge>
-                  )}
+                  <FundingIndicator expense={expense} />
                 </div>
                 {(expense.description || (expense.tags && expense.tags.length > 0)) && (
                   <div className="flex items-center gap-2 mt-0.5">
@@ -118,12 +234,21 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
             {/* Amount and Actions */}
             <div className="flex items-start gap-2">
               <div className="text-right">
-                <p className="font-semibold tabular-nums text-lg">
-                  -{formatMoney(expense.amount)}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {expense.currency}
-                </p>
+                {(() => {
+                  const amount = formatExpenseAmount(expense)
+                  return (
+                    <>
+                      <p className="font-semibold tabular-nums text-lg">
+                        {amount.main}
+                      </p>
+                      {amount.secondary && (
+                        <p className="text-xs text-muted-foreground">
+                          {amount.secondary}
+                        </p>
+                      )}
+                    </>
+                  )
+                })()}
               </div>
 
               <DropdownMenu>
@@ -167,7 +292,6 @@ interface ExpenseRowProps {
 
 export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
   const Icon = getIconByName(expense.categoryIcon)
-  const hasFundAllocation = expense.fundedAmount > 0
 
   return (
     <motion.div
@@ -187,11 +311,7 @@ export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           <span className="font-medium truncate">{expense.categoryName}</span>
-          {hasFundAllocation && (
-            <Badge variant="outline" className="text-xs">
-              Из фонда
-            </Badge>
-          )}
+          <FundingIndicator expense={expense} />
         </div>
         {(expense.description || (expense.tags && expense.tags.length > 0)) && (
           <div className="flex items-center gap-2 mt-0.5">
@@ -228,9 +348,19 @@ export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
       </span>
 
       {/* Amount */}
-      <span className="font-semibold tabular-nums shrink-0 w-28 text-right">
-        -{formatMoney(expense.amount)} ₽
-      </span>
+      <div className="shrink-0 w-32 text-right">
+        {(() => {
+          const amount = formatExpenseAmount(expense)
+          return (
+            <>
+              <span className="font-semibold tabular-nums">{amount.main}</span>
+              {amount.secondary && (
+                <p className="text-xs text-muted-foreground">{amount.secondary}</p>
+              )}
+            </>
+          )
+        })()}
+      </div>
 
       {/* Actions */}
       <DropdownMenu>

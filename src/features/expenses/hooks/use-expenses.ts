@@ -51,9 +51,10 @@ export function useCreateExpense() {
   return useMutation({
     mutationFn: (data: CreateExpenseRequest) => expensesApi.create(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: expenseKeys.lists() })
-      // Invalidate funds if expense was funded from funds
-      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      // Invalidate all expense queries (lists with any params)
+      queryClient.invalidateQueries({ queryKey: expenseKeys.all })
+      // Invalidate all fund data (in case expense was funded from funds)
+      queryClient.invalidateQueries({ queryKey: fundKeys.all })
       // Invalidate accounts to refresh balance
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход создан')
@@ -73,11 +74,9 @@ export function useUpdateExpense() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateExpenseRequest }) =>
       expensesApi.update(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: expenseKeys.lists() })
-      queryClient.invalidateQueries({
-        queryKey: expenseKeys.detail(variables.id),
-      })
+    onSuccess: () => {
+      // Invalidate all expense queries
+      queryClient.invalidateQueries({ queryKey: expenseKeys.all })
       // Invalidate accounts to refresh balance
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход обновлён')
@@ -97,9 +96,11 @@ export function useDeleteExpense() {
   return useMutation({
     mutationFn: (id: string) => expensesApi.delete(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: expenseKeys.lists() })
-      // Invalidate funds in case expense was funded from them
-      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      // Invalidate all expense queries
+      queryClient.invalidateQueries({ queryKey: expenseKeys.all })
+      // Invalidate all fund data in case expense was funded from them
+      // (при удалении бэкенд возвращает средства на счета фондов)
+      queryClient.invalidateQueries({ queryKey: fundKeys.all })
       // Invalidate accounts to refresh balance
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход удалён')

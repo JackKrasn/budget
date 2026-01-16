@@ -28,11 +28,13 @@ import {
   AccountFilter,
   CategoryFilter,
   TagFilter,
+  FundFilter,
   CategoryGrid,
   TagGrid,
   type CategorySummary,
   type TagSummary,
 } from '@/features/expenses'
+import { useFunds } from '@/features/funds'
 import { ExpenseCategoryChart, ExpenseTagChart } from '@/features/analytics'
 import type { ExpenseListRow, BudgetItemWithCategory, TransferWithAccounts, BalanceAdjustmentWithAccount } from '@/lib/api/types'
 import { useBudgetByMonth } from '@/features/budget'
@@ -77,14 +79,16 @@ export default function ExpensesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const categoryFromUrl = searchParams.get('category')
   const tagFromUrl = searchParams.get('tag')
+  const fundFromUrl = searchParams.get('fund')
 
   const [viewMode, setViewMode] = useState<ViewMode>(
-    categoryFromUrl || tagFromUrl ? 'list' : 'categories'
+    categoryFromUrl || tagFromUrl || fundFromUrl ? 'list' : 'categories'
   )
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     categoryFromUrl
   )
   const [selectedTagId, setSelectedTagId] = useState<string | null>(tagFromUrl)
+  const [selectedFundId, setSelectedFundId] = useState<string | null>(fundFromUrl)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(() => {
     // Load from localStorage on mount
     const saved = localStorage.getItem(SELECTED_ACCOUNT_KEY)
@@ -102,8 +106,11 @@ export default function ExpensesPage() {
     if (selectedTagId) {
       params.tag = selectedTagId
     }
+    if (selectedFundId) {
+      params.fund = selectedFundId
+    }
     setSearchParams(params)
-  }, [selectedCategoryId, selectedTagId, setSearchParams])
+  }, [selectedCategoryId, selectedTagId, selectedFundId, setSearchParams])
 
   // Save selected account to localStorage
   useEffect(() => {
@@ -135,10 +142,12 @@ export default function ExpensesPage() {
     categoryId: selectedCategoryId || undefined,
     accountId: selectedAccountId || undefined,
     tagId: selectedTagId || undefined,
+    fundId: selectedFundId || undefined,
   })
   const { data: categoriesData } = useExpenseCategories()
   const { data: tagsData } = useExpenseTags()
   const { data: accountsData } = useAccounts()
+  const { data: fundsData } = useFunds()
   // Используем бюджет для выбранного месяца (из dateRange)
   const budgetYear = dateRange.from.getFullYear()
   const budgetMonth = dateRange.from.getMonth() + 1
@@ -165,17 +174,23 @@ export default function ExpensesPage() {
   const categories = categoriesData?.data ?? []
   const tags = tagsData?.data ?? []
   const accounts = accountsData?.data ?? []
+  const funds = fundsData?.data ?? []
   const budgetItems: BudgetItemWithCategory[] = currentBudget?.items ?? []
   const transfers = transfersData?.data ?? []
   const adjustments = adjustmentsData?.data ?? []
 
+  // Получить выбранный фонд для заголовка
+  const selectedFund = selectedFundId
+    ? funds.find((f) => f.fund.id === selectedFundId)
+    : null
+
   // Aggregate expenses by category and merge with budget data
   const categorySummaries = useMemo<CategorySummary[]>(() => {
-    // Create a map of category expenses
+    // Create a map of category expenses (используем amount_base для конвертации в рубли)
     const expensesByCategory: Record<string, number> = {}
     expenses.forEach((expense) => {
       expensesByCategory[expense.categoryId] =
-        (expensesByCategory[expense.categoryId] || 0) + expense.amount
+        (expensesByCategory[expense.categoryId] || 0) + (expense.amountBase ?? expense.amount)
     })
 
     // Create summaries from budget items first
@@ -229,7 +244,8 @@ export default function ExpensesPage() {
               expenseCount: 0,
             }
           }
-          summariesMap[tag.id].totalAmount += expense.amount
+          // Используем amount_base для конвертации в рубли
+          summariesMap[tag.id].totalAmount += expense.amountBase ?? expense.amount
           summariesMap[tag.id].expenseCount += 1
         })
       }
@@ -265,6 +281,7 @@ export default function ExpensesPage() {
     operations: Operation[]
     totalExpenses: number
     totalTransfers: number
+    expensesByCurrency: Record<string, number>
   }
 
   const allOperationsByDate = useMemo<DayGroup[]>(() => {
@@ -290,15 +307,24 @@ export default function ExpensesPage() {
           return typeOrder[a.type] - typeOrder[b.type]
         })
 
-        const totalExpenses = ops
-          .filter((op) => op.type === 'expense')
-          .reduce((sum, op) => sum + (op.data as ExpenseListRow).amount, 0)
+        const expenseOps = ops.filter((op) => op.type === 'expense')
+        const totalExpenses = expenseOps
+          .reduce((sum, op) => sum + ((op.data as ExpenseListRow).amountBase ?? (op.data as ExpenseListRow).amount), 0)
+
+        // Группируем по валютам (кроме RUB)
+        const expensesByCurrency = expenseOps.reduce((acc, op) => {
+          const expense = op.data as ExpenseListRow
+          if (expense.currency && expense.currency !== 'RUB') {
+            acc[expense.currency] = (acc[expense.currency] || 0) + expense.amount
+          }
+          return acc
+        }, {} as Record<string, number>)
 
         const totalTransfers = ops
           .filter((op) => op.type === 'transfer')
           .reduce((sum, op) => sum + (op.data as TransferWithAccounts).amount, 0)
 
-        return { date, operations: ops, totalExpenses, totalTransfers }
+        return { date, operations: ops, totalExpenses, totalTransfers, expensesByCurrency }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [expenses, transfers, adjustments])
@@ -366,7 +392,13 @@ export default function ExpensesPage() {
     : null
 
   // Calculate total planned and progress
-  const totalPlanned = currentBudget?.total_planned ?? 0
+  // При выборе категории показываем план для этой категории
+  const selectedBudgetItem = selectedCategoryId
+    ? budgetItems.find((item) => item.categoryId === selectedCategoryId)
+    : null
+  const totalPlanned = selectedCategoryId
+    ? (selectedBudgetItem?.plannedAmount ?? 0)
+    : (currentBudget?.total_planned ?? 0)
   const totalActual = summary?.totalAmount ?? 0
   const totalProgress =
     totalPlanned > 0 ? Math.min((totalActual / totalPlanned) * 100, 100) : 0
@@ -407,11 +439,20 @@ export default function ExpensesPage() {
         className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"
       >
         <div className="flex items-center gap-3">
-          {(selectedCategoryId || selectedTagId) && (
+          {(selectedCategoryId || selectedTagId || selectedFundId) && (
             <Button
               variant="ghost"
               size="icon"
-              onClick={selectedTagId ? handleBackToTags : handleBackToCategories}
+              onClick={() => {
+                if (selectedTagId) {
+                  handleBackToTags()
+                } else if (selectedFundId) {
+                  setSelectedFundId(null)
+                  setViewMode('categories')
+                } else {
+                  handleBackToCategories()
+                }
+              }}
               className="shrink-0"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -423,7 +464,9 @@ export default function ExpensesPage() {
                 ? selectedCategory.name
                 : selectedTag
                   ? selectedTag.name
-                  : 'Расходы'}
+                  : selectedFund
+                    ? `Из фонда: ${selectedFund.fund.name}`
+                    : 'Расходы'}
             </h1>
             <p className="mt-1 text-muted-foreground capitalize">
               {currentMonthName}
@@ -610,6 +653,20 @@ export default function ExpensesPage() {
             />
           )}
 
+          {/* Fund Filter */}
+          {funds.length > 0 && (
+            <FundFilter
+              funds={funds}
+              selectedId={selectedFundId}
+              onSelect={(id) => {
+                setSelectedFundId(id)
+                if (id) {
+                  setViewMode('list')
+                }
+              }}
+            />
+          )}
+
           <div className="flex-1" />
 
           {/* View Mode */}
@@ -668,7 +725,12 @@ export default function ExpensesPage() {
               className="space-y-6"
             >
               {allOperationsByDate.length > 0 ? (
-                allOperationsByDate.map((group) => (
+                allOperationsByDate.map((group) => {
+                  const currencySymbols: Record<string, string> = { USD: '$', EUR: '€', GEL: '₾', TRY: '₺' }
+                  const currencyParts = Object.entries(group.expensesByCurrency)
+                    .map(([cur, amt]) => `${currencySymbols[cur] || cur}${formatMoney(amt)}`)
+                    .join(' + ')
+                  return (
                   <div key={group.date} className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium text-muted-foreground capitalize">
@@ -676,9 +738,16 @@ export default function ExpensesPage() {
                       </h3>
                       <div className="flex items-center gap-3 text-xs">
                         {group.totalExpenses > 0 && (
-                          <span className="text-rose-500 font-medium tabular-nums">
-                            −{formatMoney(group.totalExpenses)} ₽
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-rose-500 font-medium tabular-nums">
+                              −{formatMoney(group.totalExpenses)} ₽
+                            </span>
+                            {currencyParts && (
+                              <span className="text-muted-foreground tabular-nums">
+                                ({currencyParts})
+                              </span>
+                            )}
+                          </div>
                         )}
                         {group.totalTransfers > 0 && (
                           <span className="text-blue-500 font-medium tabular-nums">
@@ -740,7 +809,8 @@ export default function ExpensesPage() {
                       })}
                     </motion.div>
                   </div>
-                ))
+                  )
+                })
               ) : (
                 <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
                   <Receipt className="h-12 w-12 text-muted-foreground/50" />
@@ -864,16 +934,34 @@ export default function ExpensesPage() {
             >
               {expensesByDate.length > 0 ? (
                 expensesByDate.map(([date, dateExpenses]) => {
-                  const dayTotal = dateExpenses.reduce((sum, e) => sum + e.amount, 0)
+                  const dayTotal = dateExpenses.reduce((sum, e) => sum + (e.amountBase ?? e.amount), 0)
+                  // Группируем суммы по валютам (кроме RUB)
+                  const currencyTotals = dateExpenses.reduce((acc, e) => {
+                    if (e.currency && e.currency !== 'RUB') {
+                      acc[e.currency] = (acc[e.currency] || 0) + e.amount
+                    }
+                    return acc
+                  }, {} as Record<string, number>)
+                  const currencySymbols: Record<string, string> = { USD: '$', EUR: '€', GEL: '₾', TRY: '₺' }
+                  const currencyParts = Object.entries(currencyTotals)
+                    .map(([cur, amt]) => `${currencySymbols[cur] || cur}${formatMoney(amt)}`)
+                    .join(' + ')
                   return (
                   <div key={date} className="space-y-3">
                     <div className="flex items-center justify-between">
                       <h3 className="text-sm font-medium text-muted-foreground capitalize">
                         {formatDateHeader(date)}
                       </h3>
-                      <span className="text-sm font-semibold tabular-nums text-destructive">
-                        -{formatMoney(dayTotal)} ₽
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-semibold tabular-nums text-destructive">
+                          −{formatMoney(dayTotal)} ₽
+                        </span>
+                        {currencyParts && (
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            ({currencyParts})
+                          </span>
+                        )}
+                      </div>
                     </div>
                     <motion.div
                       className="space-y-2"
@@ -904,7 +992,9 @@ export default function ExpensesPage() {
                         ? 'В этой категории расходы не найдены'
                         : selectedTagId
                           ? 'С этой меткой расходы не найдены'
-                          : 'За этот месяц расходы не найдены'}
+                          : selectedFundId
+                            ? 'Расходы из этого фонда не найдены'
+                            : 'За этот месяц расходы не найдены'}
                     </p>
                   </div>
                   <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
