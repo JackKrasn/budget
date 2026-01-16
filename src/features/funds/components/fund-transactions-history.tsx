@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ShoppingCart,
@@ -6,9 +7,11 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   Plus,
+  Receipt,
   Loader2,
   Filter,
   X,
+  ExternalLink,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -52,6 +55,7 @@ function getTransactionIcon(type: FundTransactionType) {
     transfer_in: ArrowDownLeft,
     transfer_out: ArrowUpRight,
     deposit: Plus,
+    withdrawal: Receipt,
   }
   return icons[type] || ShoppingCart
 }
@@ -71,6 +75,8 @@ function getCounterpartLabel(tx: FundTransaction): string {
       return `→ ${tx.counterpart_fund_name || ''}`
     case 'deposit':
       return tx.source_account_name || ''
+    case 'withdrawal':
+      return tx.note || 'Расход'
     default:
       return ''
   }
@@ -80,14 +86,18 @@ interface FundTransactionsHistoryProps {
   fundId: string
 }
 
+const ALL_TRANSACTION_TYPES: FundTransactionType[] = [
+  'buy',
+  'sell',
+  'transfer_in',
+  'transfer_out',
+  'deposit',
+  'withdrawal',
+]
+
 export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps) {
-  const [selectedTypes, setSelectedTypes] = useState<FundTransactionType[]>([
-    'buy',
-    'sell',
-    'transfer_in',
-    'transfer_out',
-    'deposit',
-  ])
+  const navigate = useNavigate()
+  const [selectedTypes, setSelectedTypes] = useState<FundTransactionType[]>(ALL_TRANSACTION_TYPES)
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
@@ -102,7 +112,7 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
 
   // Filter by selected types (client-side when multiple types selected)
   const filteredTransactions =
-    selectedTypes.length === 5
+    selectedTypes.length === ALL_TRANSACTION_TYPES.length
       ? transactions
       : transactions.filter((tx) => selectedTypes.includes(tx.transaction_type))
 
@@ -113,13 +123,13 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   }
 
   const handleResetFilters = () => {
-    setSelectedTypes(['buy', 'sell', 'transfer_in', 'transfer_out', 'deposit'])
+    setSelectedTypes(ALL_TRANSACTION_TYPES)
     setDateFrom('')
     setDateTo('')
   }
 
   const hasActiveFilters =
-    selectedTypes.length < 5 || dateFrom !== '' || dateTo !== ''
+    selectedTypes.length < ALL_TRANSACTION_TYPES.length || dateFrom !== '' || dateTo !== ''
 
   if (isLoading) {
     return (
@@ -240,7 +250,7 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
               style={
                 isActive
                   ? {
-                      backgroundColor: `color-mix(in srgb, ${config.color === 'green' ? '#22c55e' : config.color === 'blue' ? '#3b82f6' : config.color === 'orange' ? '#f97316' : '#6b7280'} 20%, transparent)`,
+                      backgroundColor: `color-mix(in srgb, ${config.color === 'green' ? '#22c55e' : config.color === 'blue' ? '#3b82f6' : config.color === 'orange' ? '#f97316' : config.color === 'red' ? '#f43f5e' : '#6b7280'} 20%, transparent)`,
                       color:
                         config.color === 'green'
                           ? '#16a34a'
@@ -248,7 +258,9 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                             ? '#2563eb'
                             : config.color === 'orange'
                               ? '#ea580c'
-                              : '#4b5563',
+                              : config.color === 'red'
+                                ? '#e11d48'
+                                : '#4b5563',
                     }
                   : {}
               }
@@ -288,9 +300,22 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                 icon: 'text-orange-500',
                 text: 'text-orange-600 dark:text-orange-400',
               },
+              red: {
+                bg: 'bg-rose-500/10',
+                iconBg: 'bg-rose-500/20',
+                icon: 'text-rose-500',
+                text: 'text-rose-600 dark:text-rose-400',
+              },
             }
 
             const classes = colorClasses[color as keyof typeof colorClasses] || colorClasses.green
+            const isWithdrawal = tx.transaction_type === 'withdrawal'
+
+            const handleClick = () => {
+              if (isWithdrawal) {
+                navigate(`/expenses?fund=${fundId}`)
+              }
+            }
 
             return (
               <motion.div
@@ -298,7 +323,10 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.03 }}
-                className={`flex items-center gap-3 rounded-xl ${classes.bg} p-3`}
+                className={`flex items-center gap-3 rounded-xl ${classes.bg} p-3 ${
+                  isWithdrawal ? 'cursor-pointer hover:ring-2 hover:ring-rose-500/30 transition-all' : ''
+                }`}
+                onClick={handleClick}
               >
                 <div
                   className={`flex h-10 w-10 items-center justify-center rounded-xl ${classes.iconBg}`}
@@ -310,11 +338,14 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                     <p className={`font-medium ${classes.text}`}>
                       {tx.transaction_type === 'buy' || tx.transaction_type === 'sell'
                         ? `${tx.transaction_type === 'buy' ? '+' : '-'}${formatMoney(tx.amount)}`
-                        : tx.transaction_type === 'transfer_out'
+                        : tx.transaction_type === 'transfer_out' || tx.transaction_type === 'withdrawal'
                           ? `-${formatMoney(tx.amount)}`
                           : `+${formatMoney(tx.amount)}`}{' '}
                       {tx.asset_ticker || tx.asset_name}
                     </p>
+                    {isWithdrawal && (
+                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                    )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{formatDate(tx.date)}</span>

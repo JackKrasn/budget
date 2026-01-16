@@ -42,10 +42,19 @@ export function useCurrentBudget() {
   return useQuery({
     queryKey: budgetKeys.current(),
     queryFn: async () => {
-      const response = await budgetsApi.list({ year, status: 'active' })
-      const budget = response.data.find((b) => b.month === month)
-      if (!budget) return null
-      return budgetsApi.get(budget.id)
+      // Ищем бюджет на текущий месяц без фильтра по статусу
+      const response = await budgetsApi.list({ year })
+      const budgetFromList = response.data.find((b) => b.month === month)
+      if (!budgetFromList) return null
+
+      // Получаем детальную информацию о бюджете
+      const budgetDetail = await budgetsApi.get(budgetFromList.id)
+
+      // Используем total_planned из списка (там он вычисляется корректно)
+      return {
+        ...budgetDetail,
+        total_planned: budgetFromList.total_planned,
+      }
     },
   })
 }

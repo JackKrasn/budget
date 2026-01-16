@@ -495,6 +495,8 @@ export interface Expense {
   category_id: UUID
   account_id: UUID
   amount: number
+  amountBase: number // сумма в RUB
+  exchangeRate?: number // курс валюты на момент создания
   currency: string
   date: ISODate
   description?: string
@@ -517,10 +519,13 @@ export interface ExpenseListRow {
   categoryColor: string
   accountId: UUID
   amount: number
+  amountBase: number // сумма в RUB
+  exchangeRate?: number // курс валюты на момент создания
   currency: string
   date: ISODate
   description?: string
   fundedAmount: number
+  fundAllocations?: ExpenseFundAllocation[] // детализация по фондам
   tags?: ExpenseTagInfo[]
 }
 
@@ -528,6 +533,7 @@ export interface ExpenseFundAllocation {
   id: UUID
   fundId: UUID
   fundName: string
+  fundColor: string
   amount: number
 }
 
@@ -540,6 +546,8 @@ export interface ExpenseWithCategory {
   category_color: string
   account_id: UUID
   amount: number
+  amountBase: number // сумма в RUB
+  exchangeRate?: number // курс валюты на момент создания
   currency: string
   date: ISODate
   description?: string
@@ -550,6 +558,7 @@ export interface ExpenseWithCategory {
 
 export interface FundAllocationRequest {
   fundId: string
+  assetId: string // ID валютного актива фонда для списания
   amount: number
 }
 
@@ -591,6 +600,7 @@ export interface ExpensesListParams {
   categoryId?: string
   accountId?: string
   tagId?: string
+  fundId?: string // фильтр по фонду (расходы, профинансированные из этого фонда)
   [key: string]: string | number | boolean | undefined
 }
 
@@ -1246,6 +1256,7 @@ export type FundTransactionType =
   | 'transfer_in'
   | 'transfer_out'
   | 'deposit'
+  | 'withdrawal'
 
 export interface BuyAssetRequest {
   assetId: string

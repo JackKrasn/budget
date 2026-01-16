@@ -159,12 +159,14 @@ export default function BudgetPage() {
   const fundsRaw = useMemo(() => fundsData?.data ?? [], [fundsData?.data])
   const accounts = accountsData?.data ?? []
 
-  // Считаем фактические расходы по категориям
+  // Считаем фактические расходы по категориям (используем amountBase для валютных расходов)
   const actualByCategory = useMemo(() => {
     const map: Record<string, number> = {}
     for (const expense of expenses) {
       const categoryId = expense.categoryId
-      map[categoryId] = (map[categoryId] || 0) + expense.amount
+      // Используем amountBase (сумма в RUB) если есть, иначе amount
+      const amount = expense.amountBase ?? expense.amount
+      map[categoryId] = (map[categoryId] || 0) + amount
     }
     return map
   }, [expenses])
@@ -296,6 +298,22 @@ export default function BudgetPage() {
       }
     }
 
+    // 3. Добавляем суммы из фактических расходов с финансированием из фондов
+    for (const expense of expenses) {
+      if (expense.fundAllocations && expense.fundAllocations.length > 0) {
+        for (const allocation of expense.fundAllocations) {
+          // Фактические расходы сразу считаем как использованные
+          const currentUsed = fundUsed.get(allocation.fundId) || 0
+          fundUsed.set(allocation.fundId, currentUsed + allocation.amount)
+
+          // Если нет запланированной суммы - добавляем в план (чтобы показать в UI)
+          if (!fundPlanned.has(allocation.fundId)) {
+            fundPlanned.set(allocation.fundId, allocation.amount)
+          }
+        }
+      }
+    }
+
     return fundsRaw.map((f) =>
       mapFundBalanceToFinancing(
         f,
@@ -303,7 +321,20 @@ export default function BudgetPage() {
         fundUsed.get(f.fund.id) || 0
       )
     )
-  }, [fundsRaw, plannedExpenses, items])
+  }, [fundsRaw, plannedExpenses, items, expenses])
+
+  // Итоги по финансированию из фондов (соответствует итогам в FundFinancingSection)
+  const fundFinancingTotals = useMemo(() => {
+    const activeFunds = fundFinancingData.filter((f) => f.plannedAmount > 0)
+    return activeFunds.reduce(
+      (acc, fund) => ({
+        planned: acc.planned + fund.plannedAmount,
+        used: acc.used + fund.usedAmount,
+        remaining: acc.remaining + (fund.plannedAmount - fund.usedAmount),
+      }),
+      { planned: 0, used: 0, remaining: 0 }
+    )
+  }, [fundFinancingData])
 
   const handleMonthChange = (newYear: number, newMonth: number) => {
     setYear(newYear)
@@ -454,6 +485,7 @@ export default function BudgetPage() {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const handleUpdateFundFinancing = async (_fundId: string, _plannedAmount: number) => {
     // TODO: Сохранить планируемое финансирование из фонда
     toast.success('Финансирование обновлено')
@@ -710,6 +742,58 @@ export default function BudgetPage() {
           </CardContent>
         </Card>
       </motion.div>
+
+      {/* Stats Cards - Row 1.5: Финансирование из фондов (показываем только если есть) */}
+      {fundFinancingTotals.planned > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="grid gap-4 sm:grid-cols-2"
+        >
+          {/* Из фондов: план */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-500/10">
+                  <Wallet className="h-4 w-4 text-cyan-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Финансирование из фондов</p>
+                  <p className="text-lg font-bold tabular-nums text-cyan-500">
+                    {formatMoney(fundFinancingTotals.planned)} ₽
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    запланировано на расходы
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Из фондов: факт */}
+          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-500/10">
+                  <Wallet className="h-4 w-4 text-emerald-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-xs text-muted-foreground">Уже профинансировано</p>
+                  <p className="text-lg font-bold tabular-nums text-emerald-500">
+                    {formatMoney(fundFinancingTotals.used)} ₽
+                  </p>
+                  <p className={`text-xs ${fundFinancingTotals.remaining < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                    {fundFinancingTotals.remaining >= 0
+                      ? `ещё ${formatMoney(fundFinancingTotals.remaining)} ₽ по плану`
+                      : `перерасход ${formatMoney(Math.abs(fundFinancingTotals.remaining))} ₽`}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Stats Cards - Row 2: Итоги */}
       <motion.div

@@ -28,7 +28,9 @@ import { FundIcon } from '@/components/common'
 import { useAccounts } from '@/features/accounts/hooks/use-accounts'
 import { useFunds } from '@/features/funds/hooks/use-funds'
 import { useIncomes } from '@/features/incomes/hooks/use-incomes'
+import { useExpenses } from '@/features/expenses/hooks/use-expenses'
 import { useCredits, useUpcomingPayments } from '@/features/credits/hooks/use-credits'
+import { useCurrentBudget } from '@/features/budget/hooks/use-budgets'
 
 // Утилиты форматирования
 function formatMoney(amount: number, compact = false): string {
@@ -307,18 +309,26 @@ function UpcomingPayment({
 }
 
 export default function DashboardPage() {
+  // Даты текущего месяца для фильтрации
+  const now = new Date()
+  const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
+  const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
+
   // Данные
   const { data: accountsData, isLoading: accountsLoading } = useAccounts()
   const { data: fundsData, isLoading: fundsLoading } = useFunds({ status: 'active' })
   const { data: incomesData, isLoading: incomesLoading } = useIncomes()
+  const { data: expensesData, isLoading: expensesLoading } = useExpenses({ from: monthStart, to: monthEnd })
   const { data: creditsData } = useCredits('active')
   const { data: upcomingPaymentsData } = useUpcomingPayments(5)
+  const { data: currentBudget, isLoading: budgetLoading } = useCurrentBudget()
 
   // Вычисления
   const stats = useMemo(() => {
     const accounts = accountsData?.data ?? []
     const funds = fundsData?.data ?? []
     const incomes = incomesData?.data ?? []
+    const expenses = expensesData?.data ?? []
     const credits = creditsData ?? []
 
     // Общий баланс на счетах
@@ -331,16 +341,22 @@ export default function DashboardPage() {
     const totalFundsBalance = funds.reduce((sum, fb) => sum + fb.totalBase, 0)
 
     // Доходы за текущий месяц
-    const now = new Date()
-    const monthStart = startOfMonth(now)
-    const monthEnd = endOfMonth(now)
+    const monthStartDate = startOfMonth(now)
+    const monthEndDate = endOfMonth(now)
 
     const monthlyIncomes = incomes.filter((inc) => {
       const incomeDate = new Date(inc.date || inc.created_at)
-      return isWithinInterval(incomeDate, { start: monthStart, end: monthEnd })
+      return isWithinInterval(incomeDate, { start: monthStartDate, end: monthEndDate })
     })
     const totalMonthlyIncome = monthlyIncomes.reduce(
       (sum, inc) => sum + inc.amount,
+      0
+    )
+
+    // Расходы за текущий месяц (уже отфильтрованы через API)
+    // Используем amount_base для конвертации в рубли
+    const totalMonthlyExpenses = expenses.reduce(
+      (sum, exp) => sum + (exp.amountBase ?? exp.amount),
       0
     )
 
@@ -360,15 +376,35 @@ export default function DashboardPage() {
       totalAccountsBalance,
       totalFundsBalance,
       totalMonthlyIncome,
+      totalMonthlyExpenses,
+      monthlyExpensesCount: expenses.length,
       activeCreditsCount,
       totalCreditDebt,
       fundsWithGoals,
       funds,
       monthlyIncomesCount: monthlyIncomes.length,
     }
-  }, [accountsData, fundsData, incomesData, creditsData])
+  }, [accountsData, fundsData, incomesData, expensesData, creditsData, now])
 
-  const isLoading = accountsLoading || fundsLoading || incomesLoading
+  const isLoading = accountsLoading || fundsLoading || incomesLoading || expensesLoading || budgetLoading
+
+  // Данные бюджета и расходов
+  const budgetStats = useMemo(() => {
+    const totalPlanned = currentBudget?.total_planned ?? 0
+    const items = currentBudget?.items ?? []
+    const totalActual = items.reduce((sum, item) => sum + (item.actualAmount ?? 0), 0)
+    const remaining = totalPlanned - totalActual
+    const progress = totalPlanned > 0 ? (totalActual / totalPlanned) * 100 : 0
+
+    return {
+      totalPlanned,
+      totalActual,
+      remaining,
+      progress: Math.min(progress, 100),
+      itemsCount: items.length,
+      hasBudget: !!currentBudget,
+    }
+  }, [currentBudget])
 
   // Ближайшие платежи
   const upcomingPayments = useMemo(() => {
@@ -508,6 +544,85 @@ export default function DashboardPage() {
           color="default"
           href="/funds"
         />
+      </motion.div>
+
+      {/* Budget & Expenses Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.25 }}
+      >
+        <Card className="border-border/40 bg-card/60 backdrop-blur-sm overflow-hidden">
+          <CardContent className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              {/* Расходы за месяц */}
+              <div className="flex items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500/20 to-red-500/10">
+                  <TrendingDown className="h-6 w-6 text-red-500" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium">
+                    Расходы за {currentMonth}
+                  </p>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl font-bold tabular-nums text-red-500">
+                      {formatMoney(stats.totalMonthlyExpenses)}
+                    </span>
+                    <span className="text-muted-foreground">₽</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {stats.monthlyExpensesCount} операций
+                  </p>
+                </div>
+              </div>
+
+              {/* Бюджет */}
+              {budgetStats.hasBudget ? (
+                <div className="flex-1 max-w-md">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Target className="h-4 w-4 text-violet-500" />
+                    <span className="text-sm font-medium">
+                      Бюджет: {formatMoney(budgetStats.totalPlanned)} ₽
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">
+                      По категориям: <span className="font-medium text-foreground">{formatMoney(budgetStats.totalActual)} ₽</span>
+                    </span>
+                    <span className={budgetStats.remaining >= 0 ? 'text-emerald-500' : 'text-red-500'}>
+                      {budgetStats.remaining >= 0 ? 'Осталось' : 'Превышение'}: {formatMoney(Math.abs(budgetStats.remaining))} ₽
+                    </span>
+                  </div>
+                  <Progress
+                    value={budgetStats.progress}
+                    className="h-2"
+                    style={{
+                      '--progress-background': budgetStats.progress > 90 ? '#ef4444' : budgetStats.progress > 75 ? '#f97316' : '#8b5cf6',
+                    } as React.CSSProperties}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1.5">
+                    {formatPercent(budgetStats.progress)} от запланированного • {budgetStats.itemsCount} категорий
+                  </p>
+                </div>
+              ) : (
+                <div className="flex-1 flex items-center gap-3 px-4 py-3 rounded-lg bg-muted/50">
+                  <Target className="h-5 w-5 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">Бюджет не создан</p>
+                    <p className="text-xs text-muted-foreground">Создайте бюджет для контроля расходов</p>
+                  </div>
+                </div>
+              )}
+
+              <Link to="/budget">
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  {budgetStats.hasBudget ? 'Подробнее' : 'Создать'}
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
       {/* Two Column Layout */}

@@ -39,6 +39,12 @@ export const TRANSACTION_TYPES: Record<
     color: 'green',
     description: 'Пополнение с банковского счёта',
   },
+  withdrawal: {
+    label: 'Списание на расход',
+    icon: 'Receipt',
+    color: 'red',
+    description: 'Финансирование расхода из фонда',
+  },
 }
 
 export const ERROR_MESSAGES = {

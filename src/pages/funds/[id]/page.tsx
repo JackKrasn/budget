@@ -376,7 +376,8 @@ export default function FundDetailsPage() {
               <div className="flex flex-wrap gap-2">
                 <Button
                   size="sm"
-                  className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                  variant="outline"
+                  className="gap-1.5"
                   onClick={() => setBuyAssetOpen(true)}
                 >
                   <ShoppingBag className="h-4 w-4" />
@@ -384,7 +385,8 @@ export default function FundDetailsPage() {
                 </Button>
                 <Button
                   size="sm"
-                  className="gap-1.5 bg-green-600 hover:bg-green-700"
+                  variant="outline"
+                  className="gap-1.5"
                   onClick={() => setDepositFromAccountOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -393,7 +395,7 @@ export default function FundDetailsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
+                  className="gap-1.5"
                   onClick={() => setTransferAssetOpen(true)}
                 >
                   <ArrowRightLeft className="h-4 w-4" />
@@ -402,7 +404,7 @@ export default function FundDetailsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50 hover:text-red-700"
+                  className="gap-1.5"
                   onClick={() => setWithdrawalOpen(true)}
                 >
                   <ArrowDownRight className="h-4 w-4" />
