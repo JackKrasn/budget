@@ -912,6 +912,7 @@ export default function BudgetPage() {
               onGenerate={handleGeneratePlannedIncomes}
               isGenerating={generatePlannedIncomes.isPending || createBudget.isPending}
               isPending={createIncomeAndReceive.isPending || skipPlannedIncome.isPending}
+              onIncomeClick={(incomeId) => navigate(`/incomes/${incomeId}`)}
               hideWrapper
             />
           </CollapsibleSection>

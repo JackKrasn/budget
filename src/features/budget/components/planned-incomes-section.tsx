@@ -39,6 +39,8 @@ interface PlannedIncomesSectionProps {
   addButton?: React.ReactNode
   /** Скрыть обёртку Card и заголовок (для использования внутри CollapsibleSection) */
   hideWrapper?: boolean
+  /** Callback при клике на доход (переход на страницу дохода) */
+  onIncomeClick?: (incomeId: string) => void
 }
 
 const STATUS_CONFIG: Record<
@@ -59,6 +61,7 @@ export function PlannedIncomesSection({
   isPending,
   addButton,
   hideWrapper = false,
+  onIncomeClick,
 }: PlannedIncomesSectionProps) {
   const [processingId, setProcessingId] = useState<string | null>(null)
 
@@ -276,14 +279,17 @@ export function PlannedIncomesSection({
               const StatusIcon = statusConfig.icon
               const isProcessing = processingId === income.id
               const actualAmount = getActualAmount(income.actual_amount)
+              const canNavigate = income.status === 'received' && income.actual_income_id && onIncomeClick
 
               return (
                 <TableRow
                   key={income.id}
                   className={cn(
                     'group',
-                    income.status === 'skipped' && 'opacity-50'
+                    income.status === 'skipped' && 'opacity-50',
+                    canNavigate && 'cursor-pointer hover:bg-muted/50'
                   )}
+                  onClick={canNavigate ? () => onIncomeClick(income.actual_income_id!) : undefined}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">

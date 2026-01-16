@@ -321,9 +321,17 @@ export default function IncomeDetailsPage() {
       {pendingDistributions.length > 0 && (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-muted-foreground">
-              Ожидают подтверждения
-            </h3>
+            <div>
+              <h3 className="text-sm font-medium text-muted-foreground">
+                Ожидают подтверждения
+              </h3>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Доступно для распределения:{' '}
+                <span className="font-medium text-foreground">
+                  {formatMoney(income.amount - totalConfirmed)} {getCurrencySymbol(income.currency)}
+                </span>
+              </p>
+            </div>
             <AddDistributionDialog
               incomeAmount={income.amount}
               existingDistributions={distributions}
@@ -337,6 +345,7 @@ export default function IncomeDetailsPage() {
                 key={distribution.id}
                 distribution={distribution}
                 incomeAmount={income.amount}
+                availableAmount={income.amount - totalConfirmed}
                 onConfirm={() => handleConfirmClick(distribution)}
                 onEdit={() => handleEditClick(distribution)}
                 isConfirming={
@@ -430,6 +439,7 @@ export default function IncomeDetailsPage() {
 interface DistributionCardProps {
   distribution: IncomeDistribution
   incomeAmount: number
+  availableAmount?: number
   onConfirm: () => void
   onEdit: () => void
   isConfirming?: boolean
@@ -438,6 +448,7 @@ interface DistributionCardProps {
 function DistributionCard({
   distribution,
   incomeAmount,
+  availableAmount,
   onConfirm,
   onEdit,
   isConfirming,
@@ -512,6 +523,16 @@ function DistributionCard({
         </p>
         {!isCompleted && (
           <p className="text-xs text-muted-foreground">запланировано</p>
+        )}
+        {!isCompleted && availableAmount !== undefined && (
+          <p className={cn(
+            'text-xs mt-0.5',
+            availableAmount >= distribution.planned_amount
+              ? 'text-emerald-600 dark:text-emerald-400'
+              : 'text-amber-600 dark:text-amber-400'
+          )}>
+            доступно {formatMoney(availableAmount)} ₽
+          </p>
         )}
       </div>
 
