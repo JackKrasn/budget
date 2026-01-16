@@ -268,7 +268,9 @@ export function PlannedIncomesSection({
             <TableRow className="hover:bg-transparent">
               <TableHead>Источник</TableHead>
               <TableHead className="w-[100px] text-center">Дата</TableHead>
-              <TableHead className="w-[140px] text-right">Сумма</TableHead>
+              <TableHead className="w-[110px] text-right">Ожидаемое</TableHead>
+              <TableHead className="w-[110px] text-right">Фактическое</TableHead>
+              <TableHead className="w-[100px] text-right">Отклонение</TableHead>
               <TableHead className="w-[100px] text-center">Статус</TableHead>
               <TableHead className="w-[80px]"></TableHead>
             </TableRow>
@@ -311,38 +313,52 @@ export function PlannedIncomesSection({
                     {formatDate(getDateString(income.expected_date))}
                   </TableCell>
 
+                  {/* Ожидаемое */}
+                  <TableCell className="text-right">
+                    <span
+                      className={cn(
+                        'text-sm tabular-nums',
+                        income.status === 'skipped'
+                          ? 'text-muted-foreground line-through'
+                          : 'text-muted-foreground'
+                      )}
+                    >
+                      {formatMoney(income.expected_amount)} ₽
+                    </span>
+                  </TableCell>
+
+                  {/* Фактическое */}
                   <TableCell className="text-right">
                     {income.status === 'received' && actualAmount != null ? (
-                      <div>
-                        <span className="text-base font-semibold tabular-nums text-emerald-500">
-                          +{formatMoney(actualAmount)} ₽
-                        </span>
-                        {actualAmount !== income.expected_amount && (
-                          <p className={cn(
-                            'text-xs mt-0.5 flex items-center justify-end gap-0.5',
-                            actualAmount > income.expected_amount ? 'text-emerald-500' : 'text-red-500'
-                          )}>
-                            {actualAmount > income.expected_amount ? (
-                              <ArrowUp className="h-3 w-3" />
-                            ) : (
-                              <ArrowDown className="h-3 w-3" />
-                            )}
-                            {actualAmount > income.expected_amount ? '+' : ''}
-                            {formatMoney(actualAmount - income.expected_amount)} ₽
-                          </p>
-                        )}
-                      </div>
-                    ) : (
-                      <span
-                        className={cn(
-                          'text-base font-semibold tabular-nums',
-                          income.status === 'skipped'
-                            ? 'text-muted-foreground line-through'
-                            : 'text-muted-foreground'
-                        )}
-                      >
-                        +{formatMoney(income.expected_amount)} ₽
+                      <span className="text-sm font-semibold tabular-nums text-emerald-500">
+                        {formatMoney(actualAmount)} ₽
                       </span>
+                    ) : (
+                      <span className="text-sm tabular-nums text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+
+                  {/* Отклонение */}
+                  <TableCell className="text-right">
+                    {income.status === 'received' && actualAmount != null ? (
+                      actualAmount !== income.expected_amount ? (
+                        <span className={cn(
+                          'text-sm tabular-nums flex items-center justify-end gap-0.5',
+                          actualAmount > income.expected_amount ? 'text-emerald-500' : 'text-red-500'
+                        )}>
+                          {actualAmount > income.expected_amount ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )}
+                          {actualAmount > income.expected_amount ? '+' : ''}
+                          {formatMoney(actualAmount - income.expected_amount)} ₽
+                        </span>
+                      ) : (
+                        <span className="text-sm tabular-nums text-muted-foreground">0 ₽</span>
+                      )
+                    ) : (
+                      <span className="text-sm tabular-nums text-muted-foreground">—</span>
                     )}
                   </TableCell>
 
@@ -392,17 +408,34 @@ export function PlannedIncomesSection({
             <TableRow className="bg-muted/50">
               <TableCell className="font-semibold text-base">Итого</TableCell>
               <TableCell></TableCell>
+              {/* Итого ожидаемое */}
               <TableCell className="text-right">
-                <span className="tabular-nums font-semibold text-base">
-                  +{formatMoney(totals.expected)} ₽
+                <span className="tabular-nums font-semibold text-sm">
+                  {formatMoney(totals.expected)} ₽
                 </span>
-                {receivedDiff !== 0 && (
-                  <p className={cn(
-                    'text-xs mt-0.5 flex items-center justify-end gap-0.5',
+              </TableCell>
+              {/* Итого фактическое */}
+              <TableCell className="text-right">
+                <span className="tabular-nums font-semibold text-sm text-emerald-500">
+                  {formatMoney(totals.received)} ₽
+                </span>
+              </TableCell>
+              {/* Итого отклонение */}
+              <TableCell className="text-right">
+                {receivedDiff !== 0 ? (
+                  <span className={cn(
+                    'tabular-nums font-semibold text-sm flex items-center justify-end gap-0.5',
                     receivedDiff > 0 ? 'text-emerald-500' : 'text-red-500'
                   )}>
+                    {receivedDiff > 0 ? (
+                      <ArrowUp className="h-3 w-3" />
+                    ) : (
+                      <ArrowDown className="h-3 w-3" />
+                    )}
                     {receivedDiff > 0 ? '+' : ''}{formatMoney(receivedDiff)} ₽
-                  </p>
+                  </span>
+                ) : (
+                  <span className="tabular-nums text-sm text-muted-foreground">0 ₽</span>
                 )}
               </TableCell>
               <TableCell className="text-center">
