@@ -114,13 +114,44 @@ export function EditCreditDialog({
   // Load credit data into form
   useEffect(() => {
     if (credit) {
+      // Handle end_date that might come as:
+      // - string "2024-12-09"
+      // - Go sql.NullTime object {Time: "2044-12-09T00:00:00Z", Valid: true}
+      let endDateValue = ''
+      if (credit.end_date) {
+        if (typeof credit.end_date === 'string') {
+          // Already a string - extract date part
+          endDateValue = credit.end_date.split('T')[0]
+        } else if (typeof credit.end_date === 'object' && 'Time' in (credit.end_date as object)) {
+          const nullTime = credit.end_date as unknown as { Time: string; Valid: boolean }
+          if (nullTime.Valid && nullTime.Time) {
+            endDateValue = nullTime.Time.split('T')[0]
+          }
+        }
+      }
+
+      // Handle monthly_payment that might come as:
+      // - number
+      // - Go sql.NullFloat64 object {Float64: 65440.93, Valid: true}
+      let monthlyPaymentValue = ''
+      if (credit.monthly_payment) {
+        if (typeof credit.monthly_payment === 'number') {
+          monthlyPaymentValue = String(credit.monthly_payment)
+        } else if (typeof credit.monthly_payment === 'object' && 'Float64' in (credit.monthly_payment as object)) {
+          const nullFloat = credit.monthly_payment as unknown as { Float64: number; Valid: boolean }
+          if (nullFloat.Valid) {
+            monthlyPaymentValue = String(nullFloat.Float64)
+          }
+        }
+      }
+
       form.reset({
         name: credit.name,
         accountId: credit.account_id,
         categoryId: credit.category_id,
         paymentDay: String(credit.payment_day),
-        endDate: credit.end_date || '',
-        monthlyPayment: credit.monthly_payment ? String(credit.monthly_payment) : '',
+        endDate: endDateValue,
+        monthlyPayment: monthlyPaymentValue,
         status: credit.status,
         notes: credit.notes || '',
       })
