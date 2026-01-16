@@ -90,6 +90,9 @@ function InlineAmountInput({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
       handleCancel()
+    } else if (e.key === 'Enter') {
+      e.preventDefault()
+      handleSave()
     }
   }
 
