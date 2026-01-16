@@ -964,6 +964,7 @@ export default function BudgetPage() {
             <PlannedExpensesSection
               expenses={plannedExpenses}
               accounts={accounts}
+              categories={categories}
               onConfirm={handleConfirmPlanned}
               onSkip={handleSkipPlanned}
               onDelete={handleDeletePlanned}
