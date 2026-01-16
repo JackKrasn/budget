@@ -57,8 +57,12 @@ function formatDateToString(date: Date): string {
   return `${year}-${month}-${day}`
 }
 
-function parseDateString(dateStr: string): Date {
-  const [year, month, day] = dateStr.split('-').map(Number)
+function parseDateString(dateStr: string | undefined | null): Date | undefined {
+  if (!dateStr || typeof dateStr !== 'string') return undefined
+  const parts = dateStr.split('-')
+  if (parts.length !== 3) return undefined
+  const [year, month, day] = parts.map(Number)
+  if (isNaN(year) || isNaN(month) || isNaN(day)) return undefined
   return new Date(year, month - 1, day)
 }
 
@@ -286,6 +290,7 @@ export function EditCreditDialog({
                             <div className="flex items-center gap-2">
                               <CategoryIcon
                                 code={cat.code}
+                                iconName={cat.icon}
                                 color={cat.color}
                                 size="sm"
                               />
@@ -356,11 +361,10 @@ export function EditCreditDialog({
                               )}
                             >
                               <Calendar className="mr-2 h-4 w-4" />
-                              {field.value ? (
-                                format(parseDateString(field.value), 'd MMMM yyyy', { locale: ru })
-                              ) : (
-                                <span>Выберите дату</span>
-                              )}
+                              {(() => {
+                                const date = parseDateString(field.value)
+                                return date ? format(date, 'd MMMM yyyy', { locale: ru }) : <span>Выберите дату</span>
+                              })()}
                             </Button>
                           </FormControl>
                         </PopoverTrigger>

@@ -651,6 +651,7 @@ export function CreateCreditDialog({ open, onOpenChange }: CreateCreditDialogPro
                                 <div className="flex items-center gap-2">
                                   <CategoryIcon
                                     code={cat.code}
+                                    iconName={cat.icon}
                                     color={cat.color}
                                     size="sm"
                                   />
