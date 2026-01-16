@@ -651,12 +651,16 @@ export interface FundDistributionSummary {
   fundIcon: string
   fundColor: string
   expectedAmount: number
+  /** Расчёт от pending planned_incomes по правилам distribution_rules */
+  expectedFromPlannedAmount: number
   plannedAmount: number
   actualAmount: number
 }
 
 export interface DistributionSummary {
   totalExpectedDistribution: number
+  /** Общая сумма ожидаемого распределения от pending planned_incomes */
+  totalExpectedFromPlannedDistribution: number
   totalPlannedDistribution: number
   totalActualDistribution: number
   expectedRemainingForBudget: number

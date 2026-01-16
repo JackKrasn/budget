@@ -231,8 +231,12 @@ export default function BudgetPage() {
     // Общий доход для планирования = максимум из ожидаемого и реально полученного
     const totalIncome = Math.max(expectedIncome, receivedIncome)
 
-    // Доступно для планирования = Общий доход - План по категориям - Обязательные ИЗ БЮДЖЕТА - Распределения в фонды
-    const availableForPlanning = totalIncome - totalPlanned - pendingPlannedFromBudget - expectedFundDistributions
+    // Доступно для планирования (от планируемого дохода) = Ожидаемый доход - План по категориям - Распределения в фонды
+    // Обязательные расходы уже входят в план по категориям, поэтому не вычитаем отдельно
+    const plannedAvailable = expectedIncome - totalPlanned - expectedFundDistributions
+
+    // Доступно для планирования (от максимального дохода) - для обратной совместимости
+    const availableForPlanning = totalIncome - totalPlanned - expectedFundDistributions
 
     // Реально доступно = Полученный доход - Фактические расходы - Подтверждённые распределения
     const actuallyAvailable = receivedIncome - totalActual - actualFundDistributions
@@ -258,6 +262,7 @@ export default function BudgetPage() {
       pendingIncome,
       expectedFundDistributions,
       actualFundDistributions,
+      plannedAvailable,
       availableForPlanning,
       actuallyAvailable,
     }
@@ -810,26 +815,29 @@ export default function BudgetPage() {
             <div className="flex items-center gap-3">
               <div
                 className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-                  stats.availableForPlanning < 0 ? 'bg-destructive/10' : 'bg-muted'
+                  stats.plannedAvailable < 0 ? 'bg-destructive/10' : 'bg-muted'
                 }`}
               >
                 <Calculator
                   className={`h-4 w-4 ${
-                    stats.availableForPlanning < 0 ? 'text-destructive' : 'text-muted-foreground'
+                    stats.plannedAvailable < 0 ? 'text-destructive' : 'text-muted-foreground'
                   }`}
                 />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Для планирования</p>
                 <p
                   className={`text-lg font-bold tabular-nums ${
-                    stats.availableForPlanning < 0 ? 'text-destructive' : 'text-foreground'
+                    stats.plannedAvailable < 0 ? 'text-destructive' : 'text-foreground'
                   }`}
                 >
-                  {formatMoney(stats.availableForPlanning)} ₽
+                  {formatMoney(stats.plannedAvailable)} ₽
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  = доход − обязательные − категории − фонды
+                  = ожидаемый доход − категории − фонды
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatMoney(stats.expectedIncome)} − {formatMoney(stats.totalPlanned)} − {formatMoney(stats.expectedFundDistributions)}
                 </p>
               </div>
             </div>
@@ -851,7 +859,7 @@ export default function BudgetPage() {
                   }`}
                 />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Реально свободно</p>
                 <p
                   className={`text-lg font-bold tabular-nums ${
@@ -862,6 +870,9 @@ export default function BudgetPage() {
                 </p>
                 <p className="text-xs text-muted-foreground">
                   = получено − потрачено − в фонды
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {formatMoney(stats.receivedIncome)} − {formatMoney(stats.totalActual)} − {formatMoney(stats.actualFundDistributions)}
                 </p>
               </div>
             </div>
