@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import { PiggyBank, TrendingUp, TrendingDown, ArrowRight, Check, Clock, Settings, ExternalLink, Pencil } from 'lucide-react'
+import { PiggyBank, TrendingUp, Check, Clock, Settings, ExternalLink, Pencil, Wallet } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Button } from '@/components/ui/button'
@@ -11,7 +11,6 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import { FundIcon } from '@/components/common/category-icon'
-import { cn } from '@/lib/utils'
 import type { DistributionSummary, FundDistributionSummary } from '@/lib/api/types'
 import { EditDistributionRulesDialog } from './edit-distribution-rules-dialog'
 
@@ -39,37 +38,71 @@ export function DistributionSummarySection({
   const navigate = useNavigate()
   const [editDialogOpen, setEditDialogOpen] = useState(false)
 
-  // Вычисляем общую сумму плановых распределений (включая вручную добавленные)
-  const totalPlannedDistribution = fundDistributions?.reduce(
-    (sum, f) => sum + (f.plannedAmount || f.expectedAmount), 0
-  ) ?? summary?.totalExpectedDistribution ?? 0
+  // Ожидается от pending planned_incomes (расчёт по правилам)
+  const expectedFromPendingIncomes = summary?.totalExpectedFromPlannedDistribution ?? 0
 
-  if (!summary || totalPlannedDistribution === 0) {
+  // Реально созданные distributions (pending, от полученных доходов)
+  const pendingFromReceivedIncomes = summary?.totalPlannedDistribution ?? 0
+
+  // Всего ожидается = от pending доходов + pending распределения от полученных
+  const totalPending = expectedFromPendingIncomes + pendingFromReceivedIncomes
+
+  // Общая сумма к распределению = берём из summary (уже посчитано на бэкенде)
+  const totalToDistribute = summary?.totalExpectedDistribution ?? 0
+
+  if (!summary || totalToDistribute === 0) {
     return null
   }
 
-  const confirmProgress = totalPlannedDistribution > 0
-    ? Math.round((summary.totalActualDistribution / totalPlannedDistribution) * 100)
+  // Прогресс = подтверждено / (ожидаемое + запланированное)
+  const confirmProgress = totalToDistribute > 0
+    ? Math.round((summary.totalActualDistribution / totalToDistribute) * 100)
     : 0
 
-  const isPositiveDiff = summary.distributionDifference >= 0
+  // Процент от дохода, который идёт в фонды
+  const percentOfIncome = totalIncome > 0
+    ? Math.round((totalToDistribute / totalIncome) * 100)
+    : 0
 
   const content = (
     <div className="space-y-4">
       {/* Summary Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* Planned Distribution */}
+        {/* Total to Distribute (from all incomes) */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs text-muted-foreground">Запланировано в фонды</p>
+                <p className="text-xs text-muted-foreground">Всего в фонды</p>
                 <p className="text-lg font-bold tabular-nums">
-                  {formatMoney(totalPlannedDistribution)} ₽
+                  {formatMoney(totalToDistribute)} ₽
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {percentOfIncome}% от дохода
                 </p>
               </div>
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-violet-500/10">
-                <Clock className="h-4 w-4 text-violet-500" />
+                <Wallet className="h-4 w-4 text-violet-500" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pending (from all income sources) */}
+        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">Ожидается</p>
+                <p className="text-lg font-bold tabular-nums text-amber-500">
+                  {formatMoney(totalPending)} ₽
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  от всех доходов
+                </p>
+              </div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10">
+                <Clock className="h-4 w-4 text-amber-500" />
               </div>
             </div>
           </CardContent>
@@ -83,6 +116,9 @@ export function DistributionSummarySection({
                 <p className="text-xs text-muted-foreground">Подтверждено</p>
                 <p className="text-lg font-bold tabular-nums text-emerald-500">
                   {formatMoney(summary.totalActualDistribution)} ₽
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  переведено в фонды
                 </p>
               </div>
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-500/10">
@@ -101,43 +137,12 @@ export function DistributionSummarySection({
                 <p className="text-lg font-bold tabular-nums text-cyan-500">
                   {formatMoney(summary.actualRemainingForBudget)} ₽
                 </p>
+                <p className="text-xs text-muted-foreground">
+                  после распределения
+                </p>
               </div>
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-cyan-500/10">
-                <ArrowRight className="h-4 w-4 text-cyan-500" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Difference */}
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-          <CardContent className="p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-xs text-muted-foreground">
-                  {isPositiveDiff ? 'Больше плана' : 'Меньше плана'}
-                </p>
-                <p
-                  className={cn(
-                    'text-lg font-bold tabular-nums',
-                    isPositiveDiff ? 'text-emerald-500' : 'text-amber-500'
-                  )}
-                >
-                  {isPositiveDiff ? '+' : ''}
-                  {formatMoney(summary.distributionDifference)} ₽
-                </p>
-              </div>
-              <div
-                className={cn(
-                  'flex h-8 w-8 items-center justify-center rounded-lg',
-                  isPositiveDiff ? 'bg-emerald-500/10' : 'bg-amber-500/10'
-                )}
-              >
-                {isPositiveDiff ? (
-                  <TrendingUp className={cn('h-4 w-4', 'text-emerald-500')} />
-                ) : (
-                  <TrendingDown className={cn('h-4 w-4', 'text-amber-500')} />
-                )}
+                <TrendingUp className="h-4 w-4 text-cyan-500" />
               </div>
             </div>
           </CardContent>
@@ -167,7 +172,7 @@ export function DistributionSummarySection({
           <Progress value={confirmProgress} className="h-2" />
           <div className="flex justify-between mt-2 text-xs text-muted-foreground">
             <span>Подтверждено: {formatMoney(summary.totalActualDistribution)} ₽</span>
-            <span>Запланировано: {formatMoney(totalPlannedDistribution)} ₽</span>
+            <span>Всего к распределению: {formatMoney(totalToDistribute)} ₽</span>
           </div>
         </CardContent>
       </Card>
@@ -180,21 +185,18 @@ export function DistributionSummarySection({
           </CardHeader>
           <CardContent className="space-y-3">
             {fundDistributions.map((fund) => {
-              // Используем plannedAmount (реальные распределения) вместо expectedAmount (по правилам)
-              const plannedAmount = fund.plannedAmount || fund.expectedAmount
-              const fundProgress = plannedAmount > 0
-                ? Math.round((fund.actualAmount / plannedAmount) * 100)
+              // Общая сумма для фонда = ожидаемое от pending + запланированное от received
+              const fundExpectedFromPlanned = fund.expectedFromPlannedAmount ?? 0
+              const fundTotalToDistribute = fundExpectedFromPlanned + fund.plannedAmount
+
+              const fundProgress = fundTotalToDistribute > 0
+                ? Math.round((fund.actualAmount / fundTotalToDistribute) * 100)
                 : 0
-              const isCompleted = fund.actualAmount >= plannedAmount
+              const isCompleted = fund.actualAmount >= fundTotalToDistribute && fundTotalToDistribute > 0
 
               // Процент от дохода (сколько % от общего дохода идёт в этот фонд)
-              const percentOfIncome = totalIncome > 0
-                ? Math.round((plannedAmount / totalIncome) * 100)
-                : 0
-
-              // Процент от суммы на фонды (доля этого фонда среди всех распределений)
-              const percentOfFunds = totalPlannedDistribution > 0
-                ? Math.round((plannedAmount / totalPlannedDistribution) * 100)
+              const fundPercentOfIncome = totalIncome > 0
+                ? Math.round((fundTotalToDistribute / totalIncome) * 100)
                 : 0
 
               return (
@@ -208,15 +210,18 @@ export function DistributionSummarySection({
                       />
                       <span className="text-sm font-medium">{fund.fundName}</span>
                       {/* Процент от дохода */}
-                      <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-500">
-                        {percentOfIncome}% дохода
-                      </span>
-                      {/* Процент от суммы на фонды */}
-                      <span className="inline-flex items-center rounded-full bg-violet-500/10 px-1.5 py-0.5 text-xs font-medium text-violet-500">
-                        {percentOfFunds}% фондов
-                      </span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center rounded-full bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground cursor-help">
+                            {fundPercentOfIncome}%
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Процент от общего дохода</p>
+                        </TooltipContent>
+                      </Tooltip>
                       {isCompleted && (
-                        <span className="inline-flex items-center rounded-full bg-cyan-500/10 px-1.5 py-0.5 text-xs font-medium text-cyan-500">
+                        <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-1.5 py-0.5 text-xs font-medium text-emerald-500">
                           <Check className="h-3 w-3 mr-0.5" />
                           Готово
                         </span>
@@ -229,7 +234,7 @@ export function DistributionSummarySection({
                         </span>
                         <span className="text-xs text-muted-foreground">
                           {' '}
-                          / {formatMoney(plannedAmount)} ₽
+                          / {formatMoney(fundTotalToDistribute)} ₽
                         </span>
                       </div>
                       {!isCompleted && (
@@ -251,6 +256,52 @@ export function DistributionSummarySection({
                       )}
                     </div>
                   </div>
+                  {/* Breakdown: expected + planned */}
+                  {(fundExpectedFromPlanned > 0 || fund.plannedAmount > 0) && (
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground ml-7">
+                      {/* Всего ожидается (сумма) */}
+                      {fundExpectedFromPlanned > 0 && fund.plannedAmount > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">всего: {formatMoney(fundTotalToDistribute)} ₽</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Сумма ожидаемого и запланированного</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {fundExpectedFromPlanned > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">ожидается: {formatMoney(fundExpectedFromPlanned)} ₽</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Расчёт от ещё не полученных доходов</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {fund.plannedAmount > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">к подтверждению: {formatMoney(fund.plannedAmount)} ₽</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>От полученных доходов, ожидает перевода</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {fund.actualAmount > 0 && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="cursor-help">подтверждено: {formatMoney(fund.actualAmount)} ₽</span>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Уже переведено в фонд</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  )}
                   <Progress
                     value={fundProgress}
                     className="h-1.5"

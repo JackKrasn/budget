@@ -10,10 +10,13 @@ import {
   Calendar,
   Wallet,
   PiggyBank,
+  Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
+import { CollapsibleSection } from '@/components/ui/collapsible-section'
+import { Badge } from '@/components/ui/badge'
 import {
   useIncomes,
   useDeleteIncome,
@@ -23,6 +26,12 @@ import {
 } from '@/features/incomes'
 import { useAccounts } from '@/features/accounts'
 import { AccountFilter } from '@/features/expenses'
+import {
+  useCurrentBudget,
+  usePlannedIncomes,
+  useSkipPlannedIncome,
+} from '@/features/budget'
+import { PlannedIncomesSection } from '@/features/budget/components/planned-incomes-section'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -71,6 +80,16 @@ export default function IncomesPage() {
   const { data: accountsData } = useAccounts()
   const deleteIncome = useDeleteIncome()
 
+  // Planned incomes
+  const { data: currentBudget } = useCurrentBudget()
+  const { data: plannedIncomesData } = usePlannedIncomes({
+    budgetId: currentBudget?.id,
+  })
+  const skipPlannedIncome = useSkipPlannedIncome()
+
+  const plannedIncomes = plannedIncomesData?.data ?? []
+  const pendingPlannedIncomes = plannedIncomes.filter((pi) => pi.status === 'pending')
+
   const incomes = incomesData?.data ?? []
   const summary = incomesData?.summary
   const accounts = accountsData?.data ?? []
@@ -118,6 +137,15 @@ export default function IncomesPage() {
 
   const handleIncomeClick = (id: string) => {
     navigate(`/incomes/${id}`)
+  }
+
+  const handleReceivePlannedIncome = async (_id: string) => {
+    // Пользователь должен создать реальный доход через CreateIncomeDialog
+    // и связать его с planned income на странице budget
+  }
+
+  const handleSkipPlannedIncome = async (id: string) => {
+    skipPlannedIncome.mutate(id)
   }
 
   const formatDateHeader = (dateStr: string) => {
@@ -277,6 +305,33 @@ export default function IncomesPage() {
             </CardContent>
           </Card>
         </motion.div>
+      )}
+
+      {/* Planned Incomes Section */}
+      {pendingPlannedIncomes.length > 0 && (
+        <CollapsibleSection
+          id="incomes-page-planned"
+          title="Ожидаемые доходы"
+          icon={<Clock className="h-4 w-4 text-amber-500" />}
+          badge={
+            <Badge variant="outline" className="text-amber-500 border-amber-500/30 ml-2">
+              {pendingPlannedIncomes.length} на {formatMoney(
+                pendingPlannedIncomes.reduce((sum, pi) => sum + pi.expected_amount, 0)
+              )} ₽
+            </Badge>
+          }
+          defaultOpen={true}
+        >
+          <PlannedIncomesSection
+            incomes={plannedIncomes}
+            onReceive={handleReceivePlannedIncome}
+            onSkip={handleSkipPlannedIncome}
+            isPending={skipPlannedIncome.isPending}
+            hideWrapper
+            onIncomeClick={handleIncomeClick}
+            onPlannedIncomeClick={(id) => navigate(`/planned-incomes/${id}`)}
+          />
+        </CollapsibleSection>
       )}
 
       {/* Top Sources */}

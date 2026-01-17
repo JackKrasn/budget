@@ -26,12 +26,14 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { PlannedExpenseWithDetails, PlannedExpenseStatus, Account } from '@/lib/api/types'
+import type { PlannedExpenseWithDetails, PlannedExpenseStatus, Account, ExpenseCategoryWithTags } from '@/lib/api/types'
 import { ConfirmPlannedExpenseDialog } from './confirm-planned-expense-dialog'
 
 interface PlannedExpensesSectionProps {
   expenses: PlannedExpenseWithDetails[]
   accounts: Account[]
+  /** Список категорий для обогащения данных (если бэкенд не возвращает детали) */
+  categories?: ExpenseCategoryWithTags[]
   onConfirm: (
     id: string,
     data: {
@@ -64,6 +66,7 @@ const STATUS_CONFIG: Record<
 export function PlannedExpensesSection({
   expenses,
   accounts,
+  categories,
   onConfirm,
   onSkip,
   onDelete,
@@ -76,6 +79,26 @@ export function PlannedExpensesSection({
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<PlannedExpenseWithDetails | null>(null)
+
+  // Создаём Map для быстрого поиска категорий по id
+  const categoriesMap = new Map(categories?.map((c) => [c.id, c]) ?? [])
+
+  // Обогащаем расходы данными о категориях (если бэкенд не вернул)
+  const enrichedExpenses = expenses.map((expense) => {
+    // Ищем категорию по id
+    const category = categoriesMap.get(expense.category_id)
+    if (category) {
+      // Всегда используем данные из категорий, если они есть
+      return {
+        ...expense,
+        category_name: category.name,
+        category_code: category.code,
+        category_icon: category.icon,
+        category_color: category.color,
+      }
+    }
+    return expense
+  })
 
   const formatMoney = (amount: number) => {
     return amount.toLocaleString('ru-RU', {
@@ -151,7 +174,7 @@ export function PlannedExpensesSection({
   }
 
   // Группировка: pending сначала, потом confirmed, потом skipped
-  const sortedExpenses = [...expenses].sort((a, b) => {
+  const sortedExpenses = [...enrichedExpenses].sort((a, b) => {
     const statusOrder = { pending: 0, confirmed: 1, skipped: 2 }
     const orderDiff = statusOrder[a.status] - statusOrder[b.status]
     if (orderDiff !== 0) return orderDiff
@@ -160,11 +183,11 @@ export function PlannedExpensesSection({
     return new Date(dateA).getTime() - new Date(dateB).getTime()
   })
 
-  const pendingExpenses = expenses.filter((e) => e.status === 'pending')
-  const confirmedExpenses = expenses.filter((e) => e.status === 'confirmed')
+  const pendingExpenses = enrichedExpenses.filter((e) => e.status === 'pending')
+  const confirmedExpenses = enrichedExpenses.filter((e) => e.status === 'confirmed')
 
   // Группировка по фондам
-  const fundBreakdown = expenses.reduce<Record<string, { name: string; amount: number }>>((acc, e) => {
+  const fundBreakdown = enrichedExpenses.reduce<Record<string, { name: string; amount: number }>>((acc, e) => {
     const fundedAmount = getActualAmount(e.funded_amount)
     if (fundedAmount && e.fund_name && e.fund_id) {
       if (!acc[e.fund_id]) {
@@ -176,21 +199,21 @@ export function PlannedExpensesSection({
   }, {})
 
   const totals = {
-    planned: expenses.reduce((sum, e) => sum + e.planned_amount, 0),
+    planned: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount, 0),
     confirmed: confirmedExpenses.reduce(
       (sum, e) => sum + (getActualAmount(e.actual_amount) ?? e.planned_amount),
       0
     ),
     pending: pendingExpenses.reduce((sum, e) => sum + e.planned_amount, 0),
     // Финансирование из фондов (funded_amount приходит как { Float64, Valid })
-    fromFunds: expenses
+    fromFunds: enrichedExpenses
       .filter((e) => getActualAmount(e.funded_amount))
       .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
     pendingFromFunds: pendingExpenses
       .filter((e) => getActualAmount(e.funded_amount))
       .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
-    fromBudget: expenses.reduce((sum, e) => sum + e.planned_amount, 0) -
-      expenses
+    fromBudget: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount, 0) -
+      enrichedExpenses
         .filter((e) => getActualAmount(e.funded_amount))
         .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
     fundBreakdown: Object.values(fundBreakdown),
@@ -198,7 +221,7 @@ export function PlannedExpensesSection({
 
   const content = (
     <>
-      {expenses.length === 0 ? (
+      {enrichedExpenses.length === 0 ? (
         <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30">
           <Calendar className="h-8 w-8 text-muted-foreground/50" />
           <p className="text-sm text-muted-foreground">
@@ -220,6 +243,7 @@ export function PlannedExpensesSection({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>Статья</TableHead>
+              <TableHead className="w-[100px] text-center">Дата</TableHead>
               <TableHead className="w-[120px] text-right">Сумма</TableHead>
               <TableHead className="w-[100px] text-center">Статус</TableHead>
               <TableHead className="w-[80px]"></TableHead>
@@ -260,6 +284,19 @@ export function PlannedExpensesSection({
                         ) : null}
                       </div>
                     </div>
+                  </TableCell>
+
+                  <TableCell className="text-center">
+                    {(() => {
+                      const plannedDate = getDateString(expense.planned_date)
+                      if (!plannedDate) return <span className="text-muted-foreground">—</span>
+                      const date = new Date(plannedDate)
+                      return (
+                        <span className="text-sm tabular-nums">
+                          {date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })}
+                        </span>
+                      )
+                    })()}
                   </TableCell>
 
                   <TableCell className="text-right">
@@ -382,6 +419,7 @@ export function PlannedExpensesSection({
                   </div>
                 )}
               </TableCell>
+              <TableCell></TableCell>
               <TableCell className="text-right tabular-nums font-semibold text-base">
                 {formatMoney(totals.planned)} ₽
               </TableCell>
