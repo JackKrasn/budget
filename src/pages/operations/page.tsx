@@ -28,8 +28,9 @@ import {
   useDeleteFundDeposit,
   FundDepositRow,
 } from '@/features/accounts'
+import { DeleteTransactionResultDialog } from '@/features/funds/components'
 import { DateRangePicker } from '@/components/common'
-import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit } from '@/lib/api/types'
+import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -99,6 +100,9 @@ export default function OperationsPage() {
 
   const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [deleteResult, setDeleteResult] = useState<DeleteTransactionResponse | null>(null)
+  const [deleteResultDialogOpen, setDeleteResultDialogOpen] = useState(false)
+  const [deletedFundName, setDeletedFundName] = useState<string>('')
 
   // Data fetching
   const { data: expensesData, isLoading: isExpensesLoading, error: expensesError } = useExpenses({
@@ -201,9 +205,21 @@ export default function OperationsPage() {
     }
   }
 
-  const handleDeleteFundDeposit = (deposit: FundDeposit) => {
-    if (confirm('Удалить этот перевод в фонд?')) {
-      deleteFundDeposit.mutate(deposit.id)
+  const handleDeleteFundDeposit = async (deposit: FundDeposit) => {
+    if (!confirm('Удалить этот перевод в фонд?')) return
+
+    try {
+      const result = await deleteFundDeposit.mutateAsync(deposit.id)
+
+      // Show result dialog if operation returned balance info
+      if (result && (result.accountBalance || result.fundBalance)) {
+        setDeleteResult(result)
+        setDeletedFundName(deposit.fund_name)
+        setDeleteResultDialogOpen(true)
+      }
+    } catch (error) {
+      // Error handled in mutation
+      console.error('Delete fund deposit error:', error)
     }
   }
 
@@ -390,6 +406,14 @@ export default function OperationsPage() {
         expense={editingExpense}
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
+      />
+
+      {/* Delete Fund Deposit Result Dialog */}
+      <DeleteTransactionResultDialog
+        result={deleteResult}
+        fundName={deletedFundName}
+        open={deleteResultDialogOpen}
+        onOpenChange={setDeleteResultDialogOpen}
       />
     </div>
   )

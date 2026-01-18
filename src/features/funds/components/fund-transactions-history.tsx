@@ -23,8 +23,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { useFundTransactions, useDeleteContribution } from '../hooks'
-import type { FundTransaction, FundTransactionType, NullFloat64 } from '@/lib/api/types'
+import { useFundTransactions, useDeleteContribution, useDeleteTransaction, useFund } from '../hooks'
+import { DeleteContributionResultDialog } from './delete-contribution-result-dialog'
+import { DeleteTransactionResultDialog } from './delete-transaction-result-dialog'
+import type { FundTransaction, FundTransactionType, NullFloat64, DeleteContributionResponse, DeleteTransactionResponse } from '@/lib/api/types'
 import { TRANSACTION_TYPES } from '../constants'
 
 function formatMoney(amount: number): string {
@@ -102,7 +104,12 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [filterOpen, setFilterOpen] = useState(false)
+  const [deleteContributionResult, setDeleteContributionResult] = useState<DeleteContributionResponse | null>(null)
+  const [deleteContributionResultDialogOpen, setDeleteContributionResultDialogOpen] = useState(false)
+  const [deleteTransactionResult, setDeleteTransactionResult] = useState<DeleteTransactionResponse | null>(null)
+  const [deleteTransactionResultDialogOpen, setDeleteTransactionResultDialogOpen] = useState(false)
 
+  const { data: fundData } = useFund(fundId)
   const { data, isLoading } = useFundTransactions(fundId, {
     type: selectedTypes.length === 1 ? selectedTypes[0] : undefined,
     from: dateFrom || undefined,
@@ -110,6 +117,9 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   })
 
   const deleteContribution = useDeleteContribution()
+  const deleteTransaction = useDeleteTransaction()
+
+  const fundName = fundData?.fund.name || ''
 
   const transactions = data?.data ?? []
 
@@ -314,7 +324,9 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
             const classes = colorClasses[color as keyof typeof colorClasses] || colorClasses.green
             const isWithdrawal = tx.transaction_type === 'withdrawal'
             const isDeposit = tx.transaction_type === 'deposit'
-            const canDelete = isDeposit // Можно удалять только пополнения
+            const isIncomeDistribution = isDeposit && !!tx.contribution_income_id
+            // Can delete: deposits with contribution_id OR other transaction types (buy, sell, transfer)
+            const canDelete = (isDeposit && !!tx.contribution_id) || (!isDeposit && !isWithdrawal)
 
             const handleClick = () => {
               if (isWithdrawal) {
@@ -329,11 +341,34 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
               if (!confirm('Вы уверены, что хотите удалить эту операцию?')) return
 
               try {
-                await deleteContribution.mutateAsync({
-                  fundId,
-                  contributionId: tx.id,
-                })
-              } catch {
+                // Use different endpoints based on transaction type
+                if (tx.contribution_id) {
+                  // Deposit with contribution_id - use contribution endpoint
+                  const result = await deleteContribution.mutateAsync({
+                    fundId,
+                    contributionId: tx.contribution_id,
+                  })
+
+                  // Show delete contribution result dialog if operation returned balance info
+                  if (result && (result.fundBalances.length > 0 || result.accountBalances)) {
+                    setDeleteContributionResult(result)
+                    setDeleteContributionResultDialogOpen(true)
+                  }
+                } else {
+                  // Other transaction types - use transaction endpoint
+                  const result = await deleteTransaction.mutateAsync({
+                    fundId,
+                    transactionId: tx.id,
+                  })
+
+                  // Show delete transaction result dialog
+                  if (result) {
+                    setDeleteTransactionResult(result)
+                    setDeleteTransactionResultDialogOpen(true)
+                  }
+                }
+              } catch (error) {
+                console.error('Delete transaction error:', error)
                 // Error handled in mutation
               }
             }
@@ -364,6 +399,11 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                           : `+${formatMoney(tx.amount)}`}{' '}
                       {tx.asset_ticker || tx.asset_name}
                     </p>
+                    {isIncomeDistribution && (
+                      <Badge variant="secondary" className="text-xs">
+                        Из дохода
+                      </Badge>
+                    )}
                     {isWithdrawal && (
                       <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
                     )}
@@ -386,9 +426,9 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                     size="icon"
                     className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
                     onClick={handleDelete}
-                    disabled={deleteContribution.isPending}
+                    disabled={deleteContribution.isPending || deleteTransaction.isPending}
                   >
-                    {deleteContribution.isPending ? (
+                    {deleteContribution.isPending || deleteTransaction.isPending ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
                       <Trash2 className="h-4 w-4" />
@@ -413,6 +453,22 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
           </p>
         </motion.div>
       )}
+
+      {/* Delete Contribution Result Dialog */}
+      <DeleteContributionResultDialog
+        result={deleteContributionResult}
+        fundName={fundName}
+        open={deleteContributionResultDialogOpen}
+        onOpenChange={setDeleteContributionResultDialogOpen}
+      />
+
+      {/* Delete Transaction Result Dialog */}
+      <DeleteTransactionResultDialog
+        result={deleteTransactionResult}
+        fundName={fundName}
+        open={deleteTransactionResultDialogOpen}
+        onOpenChange={setDeleteTransactionResultDialogOpen}
+      />
     </div>
   )
 }

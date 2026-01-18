@@ -1077,6 +1077,38 @@ export interface DistributionAllocation {
 export interface ConfirmDistributionRequest {
   actualAmount: number
   allocations: DistributionAllocation[]
+  actualDate?: string
+}
+
+export interface CancelDistributionResponse {
+  distribution: IncomeDistribution
+  accountBalanceBefore: number
+  accountBalanceAfter: number
+  fundBalanceBefore: number
+  fundBalanceAfter: number
+  accountName: string
+  fundName: string
+  amount: number
+}
+
+export interface BalanceChange {
+  assetId: string
+  assetName: string
+  before: number
+  after: number
+  change: number
+}
+
+export interface DeleteTransactionResponse {
+  message: string
+  fundBalance: BalanceChange
+  accountBalance?: BalanceChange
+}
+
+export interface DeleteContributionResponse {
+  message: string
+  fundBalances: BalanceChange[]
+  accountBalances?: BalanceChange[]
 }
 
 // === Deposits (Банковские вклады) ===
@@ -1325,6 +1357,8 @@ export interface FundTransaction {
   counterpart_fund_id: string | null
   counterpart_asset_id: string | null
   source_account_id: string | null
+  contribution_id: string | null
+  contribution_income_id: string | null
   note: string | null
   date: ISODate
   created_at: ISODate
@@ -1367,6 +1401,8 @@ export interface FundDeposit {
   asset_name: string
   amount: number
   currency: string
+  contribution_id: string | null
+  contribution_income_id: string | null
   date: ISODate
   note: string | null
   created_at: ISODate

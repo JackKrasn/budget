@@ -9,6 +9,7 @@ import type {
   CreateIncomeDistributionRequest,
   UpdateDistributionRequest,
   ConfirmDistributionRequest,
+  CancelDistributionResponse,
 } from './types'
 
 const ENDPOINT = '/incomes'
@@ -74,7 +75,7 @@ export const incomesApi = {
    * Cancel confirmed distribution - rollback transfer
    */
   cancelDistribution: (incomeId: string, fundId: string) =>
-    apiClient.post<IncomeDistribution>(
+    apiClient.post<CancelDistributionResponse>(
       `${ENDPOINT}/${incomeId}/distributions/${fundId}/cancel`
     ),
 }

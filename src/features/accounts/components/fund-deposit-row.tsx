@@ -1,5 +1,6 @@
 import { TrendingUp, MoreVertical, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +34,8 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
     }
   }
 
+  const isIncomeDistribution = !!deposit.contribution_income_id
+
   return (
     <div
       className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
@@ -53,9 +56,16 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
 
       {/* Content */}
       <div className="min-w-0 flex-1">
-        <p className="font-medium leading-none">
-          Пополнение фонда "{deposit.fund_name}"
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="font-medium leading-none">
+            Пополнение фонда "{deposit.fund_name}"
+          </p>
+          {isIncomeDistribution && (
+            <Badge variant="secondary" className="text-xs">
+              Из дохода
+            </Badge>
+          )}
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">
           {deposit.account_name}
           {deposit.note && ` • ${deposit.note}`}

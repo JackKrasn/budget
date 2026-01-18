@@ -19,11 +19,13 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useIncome, useConfirmDistribution, useCancelDistribution, useUpdateDistribution, useCreateDistribution } from '@/features/incomes/hooks'
 import { ConfirmDistributionDialog } from '@/features/incomes/components/confirm-distribution-dialog'
+import { ConfirmDistributionInfoDialog } from '@/features/incomes/components/confirm-distribution-info-dialog'
 import { EditDistributionDialog } from '@/features/incomes/components/edit-distribution-dialog'
 import { AddDistributionDialog } from '@/features/incomes/components/add-distribution-dialog'
+import { CancellationResultDialog } from '@/features/incomes/components/cancellation-result-dialog'
 import { FundIcon } from '@/components/common/category-icon'
 import { cn } from '@/lib/utils'
-import type { IncomeDistribution, ConfirmDistributionRequest } from '@/lib/api/types'
+import type { IncomeDistribution, ConfirmDistributionRequest, CancelDistributionResponse } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -63,8 +65,12 @@ export default function IncomeDetailsPage() {
 
   const [selectedDistribution, setSelectedDistribution] = useState<IncomeDistribution | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [confirmInfoDialogOpen, setConfirmInfoDialogOpen] = useState(false)
+  const [pendingConfirmData, setPendingConfirmData] = useState<ConfirmDistributionRequest | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingDistribution, setEditingDistribution] = useState<IncomeDistribution | null>(null)
+  const [cancellationResult, setCancellationResult] = useState<CancelDistributionResponse | null>(null)
+  const [cancellationResultDialogOpen, setCancellationResultDialogOpen] = useState(false)
 
   const handleConfirmClick = (distribution: IncomeDistribution) => {
     setSelectedDistribution(distribution)
@@ -77,18 +83,28 @@ export default function IncomeDetailsPage() {
   }
 
   const handleConfirm = (data: ConfirmDistributionRequest) => {
-    if (!id || !selectedDistribution) return
+    if (!selectedDistribution) return
+
+    // Store data and show info dialog first
+    setPendingConfirmData(data)
+    setConfirmDialogOpen(false)
+    setConfirmInfoDialogOpen(true)
+  }
+
+  const handleFinalConfirm = () => {
+    if (!id || !selectedDistribution || !pendingConfirmData) return
 
     confirmDistribution.mutate(
       {
         incomeId: id,
         fundId: selectedDistribution.fund_id,
-        data,
+        data: pendingConfirmData,
       },
       {
         onSuccess: () => {
-          setConfirmDialogOpen(false)
+          setConfirmInfoDialogOpen(false)
           setSelectedDistribution(null)
+          setPendingConfirmData(null)
         },
       }
     )
@@ -140,8 +156,10 @@ export default function IncomeDetailsPage() {
         fundId: distribution.fund_id,
       },
       {
-        onSuccess: () => {
+        onSuccess: (data) => {
           setSelectedDistribution(null)
+          setCancellationResult(data)
+          setCancellationResultDialogOpen(true)
         },
         onError: () => {
           setSelectedDistribution(null)
@@ -452,10 +470,21 @@ export default function IncomeDetailsPage() {
       {/* Confirm Distribution Dialog */}
       <ConfirmDistributionDialog
         distribution={selectedDistribution}
+        incomeDate={income.date}
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}
         onConfirm={handleConfirm}
         isConfirming={confirmDistribution.isPending}
+      />
+
+      {/* Confirm Distribution Info Dialog */}
+      <ConfirmDistributionInfoDialog
+        accountName={income.source_account_name}
+        fundName={selectedDistribution?.fund_name || ''}
+        amount={pendingConfirmData?.actualAmount || 0}
+        open={confirmInfoDialogOpen}
+        onOpenChange={setConfirmInfoDialogOpen}
+        onConfirm={handleFinalConfirm}
       />
 
       {/* Edit Distribution Dialog */}
@@ -466,6 +495,13 @@ export default function IncomeDetailsPage() {
         onOpenChange={setEditDialogOpen}
         onSave={handleUpdateDistribution}
         isSaving={updateDistribution.isPending}
+      />
+
+      {/* Cancellation Result Dialog */}
+      <CancellationResultDialog
+        result={cancellationResult}
+        open={cancellationResultDialogOpen}
+        onOpenChange={setCancellationResultDialogOpen}
       />
     </div>
   )

@@ -40,15 +40,17 @@ const allocationSchema = z.object({
 const formSchema = z.object({
   actualAmount: z.number().min(0.01, 'Сумма должна быть больше 0'),
   allocations: z.array(allocationSchema),
+  date: z.string().min(1, 'Дата обязательна'),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 interface ConfirmDistributionDialogProps {
   distribution: IncomeDistribution | null
+  incomeDate?: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (data: { actualAmount: number; allocations: Array<{ assetId: string; amount: number }> }) => void
+  onConfirm: (data: { actualAmount: number; allocations: Array<{ assetId: string; amount: number }>; actualDate?: string }) => void
   isConfirming?: boolean
 }
 
@@ -61,6 +63,7 @@ function formatMoney(amount: number): string {
 
 export function ConfirmDistributionDialog({
   distribution,
+  incomeDate,
   open,
   onOpenChange,
   onConfirm,
@@ -78,6 +81,7 @@ export function ConfirmDistributionDialog({
     defaultValues: {
       actualAmount: 0,
       allocations: [],
+      date: '',
     },
   })
 
@@ -102,13 +106,19 @@ export function ConfirmDistributionDialog({
     // Set actual amount
     form.setValue('actualAmount', distribution.planned_amount)
 
+    // Set date (use income date if provided, otherwise today)
+    const defaultDate = incomeDate
+      ? new Date(incomeDate).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+    form.setValue('date', defaultDate)
+
     // Set initial allocation if we have assets
     if (firstAssetId) {
       replace([{ assetId: firstAssetId, amount: distribution.planned_amount }])
     } else {
       replace([])
     }
-  }, [open, distribution?.id, assetsReady, fundAssets, form, replace, distribution?.planned_amount])
+  }, [open, distribution?.id, assetsReady, fundAssets, form, replace, distribution?.planned_amount, incomeDate])
 
   // Watch actual amount and allocations to check balance
   const actualAmount = form.watch('actualAmount')
@@ -117,9 +127,17 @@ export function ConfirmDistributionDialog({
   const remaining = actualAmount - allocatedTotal
 
   const handleSubmit = (values: FormValues) => {
+    // Convert date to ISO format if it differs from income date
+    const selectedDate = values.date
+    const defaultDate = incomeDate
+      ? new Date(incomeDate).toISOString().split('T')[0]
+      : new Date().toISOString().split('T')[0]
+
     onConfirm({
       actualAmount: values.actualAmount,
       allocations: values.allocations,
+      // Only send actualDate if it's different from the income date
+      actualDate: selectedDate !== defaultDate ? new Date(selectedDate).toISOString() : undefined,
     })
   }
 
@@ -177,6 +195,24 @@ export function ConfirmDistributionDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {/* Date */}
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Дата операции</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="date"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Actual Amount */}
             <FormField
               control={form.control}

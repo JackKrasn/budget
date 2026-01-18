@@ -16,6 +16,7 @@ import type {
 } from '@/lib/api'
 import { toast } from 'sonner'
 import { accountKeys } from '@/features/accounts'
+import { incomeKeys } from '@/features/incomes'
 
 // === Query Keys ===
 
@@ -255,13 +256,20 @@ export function useDeleteContribution() {
       fundId: string
       contributionId: string
     }) => fundsApi.deleteContribution(fundId, contributionId),
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
       queryClient.invalidateQueries({ queryKey: fundKeys.contributions(variables.fundId) })
       queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
       queryClient.invalidateQueries({ queryKey: fundKeys.history(variables.fundId) })
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
-      toast.success('Пополнение удалено')
+      // Invalidate income queries in case this was an income distribution contribution
+      queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: incomeKeys.details() })
+
+      // Only show success toast if no balance info (balance info will be shown in dialog)
+      if (!data?.fundBalances || data.fundBalances.length === 0) {
+        toast.success('Пополнение удалено')
+      }
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)
@@ -444,5 +452,34 @@ export function useFundTransactions(
     queryKey: fundKeys.transactions(fundId, params),
     queryFn: () => fundsApi.listTransactions(fundId, params),
     enabled: !!fundId,
+  })
+}
+
+/**
+ * Удалить транзакцию (для покупок, продаж, переводов)
+ */
+export function useDeleteTransaction() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      fundId,
+      transactionId,
+    }: {
+      fundId: string
+      transactionId: string
+    }) => fundsApi.deleteTransaction(fundId, transactionId),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.transactions(variables.fundId),
+      })
+      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      toast.success('Транзакция удалена')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
   })
 }

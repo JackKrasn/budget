@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { fundDepositsApi } from '@/lib/api'
 import type { ListFundDepositsParams } from '@/lib/api/types'
 import { toast } from 'sonner'
+import { incomeKeys } from '@/features/incomes'
 
 // === Query Keys ===
 
@@ -38,16 +39,23 @@ export function useFundDeposit(id: string) {
 }
 
 /**
- * Удалить перевод в фонд
+ * Удалить перевод в фонд (откатывает распределение если оно было из дохода)
  */
 export function useDeleteFundDeposit() {
   const queryClient = useQueryClient()
 
   return useMutation({
     mutationFn: (id: string) => fundDepositsApi.delete(id),
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
-      toast.success('Перевод удалён')
+      // Invalidate income queries in case this was an income distribution deposit
+      queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: incomeKeys.details() })
+
+      // Only show success toast if no balance info (balance info will be shown in dialog)
+      if (!data?.accountBalance && !data?.fundBalance) {
+        toast.success('Перевод удалён')
+      }
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)
