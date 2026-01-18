@@ -151,8 +151,8 @@ export function AccountCard({
             <p className="text-xs text-muted-foreground mb-1">Баланс</p>
             <p className="text-2xl font-bold tabular-nums">
               {account.current_balance.toLocaleString('ru-RU', {
-                minimumFractionDigits: 0,
-                maximumFractionDigits: 0,
+                minimumFractionDigits: 2,
+                maximumFractionDigits: 2,
               })}{' '}
               <span className="text-lg">{currencySymbol}</span>
             </p>

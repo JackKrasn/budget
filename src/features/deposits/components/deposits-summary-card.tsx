@@ -22,8 +22,8 @@ export function DepositsSummaryCard({ summary, currency = 'RUB' }: DepositsSumma
   const formatAmount = (amount: number | undefined | null) => {
     if (amount == null) return '0'
     return amount.toLocaleString('ru-RU', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     })
   }
 

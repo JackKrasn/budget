@@ -133,8 +133,8 @@ export default function AccountsPage() {
                 <p className="text-sm text-muted-foreground">Общий баланс</p>
                 <p className="text-xl font-bold tabular-nums">
                   {totalBalance.toLocaleString('ru-RU', {
-                    minimumFractionDigits: 0,
-                    maximumFractionDigits: 0,
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
                   })} ₽
                 </p>
               </div>

@@ -7,8 +7,18 @@ import {
   ArrowLeftRight,
   TrendingDown,
   Plus,
+  Filter,
+  Settings,
+  PiggyBank,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   useExpenses,
   useDeleteExpense,
@@ -27,6 +37,7 @@ import {
   useFundDeposits,
   useDeleteFundDeposit,
   FundDepositRow,
+  useAccounts,
 } from '@/features/accounts'
 import { DeleteTransactionResultDialog } from '@/features/funds/components'
 import { DateRangePicker } from '@/components/common'
@@ -34,8 +45,8 @@ import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -73,6 +84,8 @@ interface DayGroup {
   operations: Operation[]
   totalExpenses: number
   totalTransfers: number
+  totalAdjustments: number
+  totalFundDeposits: number
 }
 
 const container = {
@@ -103,6 +116,11 @@ export default function OperationsPage() {
   const [deleteResult, setDeleteResult] = useState<DeleteTransactionResponse | null>(null)
   const [deleteResultDialogOpen, setDeleteResultDialogOpen] = useState(false)
   const [deletedFundName, setDeletedFundName] = useState<string>('')
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
+  const [selectedOperationType, setSelectedOperationType] = useState<string>('all')
+
+  // Fetch accounts for filter
+  const { data: accountsData } = useAccounts()
 
   // Data fetching
   const { data: expensesData, isLoading: isExpensesLoading, error: expensesError } = useExpenses({
@@ -120,7 +138,7 @@ export default function OperationsPage() {
     to: dateRange.to.toISOString().split('T')[0],
   })
 
-  const { data: fundDepositsData, isLoading: isFundDepositsLoading, error: fundDepositsError } = useFundDeposits({
+  const { data: fundDepositsData, isLoading: isFundDepositsLoading } = useFundDeposits({
     from_date: dateRange.from.toISOString().split('T')[0],
     to_date: dateRange.to.toISOString().split('T')[0],
   })
@@ -134,17 +152,46 @@ export default function OperationsPage() {
   const transfers = transfersData?.data ?? []
   const adjustments = adjustmentsData?.data ?? []
   const fundDeposits = fundDepositsData?.data ?? []
+  const accounts = accountsData?.data ?? []
 
   const isLoading = isExpensesLoading || isTransfersLoading || isAdjustmentsLoading || isFundDepositsLoading
 
-  // Group all operations by date
+  // Helper to check if operation involves selected account
+  const operationMatchesAccount = (op: Operation): boolean => {
+    if (selectedAccountId === 'all') return true
+
+    if (op.type === 'expense') {
+      return (op.data as ExpenseListRow).accountId === selectedAccountId
+    }
+    if (op.type === 'transfer') {
+      const t = op.data as TransferWithAccounts
+      return t.from_account_id === selectedAccountId || t.to_account_id === selectedAccountId
+    }
+    if (op.type === 'adjustment') {
+      return (op.data as BalanceAdjustmentWithAccount).account_id === selectedAccountId
+    }
+    if (op.type === 'fund_deposit') {
+      const fd = op.data as FundDeposit
+      return fd.from_account_id === selectedAccountId
+    }
+    return false
+  }
+
+  // Group all operations by date with filters
   const dayGroups = useMemo<DayGroup[]>(() => {
-    const operations: Operation[] = [
+    let operations: Operation[] = [
       ...expenses.map((e) => ({ id: e.id, type: 'expense' as const, date: e.date, data: e })),
       ...transfers.map((t) => ({ id: t.id, type: 'transfer' as const, date: t.date, data: t })),
       ...adjustments.map((a) => ({ id: a.id, type: 'adjustment' as const, date: a.date, data: a })),
       ...fundDeposits.map((fd) => ({ id: fd.id, type: 'fund_deposit' as const, date: fd.date, data: fd })),
     ]
+
+    // Apply filters
+    if (selectedOperationType !== 'all') {
+      operations = operations.filter(op => op.type === selectedOperationType)
+    }
+
+    operations = operations.filter(operationMatchesAccount)
 
     // Group by date
     const groups: Record<string, Operation[]> = {}
@@ -173,14 +220,35 @@ export default function OperationsPage() {
           .filter((op) => op.type === 'transfer')
           .reduce((sum, op) => sum + (op.data as TransferWithAccounts).amount, 0)
 
-        return { date, operations: ops, totalExpenses, totalTransfers }
+        const totalAdjustments = ops
+          .filter((op) => op.type === 'adjustment')
+          .reduce((sum, op) => sum + Math.abs((op.data as BalanceAdjustmentWithAccount).amount), 0)
+
+        const totalFundDeposits = ops
+          .filter((op) => op.type === 'fund_deposit')
+          .reduce((sum, op) => sum + (op.data as FundDeposit).amount, 0)
+
+        return { date, operations: ops, totalExpenses, totalTransfers, totalAdjustments, totalFundDeposits }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [expenses, transfers, adjustments, fundDeposits])
+  }, [expenses, transfers, adjustments, fundDeposits, selectedAccountId, selectedOperationType])
 
-  // Total summary
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
-  const totalTransfers = transfers.reduce((sum, t) => sum + t.amount, 0)
+  // Total summary with filters applied
+  const totalExpenses = useMemo(() => {
+    return dayGroups.reduce((sum, group) => sum + group.totalExpenses, 0)
+  }, [dayGroups])
+
+  const totalTransfers = useMemo(() => {
+    return dayGroups.reduce((sum, group) => sum + group.totalTransfers, 0)
+  }, [dayGroups])
+
+  const totalAdjustments = useMemo(() => {
+    return dayGroups.reduce((sum, group) => sum + group.totalAdjustments, 0)
+  }, [dayGroups])
+
+  const totalFundDeposits = useMemo(() => {
+    return dayGroups.reduce((sum, group) => sum + group.totalFundDeposits, 0)
+  }, [dayGroups])
 
   const handleEditExpense = (expense: ExpenseListRow) => {
     setEditingExpense(expense)
@@ -206,8 +274,6 @@ export default function OperationsPage() {
   }
 
   const handleDeleteFundDeposit = async (deposit: FundDeposit) => {
-    if (!confirm('Удалить этот перевод в фонд?')) return
-
     try {
       const result = await deleteFundDeposit.mutateAsync(deposit.id)
 
@@ -268,20 +334,86 @@ export default function OperationsPage() {
           onRangeChange={(from, to) => setDateRange({ from, to })}
         />
 
+        {/* Filters */}
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+
+          {/* Account Filter */}
+          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Все счета" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все счета</SelectItem>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Operation Type Filter */}
+          <Select value={selectedOperationType} onValueChange={setSelectedOperationType}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Все типы" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все типы</SelectItem>
+              <SelectItem value="expense">Расходы</SelectItem>
+              <SelectItem value="transfer">Переводы</SelectItem>
+              <SelectItem value="adjustment">Корректировки</SelectItem>
+              <SelectItem value="fund_deposit">Переводы в фонды</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Clear filters button */}
+          {(selectedAccountId !== 'all' || selectedOperationType !== 'all') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedAccountId('all')
+                setSelectedOperationType('all')
+              }}
+            >
+              Сбросить
+            </Button>
+          )}
+        </div>
+
         <div className="flex-1" />
 
         {/* Summary stats */}
         <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-rose-500" />
-            <span className="text-muted-foreground">Расходы:</span>
-            <span className="font-semibold tabular-nums">{formatMoney(totalExpenses)} ₽</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <ArrowLeftRight className="h-4 w-4 text-blue-500" />
-            <span className="text-muted-foreground">Переводы:</span>
-            <span className="font-semibold tabular-nums">{formatMoney(totalTransfers)} ₽</span>
-          </div>
+          {totalExpenses > 0 && (
+            <div className="flex items-center gap-2">
+              <TrendingDown className="h-4 w-4 text-rose-500" />
+              <span className="text-muted-foreground">Расходы:</span>
+              <span className="font-semibold tabular-nums">{formatMoney(totalExpenses)} ₽</span>
+            </div>
+          )}
+          {totalTransfers > 0 && (
+            <div className="flex items-center gap-2">
+              <ArrowLeftRight className="h-4 w-4 text-blue-500" />
+              <span className="text-muted-foreground">Переводы:</span>
+              <span className="font-semibold tabular-nums">{formatMoney(totalTransfers)} ₽</span>
+            </div>
+          )}
+          {totalAdjustments > 0 && (
+            <div className="flex items-center gap-2">
+              <Settings className="h-4 w-4 text-amber-500" />
+              <span className="text-muted-foreground">Корректировки:</span>
+              <span className="font-semibold tabular-nums">{formatMoney(totalAdjustments)} ₽</span>
+            </div>
+          )}
+          {totalFundDeposits > 0 && (
+            <div className="flex items-center gap-2">
+              <PiggyBank className="h-4 w-4 text-purple-500" />
+              <span className="text-muted-foreground">В фонды:</span>
+              <span className="font-semibold tabular-nums">{formatMoney(totalFundDeposits)} ₽</span>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -314,19 +446,41 @@ export default function OperationsPage() {
                 <motion.div key={group.date} variants={item}>
                   {/* Day Header */}
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-medium text-muted-foreground capitalize">
+                    <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">
                       {formatDateHeader(group.date)}
                     </h2>
                     <div className="flex items-center gap-3 text-xs">
                       {group.totalExpenses > 0 && (
-                        <span className="text-rose-500 font-medium tabular-nums">
-                          −{formatMoney(group.totalExpenses)} ₽
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Расходы:</span>
+                          <span className="text-rose-500 font-medium tabular-nums">
+                            {formatMoney(group.totalExpenses)} ₽
+                          </span>
+                        </div>
                       )}
                       {group.totalTransfers > 0 && (
-                        <span className="text-blue-500 font-medium tabular-nums">
-                          ↔ {formatMoney(group.totalTransfers)} ₽
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Переводы:</span>
+                          <span className="text-blue-500 font-medium tabular-nums">
+                            {formatMoney(group.totalTransfers)} ₽
+                          </span>
+                        </div>
+                      )}
+                      {group.totalAdjustments > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Корректировки:</span>
+                          <span className="text-amber-500 font-medium tabular-nums">
+                            {formatMoney(group.totalAdjustments)} ₽
+                          </span>
+                        </div>
+                      )}
+                      {group.totalFundDeposits > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">В фонды:</span>
+                          <span className="text-purple-500 font-medium tabular-nums">
+                            {formatMoney(group.totalFundDeposits)} ₽
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>

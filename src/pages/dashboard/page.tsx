@@ -41,15 +41,15 @@ function formatMoney(amount: number, compact = false): string {
     return (amount / 1000).toFixed(0) + 'K'
   }
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
 function formatPercent(value: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'percent',
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 1,
   }).format(value / 100)
 }

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { TrendingUp, MoreVertical, Trash2, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { ConfirmDeleteDepositDialog } from './confirm-delete-deposit-dialog'
 import type { FundDeposit } from '@/lib/api/types'
 
 interface FundDepositRowProps {
@@ -17,26 +19,41 @@ interface FundDepositRowProps {
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
-function getFundIcon(icon: string | null): React.ReactNode {
+function getFundIcon(_icon: string | null): React.ReactNode {
   // Можно расширить, если иконки фондов — это lucide icons
   return <TrendingUp className="h-4 w-4" />
 }
 
 export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRowProps) {
-  const handleDelete = () => {
-    if (onDelete && confirm('Вы уверены, что хотите удалить эту операцию?')) {
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+
+  const handleDeleteClick = () => {
+    setConfirmDialogOpen(true)
+  }
+
+  const handleConfirmDelete = () => {
+    if (onDelete) {
       onDelete(deposit.id)
     }
+    setConfirmDialogOpen(false)
   }
 
   const isIncomeDistribution = !!deposit.contribution_income_id
 
   return (
+    <>
+    <ConfirmDeleteDepositDialog
+      deposit={deposit}
+      open={confirmDialogOpen}
+      onOpenChange={setConfirmDialogOpen}
+      onConfirm={handleConfirmDelete}
+      isDeleting={isDeleting}
+    />
     <div
       className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
       style={{ borderColor: deposit.fund_color || undefined }}
@@ -99,7 +116,7 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
           <DropdownMenuContent align="end">
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
-              onClick={handleDelete}
+              onClick={handleDeleteClick}
             >
               <Trash2 className="mr-2 h-4 w-4" />
               Удалить
@@ -108,5 +125,6 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
         </DropdownMenu>
       )}
     </div>
+    </>
   )
 }

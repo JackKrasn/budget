@@ -704,7 +704,7 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
 
                           <div className="flex items-center gap-4 pt-2 border-t border-border/30 text-xs text-muted-foreground">
                             <span>
-                              ~{projectedYield.monthlyYield.toLocaleString('ru-RU', { maximumFractionDigits: 0 })} {currencySymbol}/мес
+                              ~{projectedYield.monthlyYield.toLocaleString('ru-RU', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {currencySymbol}/мес
                             </span>
                             <span>•</span>
                             <span>

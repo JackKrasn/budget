@@ -41,7 +41,7 @@ const allocationSchema = z.object({
 const formSchema = z.object({
   actualAmount: z.number().min(0.01, 'Сумма должна быть больше 0'),
   allocations: z.array(allocationSchema),
-  date: z.date({ required_error: 'Дата обязательна' }),
+  date: z.date({ message: 'Дата обязательна' }),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -57,8 +57,8 @@ interface ConfirmDistributionDialogProps {
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -126,17 +126,33 @@ export function ConfirmDistributionDialog({
   const remaining = actualAmount - allocatedTotal
 
   const handleSubmit = (values: FormValues) => {
-    // Convert date to ISO format if it differs from income date
-    const selectedDate = values.date.toISOString().split('T')[0]
+    // Helper to format date in local timezone (YYYY-MM-DD)
+    const formatLocalDate = (date: Date): string => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    // Helper to create ISO datetime string in local timezone
+    const toLocalISOString = (date: Date): string => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}T00:00:00Z`
+    }
+
+    // Convert date to local format for comparison
+    const selectedDate = formatLocalDate(values.date)
     const defaultDate = incomeDate
-      ? new Date(incomeDate).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0]
+      ? incomeDate.split('T')[0] // Extract date part from ISO string
+      : formatLocalDate(new Date())
 
     onConfirm({
       actualAmount: values.actualAmount,
       allocations: values.allocations,
       // Only send actualDate if it's different from the income date
-      actualDate: selectedDate !== defaultDate ? values.date.toISOString() : undefined,
+      actualDate: selectedDate !== defaultDate ? toLocalISOString(values.date) : undefined,
     })
   }
 

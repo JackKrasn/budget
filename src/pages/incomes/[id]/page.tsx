@@ -29,8 +29,8 @@ import type { IncomeDistribution, ConfirmDistributionRequest, CancelDistribution
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -479,6 +479,8 @@ export default function IncomeDetailsPage() {
 
       {/* Confirm Distribution Info Dialog */}
       <ConfirmDistributionInfoDialog
+        accountId={income.account_id || ''}
+        fundId={selectedDistribution?.fund_id || ''}
         accountName={income.account_name || 'Счёт'}
         fundName={selectedDistribution?.fund_name || ''}
         amount={pendingConfirmData?.actualAmount || 0}

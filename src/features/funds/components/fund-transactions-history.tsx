@@ -26,6 +26,7 @@ import {
 import { useFundTransactions, useDeleteContribution, useDeleteTransaction, useFund } from '../hooks'
 import { DeleteContributionResultDialog } from './delete-contribution-result-dialog'
 import { DeleteTransactionResultDialog } from './delete-transaction-result-dialog'
+import { ConfirmDeleteTransactionDialog } from './confirm-delete-transaction-dialog'
 import type { FundTransaction, FundTransactionType, NullFloat64, DeleteContributionResponse, DeleteTransactionResponse } from '@/lib/api/types'
 import { TRANSACTION_TYPES } from '../constants'
 
@@ -108,6 +109,8 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   const [deleteContributionResultDialogOpen, setDeleteContributionResultDialogOpen] = useState(false)
   const [deleteTransactionResult, setDeleteTransactionResult] = useState<DeleteTransactionResponse | null>(null)
   const [deleteTransactionResultDialogOpen, setDeleteTransactionResultDialogOpen] = useState(false)
+  const [confirmDeleteDialogOpen, setConfirmDeleteDialogOpen] = useState(false)
+  const [transactionToDelete, setTransactionToDelete] = useState<FundTransaction | null>(null)
 
   const { data: fundData } = useFund(fundId)
   const { data, isLoading } = useFundTransactions(fundId, {
@@ -139,6 +142,46 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
     setSelectedTypes(ALL_TRANSACTION_TYPES)
     setDateFrom('')
     setDateTo('')
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!transactionToDelete) return
+
+    setConfirmDeleteDialogOpen(false)
+
+    try {
+      // Use different endpoints based on transaction type
+      if (transactionToDelete.contribution_id) {
+        // Deposit with contribution_id - use contribution endpoint
+        const result = await deleteContribution.mutateAsync({
+          fundId,
+          contributionId: transactionToDelete.contribution_id,
+        })
+
+        // Show delete contribution result dialog if operation returned balance info
+        if (result && (result.fundBalances.length > 0 || result.accountBalances)) {
+          setDeleteContributionResult(result)
+          setDeleteContributionResultDialogOpen(true)
+        }
+      } else {
+        // Other transaction types - use transaction endpoint
+        const result = await deleteTransaction.mutateAsync({
+          fundId,
+          transactionId: transactionToDelete.id,
+        })
+
+        // Show delete transaction result dialog
+        if (result) {
+          setDeleteTransactionResult(result)
+          setDeleteTransactionResultDialogOpen(true)
+        }
+      }
+    } catch (error) {
+      console.error('Delete transaction error:', error)
+      // Error handled in mutation
+    } finally {
+      setTransactionToDelete(null)
+    }
   }
 
   const hasActiveFilters =
@@ -334,43 +377,12 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
               }
             }
 
-            const handleDelete = async (e: React.MouseEvent) => {
+            const handleDeleteClick = (e: React.MouseEvent) => {
               e.stopPropagation()
               if (!canDelete) return
 
-              if (!confirm('Вы уверены, что хотите удалить эту операцию?')) return
-
-              try {
-                // Use different endpoints based on transaction type
-                if (tx.contribution_id) {
-                  // Deposit with contribution_id - use contribution endpoint
-                  const result = await deleteContribution.mutateAsync({
-                    fundId,
-                    contributionId: tx.contribution_id,
-                  })
-
-                  // Show delete contribution result dialog if operation returned balance info
-                  if (result && (result.fundBalances.length > 0 || result.accountBalances)) {
-                    setDeleteContributionResult(result)
-                    setDeleteContributionResultDialogOpen(true)
-                  }
-                } else {
-                  // Other transaction types - use transaction endpoint
-                  const result = await deleteTransaction.mutateAsync({
-                    fundId,
-                    transactionId: tx.id,
-                  })
-
-                  // Show delete transaction result dialog
-                  if (result) {
-                    setDeleteTransactionResult(result)
-                    setDeleteTransactionResultDialogOpen(true)
-                  }
-                }
-              } catch (error) {
-                console.error('Delete transaction error:', error)
-                // Error handled in mutation
-              }
+              setTransactionToDelete(tx)
+              setConfirmDeleteDialogOpen(true)
             }
 
             return (
@@ -425,7 +437,7 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={handleDelete}
+                    onClick={handleDeleteClick}
                     disabled={deleteContribution.isPending || deleteTransaction.isPending}
                   >
                     {deleteContribution.isPending || deleteTransaction.isPending ? (
@@ -468,6 +480,16 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
         fundName={fundName}
         open={deleteTransactionResultDialogOpen}
         onOpenChange={setDeleteTransactionResultDialogOpen}
+      />
+
+      {/* Confirm Delete Transaction Dialog */}
+      <ConfirmDeleteTransactionDialog
+        transaction={transactionToDelete}
+        fundName={fundName}
+        open={confirmDeleteDialogOpen}
+        onOpenChange={setConfirmDeleteDialogOpen}
+        onConfirm={handleConfirmDelete}
+        isDeleting={deleteContribution.isPending || deleteTransaction.isPending}
       />
     </div>
   )
