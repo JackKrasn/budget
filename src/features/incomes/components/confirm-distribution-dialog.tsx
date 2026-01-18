@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
 import { FundIcon } from '@/components/common/category-icon'
 import { useFundAssets } from '@/features/funds'
 import type { IncomeDistribution, FundAssetBalance } from '@/lib/api/types'
@@ -40,7 +41,7 @@ const allocationSchema = z.object({
 const formSchema = z.object({
   actualAmount: z.number().min(0.01, 'Сумма должна быть больше 0'),
   allocations: z.array(allocationSchema),
-  date: z.string().min(1, 'Дата обязательна'),
+  date: z.date({ required_error: 'Дата обязательна' }),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -81,7 +82,7 @@ export function ConfirmDistributionDialog({
     defaultValues: {
       actualAmount: 0,
       allocations: [],
-      date: '',
+      date: new Date(),
     },
   })
 
@@ -107,9 +108,7 @@ export function ConfirmDistributionDialog({
     form.setValue('actualAmount', distribution.planned_amount)
 
     // Set date (use income date if provided, otherwise today)
-    const defaultDate = incomeDate
-      ? new Date(incomeDate).toISOString().split('T')[0]
-      : new Date().toISOString().split('T')[0]
+    const defaultDate = incomeDate ? new Date(incomeDate) : new Date()
     form.setValue('date', defaultDate)
 
     // Set initial allocation if we have assets
@@ -128,7 +127,7 @@ export function ConfirmDistributionDialog({
 
   const handleSubmit = (values: FormValues) => {
     // Convert date to ISO format if it differs from income date
-    const selectedDate = values.date
+    const selectedDate = values.date.toISOString().split('T')[0]
     const defaultDate = incomeDate
       ? new Date(incomeDate).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0]
@@ -137,7 +136,7 @@ export function ConfirmDistributionDialog({
       actualAmount: values.actualAmount,
       allocations: values.allocations,
       // Only send actualDate if it's different from the income date
-      actualDate: selectedDate !== defaultDate ? new Date(selectedDate).toISOString() : undefined,
+      actualDate: selectedDate !== defaultDate ? values.date.toISOString() : undefined,
     })
   }
 
@@ -203,9 +202,9 @@ export function ConfirmDistributionDialog({
                 <FormItem>
                   <FormLabel>Дата операции</FormLabel>
                   <FormControl>
-                    <Input
-                      type="date"
-                      {...field}
+                    <DatePicker
+                      value={field.value}
+                      onChange={field.onChange}
                     />
                   </FormControl>
                   <FormMessage />
