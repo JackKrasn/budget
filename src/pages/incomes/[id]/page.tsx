@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Check,
   Pencil,
+  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,7 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useIncome, useConfirmDistribution, useUpdateDistribution, useCreateDistribution } from '@/features/incomes/hooks'
+import { useIncome, useConfirmDistribution, useCancelDistribution, useUpdateDistribution, useCreateDistribution } from '@/features/incomes/hooks'
 import { ConfirmDistributionDialog } from '@/features/incomes/components/confirm-distribution-dialog'
 import { EditDistributionDialog } from '@/features/incomes/components/edit-distribution-dialog'
 import { AddDistributionDialog } from '@/features/incomes/components/add-distribution-dialog'
@@ -56,6 +57,7 @@ export default function IncomeDetailsPage() {
   const navigate = useNavigate()
   const { data: income, error, isLoading } = useIncome(id ?? '')
   const confirmDistribution = useConfirmDistribution()
+  const cancelDistribution = useCancelDistribution()
   const updateDistribution = useUpdateDistribution()
   const createDistribution = useCreateDistribution()
 
@@ -117,6 +119,35 @@ export default function IncomeDetailsPage() {
       incomeId: id,
       data: { fundId, plannedAmount },
     })
+  }
+
+  const handleCancelDistribution = (distribution: IncomeDistribution) => {
+    if (!id) return
+
+    const confirmCancel = confirm(
+      `Отменить распределение в фонд "${distribution.fund_name}"?\n\n` +
+      `Сумма ${formatMoney(distribution.actual_amount ?? 0)} ₽ вернётся на счёт.\n` +
+      `Распределение вернётся в статус "Не подтверждено".`
+    )
+
+    if (!confirmCancel) return
+
+    setSelectedDistribution(distribution)
+
+    cancelDistribution.mutate(
+      {
+        incomeId: id,
+        fundId: distribution.fund_id,
+      },
+      {
+        onSuccess: () => {
+          setSelectedDistribution(null)
+        },
+        onError: () => {
+          setSelectedDistribution(null)
+        },
+      }
+    )
   }
 
   if (!id) {
@@ -382,6 +413,11 @@ export default function IncomeDetailsPage() {
                 incomeAmount={income.amount}
                 onConfirm={() => {}}
                 onEdit={() => {}}
+                onCancel={() => handleCancelDistribution(distribution)}
+                isCancelling={
+                  cancelDistribution.isPending &&
+                  selectedDistribution?.id === distribution.id
+                }
               />
             ))}
           </div>
@@ -442,7 +478,9 @@ interface DistributionCardProps {
   availableAmount?: number
   onConfirm: () => void
   onEdit: () => void
+  onCancel?: () => void
   isConfirming?: boolean
+  isCancelling?: boolean
 }
 
 function DistributionCard({
@@ -451,7 +489,9 @@ function DistributionCard({
   availableAmount,
   onConfirm,
   onEdit,
+  onCancel,
   isConfirming,
+  isCancelling,
 }: DistributionCardProps) {
   const isCompleted = distribution.is_completed
   const actualAmount = distribution.actual_amount ?? 0
@@ -554,6 +594,21 @@ function DistributionCard({
             disabled={isConfirming}
           >
             {isConfirming ? 'Подтверждение...' : 'Подтвердить'}
+          </Button>
+        </div>
+      )}
+      {isCompleted && onCancel && (
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={isCancelling}
+            className="gap-1.5 text-muted-foreground hover:text-destructive"
+            title="Отменить распределение"
+          >
+            <XCircle className="h-4 w-4" />
+            {isCancelling ? 'Отмена...' : 'Отменить'}
           </Button>
         </div>
       )}

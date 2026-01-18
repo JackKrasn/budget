@@ -69,4 +69,12 @@ export const incomesApi = {
       `${ENDPOINT}/${incomeId}/distributions/${fundId}/confirm`,
       data
     ),
+
+  /**
+   * Cancel confirmed distribution - rollback transfer
+   */
+  cancelDistribution: (incomeId: string, fundId: string) =>
+    apiClient.post<IncomeDistribution>(
+      `${ENDPOINT}/${incomeId}/distributions/${fundId}/cancel`
+    ),
 }
