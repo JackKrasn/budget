@@ -479,7 +479,7 @@ export default function IncomeDetailsPage() {
 
       {/* Confirm Distribution Info Dialog */}
       <ConfirmDistributionInfoDialog
-        accountName={income.source_account_name}
+        accountName={income.account_name || 'Счёт'}
         fundName={selectedDistribution?.fund_name || ''}
         amount={pendingConfirmData?.actualAmount || 0}
         open={confirmInfoDialogOpen}
