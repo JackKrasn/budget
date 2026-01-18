@@ -5,11 +5,8 @@ import {
   AlertCircle,
   Receipt,
   ArrowLeftRight,
-  TrendingDown,
   Plus,
   Filter,
-  Settings,
-  PiggyBank,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -117,7 +114,7 @@ export default function OperationsPage() {
   const [deleteResultDialogOpen, setDeleteResultDialogOpen] = useState(false)
   const [deletedFundName, setDeletedFundName] = useState<string>('')
   const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
-  const [selectedOperationType, setSelectedOperationType] = useState<string>('all')
+  const [selectedOperationType, setSelectedOperationType] = useState<'all' | OperationType>('all')
 
   // Fetch accounts for filter
   const { data: accountsData } = useAccounts()
@@ -238,14 +235,6 @@ export default function OperationsPage() {
     return dayGroups.reduce((sum, group) => sum + group.totalExpenses, 0)
   }, [dayGroups])
 
-  const totalTransfers = useMemo(() => {
-    return dayGroups.reduce((sum, group) => sum + group.totalTransfers, 0)
-  }, [dayGroups])
-
-  const totalAdjustments = useMemo(() => {
-    return dayGroups.reduce((sum, group) => sum + group.totalAdjustments, 0)
-  }, [dayGroups])
-
   const totalFundDeposits = useMemo(() => {
     return dayGroups.reduce((sum, group) => sum + group.totalFundDeposits, 0)
   }, [dayGroups])
@@ -321,26 +310,29 @@ export default function OperationsPage() {
         </div>
       </motion.div>
 
-      {/* Controls */}
+      {/* Controls - Refined Editorial Layout */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="flex flex-wrap items-center gap-4"
+        className="space-y-4"
       >
-        <DateRangePicker
-          from={dateRange.from}
-          to={dateRange.to}
-          onRangeChange={(from, to) => setDateRange({ from, to })}
-        />
+        {/* Filters Section */}
+        <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-border/40">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/30 border border-border/50">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Фильтры</span>
+          </div>
 
-        {/* Filters */}
-        <div className="flex items-center gap-2">
-          <Filter className="h-4 w-4 text-muted-foreground" />
+          <DateRangePicker
+            from={dateRange.from}
+            to={dateRange.to}
+            onRangeChange={(from, to) => setDateRange({ from, to })}
+          />
 
           {/* Account Filter */}
           <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[180px] border-border/50 bg-background/50">
               <SelectValue placeholder="Все счета" />
             </SelectTrigger>
             <SelectContent>
@@ -354,8 +346,8 @@ export default function OperationsPage() {
           </Select>
 
           {/* Operation Type Filter */}
-          <Select value={selectedOperationType} onValueChange={setSelectedOperationType}>
-            <SelectTrigger className="w-[180px]">
+          <Select value={selectedOperationType} onValueChange={(value) => setSelectedOperationType(value as 'all' | OperationType)}>
+            <SelectTrigger className="w-[180px] border-border/50 bg-background/50">
               <SelectValue placeholder="Все типы" />
             </SelectTrigger>
             <SelectContent>
@@ -372,6 +364,7 @@ export default function OperationsPage() {
             <Button
               variant="ghost"
               size="sm"
+              className="text-xs"
               onClick={() => {
                 setSelectedAccountId('all')
                 setSelectedOperationType('all')
@@ -382,36 +375,24 @@ export default function OperationsPage() {
           )}
         </div>
 
-        <div className="flex-1" />
-
-        {/* Summary stats */}
-        <div className="flex items-center gap-4 text-sm">
+        {/* Summary Stats - Editorial Typography */}
+        <div className="flex items-center gap-6 px-1">
           {totalExpenses > 0 && (
-            <div className="flex items-center gap-2">
-              <TrendingDown className="h-4 w-4 text-rose-500" />
-              <span className="text-muted-foreground">Расходы:</span>
-              <span className="font-semibold tabular-nums">{formatMoney(totalExpenses)} ₽</span>
-            </div>
-          )}
-          {totalTransfers > 0 && (
-            <div className="flex items-center gap-2">
-              <ArrowLeftRight className="h-4 w-4 text-blue-500" />
-              <span className="text-muted-foreground">Переводы:</span>
-              <span className="font-semibold tabular-nums">{formatMoney(totalTransfers)} ₽</span>
-            </div>
-          )}
-          {totalAdjustments > 0 && (
-            <div className="flex items-center gap-2">
-              <Settings className="h-4 w-4 text-amber-500" />
-              <span className="text-muted-foreground">Корректировки:</span>
-              <span className="font-semibold tabular-nums">{formatMoney(totalAdjustments)} ₽</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Расходы</span>
+              <span className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">{formatMoney(totalExpenses)} ₽</span>
             </div>
           )}
           {totalFundDeposits > 0 && (
-            <div className="flex items-center gap-2">
-              <PiggyBank className="h-4 w-4 text-purple-500" />
-              <span className="text-muted-foreground">В фонды:</span>
-              <span className="font-semibold tabular-nums">{formatMoney(totalFundDeposits)} ₽</span>
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">В фонды</span>
+              <span className="text-lg font-semibold tabular-nums text-purple-600 dark:text-purple-400">{formatMoney(totalFundDeposits)} ₽</span>
+            </div>
+          )}
+          {(totalExpenses > 0 || totalFundDeposits > 0) && (
+            <div className="flex flex-col gap-1 pl-4 border-l border-border/50">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Итого</span>
+              <span className="text-lg font-semibold tabular-nums">{formatMoney(totalExpenses + totalFundDeposits)} ₽</span>
             </div>
           )}
         </div>
@@ -437,6 +418,7 @@ export default function OperationsPage() {
         <>
           {dayGroups.length > 0 ? (
             <motion.div
+              key={`${selectedOperationType}-${selectedAccountId}`}
               className="space-y-6"
               variants={container}
               initial="hidden"

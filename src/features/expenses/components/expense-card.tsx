@@ -297,14 +297,18 @@ export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
     <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      className="group flex items-center gap-4 rounded-lg border border-border/50 bg-card/30 p-3 transition-all hover:border-border hover:bg-card/50"
+      className="group relative flex items-center gap-4 rounded-lg border border-border/30 bg-background/50 p-3 pl-4 transition-all hover:border-border/60 hover:bg-background/80 hover:shadow-sm"
     >
-      {/* Icon */}
+      {/* Subtle left accent - red for expenses */}
       <div
-        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
-        style={{ backgroundColor: `${expense.categoryColor}20` }}
+        className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-red-500/40 group-hover:bg-red-500/60 transition-colors"
+      />
+
+      {/* Icon - red theme for expenses */}
+      <div
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-500/10"
       >
-        <Icon className="h-4 w-4" style={{ color: expense.categoryColor }} />
+        <Icon className="h-4 w-4 text-red-500" />
       </div>
 
       {/* Content */}

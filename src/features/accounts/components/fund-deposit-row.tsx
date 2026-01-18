@@ -55,15 +55,20 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
       isDeleting={isDeleting}
     />
     <div
-      className="flex items-center gap-3 rounded-lg border bg-card p-3 transition-colors hover:bg-muted/50"
-      style={{ borderColor: deposit.fund_color || undefined }}
+      className="group relative flex items-center gap-3 rounded-lg border border-border/30 bg-background/50 p-3 pl-4 transition-all hover:border-border/60 hover:bg-background/80 hover:shadow-sm overflow-hidden"
     >
+      {/* Colorful left border for fund deposits */}
+      <div
+        className="absolute left-0 top-0 bottom-0 w-1 transition-opacity group-hover:opacity-90"
+        style={{ backgroundColor: deposit.fund_color || '#8b5cf6' }}
+      />
+
       {/* Icon */}
       <div
-        className="flex h-10 w-10 items-center justify-center rounded-lg"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg"
         style={{
           backgroundColor: deposit.fund_color
-            ? `${deposit.fund_color}20`
+            ? `${deposit.fund_color}15`
             : 'rgba(139, 92, 246, 0.1)',
           color: deposit.fund_color || '#8b5cf6',
         }}
@@ -103,7 +108,7 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
             <Button
               variant="ghost"
               size="icon"
-              className="h-8 w-8 shrink-0"
+              className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
               disabled={isDeleting}
             >
               {isDeleting ? (

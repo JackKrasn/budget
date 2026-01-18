@@ -43,8 +43,13 @@ export function TransferRow({ transfer, onDelete }: TransferRowProps) {
     <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card/30 p-3 transition-all hover:border-border hover:bg-card/50"
+      className="group relative flex items-center gap-3 rounded-lg border border-border/30 bg-background/50 p-3 pl-4 transition-all hover:border-border/60 hover:bg-background/80 hover:shadow-sm"
     >
+      {/* Subtle left accent for transfers */}
+      <div
+        className="absolute left-0 top-2 bottom-2 w-0.5 rounded-full bg-blue-500/40 group-hover:bg-blue-500/60 transition-colors"
+      />
+
       {/* Transfer direction indicator */}
       <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10">
         <ArrowRight className="h-4 w-4 text-blue-500" />

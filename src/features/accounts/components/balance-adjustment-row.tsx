@@ -35,18 +35,27 @@ export function BalanceAdjustmentRow({ adjustment, onDelete }: BalanceAdjustment
     <motion.div
       initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      className="group flex items-center gap-3 rounded-lg border border-border/50 bg-card/30 p-3 transition-all hover:border-border hover:bg-card/50"
+      className="group relative flex items-center gap-3 rounded-lg border border-border/30 bg-background/50 p-3 pl-4 transition-all hover:border-border/60 hover:bg-background/80 hover:shadow-sm"
     >
+      {/* Subtle left accent for adjustments */}
+      <div
+        className={`absolute left-0 top-2 bottom-2 w-0.5 rounded-full transition-colors ${
+          isPositive
+            ? 'bg-emerald-500/40 group-hover:bg-emerald-500/60'
+            : 'bg-amber-500/40 group-hover:bg-amber-500/60'
+        }`}
+      />
+
       {/* Adjustment icon */}
       <div
         className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${
-          isPositive ? 'bg-emerald-500/10' : 'bg-orange-500/10'
+          isPositive ? 'bg-emerald-500/10' : 'bg-amber-500/10'
         }`}
       >
         {isPositive ? (
           <TrendingUp className="h-4 w-4 text-emerald-500" />
         ) : (
-          <TrendingDown className="h-4 w-4 text-orange-500" />
+          <TrendingDown className="h-4 w-4 text-amber-500" />
         )}
       </div>
 
@@ -71,7 +80,7 @@ export function BalanceAdjustmentRow({ adjustment, onDelete }: BalanceAdjustment
       {/* Amount */}
       <span
         className={`font-semibold tabular-nums shrink-0 w-28 text-right ${
-          isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-orange-600 dark:text-orange-400'
+          isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
         }`}
       >
         {isPositive ? '+' : '-'}{formatMoney(adjustment.amount)} ₽
