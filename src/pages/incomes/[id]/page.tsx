@@ -20,6 +20,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useIncome, useConfirmDistribution, useCancelDistribution, useUpdateDistribution, useCreateDistribution } from '@/features/incomes/hooks'
 import { ConfirmDistributionDialog } from '@/features/incomes/components/confirm-distribution-dialog'
 import { ConfirmDistributionInfoDialog } from '@/features/incomes/components/confirm-distribution-info-dialog'
+import { ConfirmCancelDistributionDialog } from '@/features/incomes/components/confirm-cancel-distribution-dialog'
 import { EditDistributionDialog } from '@/features/incomes/components/edit-distribution-dialog'
 import { AddDistributionDialog } from '@/features/incomes/components/add-distribution-dialog'
 import { CancellationResultDialog } from '@/features/incomes/components/cancellation-result-dialog'
@@ -66,6 +67,8 @@ export default function IncomeDetailsPage() {
   const [selectedDistribution, setSelectedDistribution] = useState<IncomeDistribution | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [confirmInfoDialogOpen, setConfirmInfoDialogOpen] = useState(false)
+  const [confirmCancelDialogOpen, setConfirmCancelDialogOpen] = useState(false)
+  const [cancellingDistribution, setCancellingDistribution] = useState<IncomeDistribution | null>(null)
   const [pendingConfirmData, setPendingConfirmData] = useState<ConfirmDistributionRequest | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingDistribution, setEditingDistribution] = useState<IncomeDistribution | null>(null)
@@ -138,31 +141,28 @@ export default function IncomeDetailsPage() {
   }
 
   const handleCancelDistribution = (distribution: IncomeDistribution) => {
-    if (!id) return
+    setCancellingDistribution(distribution)
+    setConfirmCancelDialogOpen(true)
+  }
 
-    const confirmCancel = confirm(
-      `Отменить распределение в фонд "${distribution.fund_name}"?\n\n` +
-      `Сумма ${formatMoney(distribution.actual_amount ?? 0)} ₽ вернётся на счёт.\n` +
-      `Распределение вернётся в статус "Не подтверждено".`
-    )
-
-    if (!confirmCancel) return
-
-    setSelectedDistribution(distribution)
+  const handleConfirmCancelDistribution = () => {
+    if (!id || !cancellingDistribution) return
 
     cancelDistribution.mutate(
       {
         incomeId: id,
-        fundId: distribution.fund_id,
+        fundId: cancellingDistribution.fund_id,
       },
       {
         onSuccess: (data) => {
-          setSelectedDistribution(null)
+          setConfirmCancelDialogOpen(false)
+          setCancellingDistribution(null)
           setCancellationResult(data)
           setCancellationResultDialogOpen(true)
         },
         onError: () => {
-          setSelectedDistribution(null)
+          setConfirmCancelDialogOpen(false)
+          setCancellingDistribution(null)
         },
       }
     )
@@ -497,6 +497,16 @@ export default function IncomeDetailsPage() {
         onOpenChange={setEditDialogOpen}
         onSave={handleUpdateDistribution}
         isSaving={updateDistribution.isPending}
+      />
+
+      {/* Confirm Cancel Distribution Dialog */}
+      <ConfirmCancelDistributionDialog
+        distribution={cancellingDistribution}
+        accountName={income.account_name}
+        open={confirmCancelDialogOpen}
+        onOpenChange={setConfirmCancelDialogOpen}
+        onConfirm={handleConfirmCancelDistribution}
+        isCancelling={cancelDistribution.isPending}
       />
 
       {/* Cancellation Result Dialog */}
