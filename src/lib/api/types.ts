@@ -1081,14 +1081,10 @@ export interface ConfirmDistributionRequest {
 }
 
 export interface CancelDistributionResponse {
+  message: string
   distribution: IncomeDistribution
-  accountBalanceBefore: number
-  accountBalanceAfter: number
-  fundBalanceBefore: number
-  fundBalanceAfter: number
-  accountName: string
-  fundName: string
-  amount: number
+  accountBalances: BalanceChange[]
+  fundBalances: BalanceChange[]
 }
 
 export interface BalanceChange {
