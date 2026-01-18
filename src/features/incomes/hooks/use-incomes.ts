@@ -175,12 +175,16 @@ export function useCancelDistribution() {
       incomeId: string
       fundId: string
     }) => incomesApi.cancelDistribution(incomeId, fundId),
-    onSuccess: (_, { incomeId }) => {
+    onSuccess: (_, { incomeId, fundId }) => {
       queryClient.invalidateQueries({ queryKey: incomeKeys.detail(incomeId) })
       queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
+      // Invalidate fund lists and specific fund details
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: fundKeys.details() })
+      queryClient.invalidateQueries({ queryKey: fundKeys.detail(fundId) })
       // Invalidate accounts and fund deposits to reflect rollback
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: accountKeys.details() })
       queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
       toast.success('Распределение отменено, деньги возвращены на счёт')
     },
