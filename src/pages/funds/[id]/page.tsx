@@ -63,6 +63,7 @@ import {
   DepositToFundDialog,
   TransferAssetDialog,
   FundTransactionsHistory,
+  SetInitialBalanceDialog,
 } from '@/features/funds'
 import type { FundStatus, RuleType, FundBalance } from '@/lib/api/types'
 
@@ -129,6 +130,7 @@ export default function FundDetailsPage() {
   const [buyAssetOpen, setBuyAssetOpen] = useState(false)
   const [depositFromAccountOpen, setDepositFromAccountOpen] = useState(false)
   const [transferAssetOpen, setTransferAssetOpen] = useState(false)
+  const [setInitialBalanceOpen, setSetInitialBalanceOpen] = useState(false)
 
   const { data: fund, isLoading, error } = useFund(id!)
   const updateFund = useUpdateFund()
@@ -400,6 +402,15 @@ export default function FundDetailsPage() {
                 >
                   <ArrowRightLeft className="h-4 w-4" />
                   Перевести
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5"
+                  onClick={() => setSetInitialBalanceOpen(true)}
+                >
+                  <Settings className="h-4 w-4" />
+                  Начальный остаток
                 </Button>
                 <Button
                   size="sm"
@@ -948,6 +959,11 @@ export default function FundDetailsPage() {
         fund={fundBalance}
         open={transferAssetOpen}
         onOpenChange={setTransferAssetOpen}
+      />
+      <SetInitialBalanceDialog
+        fund={fundBalance}
+        open={setInitialBalanceOpen}
+        onOpenChange={setSetInitialBalanceOpen}
       />
     </div>
   )

@@ -1,0 +1,56 @@
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { fundDepositsApi } from '@/lib/api'
+import type { ListFundDepositsParams } from '@/lib/api/types'
+import { toast } from 'sonner'
+
+// === Query Keys ===
+
+export const fundDepositKeys = {
+  all: ['fund-deposits'] as const,
+  lists: () => [...fundDepositKeys.all, 'list'] as const,
+  list: (params?: ListFundDepositsParams) =>
+    params ? [...fundDepositKeys.lists(), params] : fundDepositKeys.lists(),
+  details: () => [...fundDepositKeys.all, 'detail'] as const,
+  detail: (id: string) => [...fundDepositKeys.details(), id] as const,
+}
+
+// === Hooks ===
+
+/**
+ * Получить список переводов в фонды
+ */
+export function useFundDeposits(params?: ListFundDepositsParams) {
+  return useQuery({
+    queryKey: fundDepositKeys.list(params),
+    queryFn: () => fundDepositsApi.list(params),
+  })
+}
+
+/**
+ * Получить перевод в фонд по ID
+ */
+export function useFundDeposit(id: string) {
+  return useQuery({
+    queryKey: fundDepositKeys.detail(id),
+    queryFn: () => fundDepositsApi.get(id),
+    enabled: !!id,
+  })
+}
+
+/**
+ * Удалить перевод в фонд
+ */
+export function useDeleteFundDeposit() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: (id: string) => fundDepositsApi.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
+      toast.success('Перевод удалён')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
