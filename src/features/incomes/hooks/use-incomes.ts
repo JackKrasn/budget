@@ -10,7 +10,7 @@ import type {
 } from '@/lib/api/types'
 import { toast } from 'sonner'
 import { fundKeys } from '@/features/funds'
-import { accountKeys } from '@/features/accounts/hooks/use-accounts'
+import { accountKeys, fundDepositKeys } from '@/features/accounts'
 
 export const incomeKeys = {
   all: ['incomes'] as const,
@@ -153,6 +153,9 @@ export function useConfirmDistribution() {
       queryClient.invalidateQueries({ queryKey: incomeKeys.detail(incomeId) })
       queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      // Invalidate accounts and fund deposits to reflect new transactions
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
       toast.success('Распределение подтверждено')
     },
     onError: (error) => {

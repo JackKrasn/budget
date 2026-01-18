@@ -12,6 +12,7 @@ import {
   Filter,
   X,
   ExternalLink,
+  Trash2,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -22,7 +23,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { useFundTransactions } from '../hooks'
+import { useFundTransactions, useDeleteContribution } from '../hooks'
 import type { FundTransaction, FundTransactionType, NullFloat64 } from '@/lib/api/types'
 import { TRANSACTION_TYPES } from '../constants'
 
@@ -107,6 +108,8 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
     from: dateFrom || undefined,
     to: dateTo || undefined,
   })
+
+  const deleteContribution = useDeleteContribution()
 
   const transactions = data?.data ?? []
 
@@ -310,10 +313,28 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
 
             const classes = colorClasses[color as keyof typeof colorClasses] || colorClasses.green
             const isWithdrawal = tx.transaction_type === 'withdrawal'
+            const isDeposit = tx.transaction_type === 'deposit'
+            const canDelete = isDeposit // Можно удалять только пополнения
 
             const handleClick = () => {
               if (isWithdrawal) {
                 navigate(`/expenses?fund=${fundId}`)
+              }
+            }
+
+            const handleDelete = async (e: React.MouseEvent) => {
+              e.stopPropagation()
+              if (!canDelete) return
+
+              if (!confirm('Вы уверены, что хотите удалить эту операцию?')) return
+
+              try {
+                await deleteContribution.mutateAsync({
+                  fundId,
+                  contributionId: tx.id,
+                })
+              } catch {
+                // Error handled in mutation
               }
             }
 
@@ -359,6 +380,21 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                     {tx.note && <span>• {tx.note}</span>}
                   </div>
                 </div>
+                {canDelete && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
+                    onClick={handleDelete}
+                    disabled={deleteContribution.isPending}
+                  >
+                    {deleteContribution.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
               </motion.div>
             )
           })}

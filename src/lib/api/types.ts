@@ -1352,3 +1352,35 @@ export interface FundTransactionsListParams {
 export interface FundCurrencyAssetsResponse {
   data: FundAssetBalance[]
 }
+
+// === Fund Deposits Types ===
+
+export interface FundDeposit {
+  id: UUID
+  fund_id: UUID
+  fund_name: string
+  fund_icon: string | null
+  fund_color: string | null
+  from_account_id: UUID
+  account_name: string
+  asset_id: UUID
+  asset_name: string
+  amount: number
+  currency: string
+  date: ISODate
+  note: string | null
+  created_at: ISODate
+}
+
+export interface ListFundDepositsParams {
+  fund_id?: string
+  from_account_id?: string
+  from_date?: string
+  to_date?: string
+  [key: string]: string | number | boolean | undefined
+}
+
+export interface ListFundDepositsResponse {
+  data: FundDeposit[]
+  total: number
+}

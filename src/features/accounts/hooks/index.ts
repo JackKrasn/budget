@@ -33,3 +33,12 @@ export {
   useCreateTransfer,
   useDeleteTransfer,
 } from './use-transfers'
+
+export {
+  // Query keys
+  fundDepositKeys,
+  // Fund Deposits
+  useFundDeposits,
+  useFundDeposit,
+  useDeleteFundDeposit,
+} from './use-fund-deposits'

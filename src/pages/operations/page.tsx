@@ -24,9 +24,12 @@ import {
   useBalanceAdjustments,
   useDeleteBalanceAdjustment,
   BalanceAdjustmentRow,
+  useFundDeposits,
+  useDeleteFundDeposit,
+  FundDepositRow,
 } from '@/features/accounts'
 import { DateRangePicker } from '@/components/common'
-import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount } from '@/lib/api/types'
+import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -55,13 +58,13 @@ function formatDateHeader(date: string): string {
   })
 }
 
-type OperationType = 'expense' | 'transfer' | 'adjustment'
+type OperationType = 'expense' | 'transfer' | 'adjustment' | 'fund_deposit'
 
 interface Operation {
   id: string
   type: OperationType
   date: string
-  data: ExpenseListRow | TransferWithAccounts | BalanceAdjustmentWithAccount
+  data: ExpenseListRow | TransferWithAccounts | BalanceAdjustmentWithAccount | FundDeposit
 }
 
 interface DayGroup {
@@ -113,15 +116,22 @@ export default function OperationsPage() {
     to: dateRange.to.toISOString().split('T')[0],
   })
 
+  const { data: fundDepositsData, isLoading: isFundDepositsLoading, error: fundDepositsError } = useFundDeposits({
+    from_date: dateRange.from.toISOString().split('T')[0],
+    to_date: dateRange.to.toISOString().split('T')[0],
+  })
+
   const deleteExpense = useDeleteExpense()
   const deleteTransfer = useDeleteTransfer()
   const deleteAdjustment = useDeleteBalanceAdjustment()
+  const deleteFundDeposit = useDeleteFundDeposit()
 
   const expenses = expensesData?.data ?? []
   const transfers = transfersData?.data ?? []
   const adjustments = adjustmentsData?.data ?? []
+  const fundDeposits = fundDepositsData?.data ?? []
 
-  const isLoading = isExpensesLoading || isTransfersLoading || isAdjustmentsLoading
+  const isLoading = isExpensesLoading || isTransfersLoading || isAdjustmentsLoading || isFundDepositsLoading
 
   // Group all operations by date
   const dayGroups = useMemo<DayGroup[]>(() => {
@@ -129,6 +139,7 @@ export default function OperationsPage() {
       ...expenses.map((e) => ({ id: e.id, type: 'expense' as const, date: e.date, data: e })),
       ...transfers.map((t) => ({ id: t.id, type: 'transfer' as const, date: t.date, data: t })),
       ...adjustments.map((a) => ({ id: a.id, type: 'adjustment' as const, date: a.date, data: a })),
+      ...fundDeposits.map((fd) => ({ id: fd.id, type: 'fund_deposit' as const, date: fd.date, data: fd })),
     ]
 
     // Group by date
@@ -144,9 +155,9 @@ export default function OperationsPage() {
     // Sort operations within each day and calculate totals
     return Object.entries(groups)
       .map(([date, ops]) => {
-        // Sort by type: expenses first, then transfers, then adjustments
+        // Sort by type: expenses first, then transfers, then fund deposits, then adjustments
         ops.sort((a, b) => {
-          const typeOrder = { expense: 0, transfer: 1, adjustment: 2 }
+          const typeOrder = { expense: 0, transfer: 1, fund_deposit: 2, adjustment: 3 }
           return typeOrder[a.type] - typeOrder[b.type]
         })
 
@@ -161,7 +172,7 @@ export default function OperationsPage() {
         return { date, operations: ops, totalExpenses, totalTransfers }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [expenses, transfers, adjustments])
+  }, [expenses, transfers, adjustments, fundDeposits])
 
   // Total summary
   const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
@@ -187,6 +198,12 @@ export default function OperationsPage() {
   const handleDeleteAdjustment = (adjustment: BalanceAdjustmentWithAccount) => {
     if (confirm('Удалить эту корректировку?')) {
       deleteAdjustment.mutate(adjustment.id)
+    }
+  }
+
+  const handleDeleteFundDeposit = (deposit: FundDeposit) => {
+    if (confirm('Удалить этот перевод в фонд?')) {
+      deleteFundDeposit.mutate(deposit.id)
     }
   }
 
@@ -329,6 +346,16 @@ export default function OperationsPage() {
                             key={op.id}
                             adjustment={adjustment}
                             onDelete={() => handleDeleteAdjustment(adjustment)}
+                          />
+                        )
+                      }
+                      if (op.type === 'fund_deposit') {
+                        const deposit = op.data as FundDeposit
+                        return (
+                          <FundDepositRow
+                            key={op.id}
+                            deposit={deposit}
+                            onDelete={() => handleDeleteFundDeposit(deposit)}
                           />
                         )
                       }
