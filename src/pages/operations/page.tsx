@@ -36,6 +36,7 @@ import {
   FundDepositRow,
   useAccounts,
 } from '@/features/accounts'
+import { AccountIcon } from '@/components/ui/account-icon'
 import { DeleteTransactionResultDialog } from '@/features/funds/components'
 import { DateRangePicker } from '@/components/common'
 import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse } from '@/lib/api/types'
@@ -339,7 +340,16 @@ export default function OperationsPage() {
               <SelectItem value="all">Все счета</SelectItem>
               {accounts.map((account) => (
                 <SelectItem key={account.id} value={account.id}>
-                  {account.name}
+                  <div className="flex items-center gap-2">
+                    <AccountIcon
+                      bankName={account.bank_name}
+                      typeCode={account.type_code}
+                      color={account.color}
+                      size="sm"
+                      showBackground={false}
+                    />
+                    <span>{account.name}</span>
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>

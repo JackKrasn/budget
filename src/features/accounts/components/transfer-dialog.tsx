@@ -29,6 +29,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { ArrowDown, ArrowUpDown } from 'lucide-react'
+import { AccountIcon } from '@/components/ui/account-icon'
 import { useCreateTransfer, useAccounts } from '../hooks'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -198,9 +199,12 @@ export function TransferDialog({
                           {accounts.map((account) => (
                             <SelectItem key={account.id} value={account.id}>
                               <div className="flex items-center gap-2">
-                                <span
-                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                  style={{ backgroundColor: account.color || '#10b981' }}
+                                <AccountIcon
+                                  bankName={account.bank_name}
+                                  typeCode={account.type_code}
+                                  color={account.color}
+                                  size="sm"
+                                  showBackground={false}
                                 />
                                 <span>{account.name}</span>
                                 <span className="text-muted-foreground ml-auto">
@@ -264,9 +268,12 @@ export function TransferDialog({
                           {accounts.map((account) => (
                             <SelectItem key={account.id} value={account.id}>
                               <div className="flex items-center gap-2">
-                                <span
-                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                  style={{ backgroundColor: account.color || '#10b981' }}
+                                <AccountIcon
+                                  bankName={account.bank_name}
+                                  typeCode={account.type_code}
+                                  color={account.color}
+                                  size="sm"
+                                  showBackground={false}
                                 />
                                 <span>{account.name}</span>
                                 <span className="text-muted-foreground ml-auto">

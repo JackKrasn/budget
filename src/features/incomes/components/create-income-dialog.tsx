@@ -41,6 +41,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { AccountIcon } from '@/components/ui/account-icon'
 import { useCreateIncome } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 
@@ -278,7 +279,17 @@ export function CreateIncomeDialog({ children }: CreateIncomeDialogProps) {
                         <SelectGroup>
                           {accounts.map((acc) => (
                             <SelectItem key={acc.id} value={acc.id}>
-                              {acc.name} ({acc.currency})
+                              <div className="flex items-center gap-2">
+                                <AccountIcon
+                                  bankName={acc.bank_name}
+                                  typeCode={acc.type_code}
+                                  color={acc.color}
+                                  size="sm"
+                                  showBackground={false}
+                                />
+                                <span>{acc.name}</span>
+                                <span className="text-muted-foreground">({acc.currency})</span>
+                              </div>
                             </SelectItem>
                           ))}
                         </SelectGroup>

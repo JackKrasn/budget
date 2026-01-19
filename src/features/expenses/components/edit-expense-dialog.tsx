@@ -56,6 +56,7 @@ import { useAccounts } from '@/features/accounts'
 import { TagSelector } from './tag-selector'
 import { CalendarIcon } from 'lucide-react'
 import { getIconByName } from '@/lib/icon-registry'
+import { AccountIcon } from '@/components/ui/account-icon'
 import type { ExpenseListRow } from '@/lib/api/types'
 
 const formSchema = z.object({
@@ -176,7 +177,16 @@ export function EditExpenseDialog({
                       {accounts.map((acc) => (
                         <SelectItem key={acc.id} value={acc.id}>
                           <div className="flex items-center justify-between gap-3 w-full">
-                            <span>{acc.name}</span>
+                            <div className="flex items-center gap-2">
+                              <AccountIcon
+                                bankName={acc.bank_name}
+                                typeCode={acc.type_code}
+                                color={acc.color}
+                                size="sm"
+                                showBackground={false}
+                              />
+                              <span>{acc.name}</span>
+                            </div>
                             <span className="text-muted-foreground text-sm tabular-nums">
                               {(acc.current_balance ?? 0).toLocaleString('ru-RU')} {acc.currency === 'RUB' ? '₽' : acc.currency}
                             </span>
