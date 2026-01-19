@@ -49,8 +49,8 @@ function formatMoney(amount: number, compact = false): string {
 function formatPercent(value: number): string {
   return new Intl.NumberFormat('ru-RU', {
     style: 'percent',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 1,
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 2,
   }).format(value / 100)
 }
 
