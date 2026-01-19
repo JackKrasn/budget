@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { format, startOfMonth, endOfMonth, isWithinInterval } from 'date-fns'
+import { format, startOfMonth, endOfMonth, isWithinInterval, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
   TrendingUp,
@@ -29,8 +29,9 @@ import { useAccounts } from '@/features/accounts/hooks/use-accounts'
 import { useFunds } from '@/features/funds/hooks/use-funds'
 import { useIncomes } from '@/features/incomes/hooks/use-incomes'
 import { useExpenses } from '@/features/expenses/hooks/use-expenses'
-import { useCredits, useUpcomingPayments } from '@/features/credits/hooks/use-credits'
+import { useCredits } from '@/features/credits/hooks/use-credits'
 import { useCurrentBudget } from '@/features/budget/hooks/use-budgets'
+import { useUpcomingPlannedExpenses } from '@/features/budget/hooks/use-planned-expenses'
 
 // Утилиты форматирования
 function formatMoney(amount: number, compact = false): string {
@@ -266,13 +267,11 @@ function UpcomingPayment({
   name,
   amount,
   date,
-  type,
   index,
 }: {
   name: string
   amount: number
   date: string
-  type: 'credit' | 'expense'
   index: number
 }) {
   return (
@@ -283,18 +282,8 @@ function UpcomingPayment({
       className="flex items-center justify-between gap-3 py-3 border-b border-border/30 last:border-0"
     >
       <div className="flex items-center gap-3">
-        <div
-          className={`flex h-9 w-9 items-center justify-center rounded-lg ${
-            type === 'credit'
-              ? 'bg-amber-500/10 text-amber-500'
-              : 'bg-blue-500/10 text-blue-500'
-          }`}
-        >
-          {type === 'credit' ? (
-            <CreditCard className="h-4 w-4" />
-          ) : (
-            <Calendar className="h-4 w-4" />
-          )}
+        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
+          <Calendar className="h-4 w-4" />
         </div>
         <div>
           <p className="text-sm font-medium">{name}</p>
@@ -313,6 +302,8 @@ export default function DashboardPage() {
   const now = new Date()
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
+  const today = format(now, 'yyyy-MM-dd')
+  const in30Days = format(addDays(now, 30), 'yyyy-MM-dd')
 
   // Данные
   const { data: accountsData, isLoading: accountsLoading } = useAccounts()
@@ -320,7 +311,7 @@ export default function DashboardPage() {
   const { data: incomesData, isLoading: incomesLoading } = useIncomes()
   const { data: expensesData, isLoading: expensesLoading } = useExpenses({ from: monthStart, to: monthEnd })
   const { data: creditsData } = useCredits('active')
-  const { data: upcomingPaymentsData } = useUpcomingPayments(5)
+  const { data: upcomingPlannedExpensesData } = useUpcomingPlannedExpenses(today, in30Days)
   const { data: currentBudget, isLoading: budgetLoading } = useCurrentBudget()
 
   // Вычисления
@@ -406,31 +397,43 @@ export default function DashboardPage() {
     }
   }, [currentBudget])
 
-  // Ближайшие платежи
+  // Ближайшие платежи (только запланированные расходы)
   const upcomingPayments = useMemo(() => {
     const payments: Array<{
       id: string
       name: string
       amount: number
       date: string
-      type: 'credit' | 'expense'
+      rawDate: Date
     }> = []
 
-    // Добавляем платежи по кредитам
-    if (upcomingPaymentsData) {
-      upcomingPaymentsData.forEach((p) => {
-        payments.push({
-          id: p.id,
-          name: p.creditName || 'Платёж по кредиту',
-          amount: p.totalPayment,
-          date: format(new Date(p.dueDate), 'd MMM', { locale: ru }),
-          type: 'credit',
+    if (upcomingPlannedExpensesData?.data) {
+      upcomingPlannedExpensesData.data
+        .filter((p) => p.status === 'pending' && p.planned_date)
+        .forEach((p) => {
+          // planned_date может быть строкой или объектом { Time, Valid }
+          const dateValue =
+            typeof p.planned_date === 'string'
+              ? p.planned_date
+              : p.planned_date?.Time
+          if (!dateValue) return
+          const plannedDate = new Date(dateValue)
+          if (isNaN(plannedDate.getTime())) return
+          payments.push({
+            id: p.id,
+            name: p.name,
+            amount: p.planned_amount,
+            date: format(plannedDate, 'd MMM', { locale: ru }),
+            rawDate: plannedDate,
+          })
         })
-      })
     }
 
+    // Сортируем по дате
+    payments.sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
+
     return payments.slice(0, 5)
-  }, [upcomingPaymentsData])
+  }, [upcomingPlannedExpensesData])
 
   // Текущий месяц
   const currentMonth = format(new Date(), 'LLLL yyyy', { locale: ru })
@@ -719,7 +722,6 @@ export default function DashboardPage() {
                       name={payment.name}
                       amount={payment.amount}
                       date={payment.date}
-                      type={payment.type}
                       index={index}
                     />
                   ))}
@@ -732,7 +734,7 @@ export default function DashboardPage() {
                   <div>
                     <p className="font-medium">Нет предстоящих платежей</p>
                     <p className="text-sm text-muted-foreground">
-                      Платежи по кредитам появятся здесь
+                      Запланированные платежи появятся здесь
                     </p>
                   </div>
                 </div>
