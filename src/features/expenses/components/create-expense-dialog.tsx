@@ -60,12 +60,12 @@ import {
   Plus,
   X,
   CalendarIcon,
-  Banknote,
   TrendingDown,
   Sparkles,
   ChevronRight,
 } from 'lucide-react'
 import { getIconByName } from '@/lib/icon-registry'
+import { AccountIcon } from '@/components/ui/account-icon'
 
 const formSchema = z.object({
   categoryId: z.string().min(1, 'Выберите категорию'),
@@ -342,7 +342,13 @@ export function CreateExpenseDialog({
                           <SelectItem key={acc.id} value={acc.id}>
                             <div className="flex items-center justify-between gap-4 w-full">
                               <div className="flex items-center gap-2">
-                                <Banknote className="h-4 w-4 text-muted-foreground" />
+                                <AccountIcon
+                                  bankName={acc.bank_name}
+                                  typeCode={acc.type_code}
+                                  color={acc.color}
+                                  size="sm"
+                                  showBackground={false}
+                                />
                                 <span className="font-medium">{acc.name}</span>
                               </div>
                               <span className="text-muted-foreground tabular-nums">

@@ -1,11 +1,5 @@
 import { motion } from 'framer-motion'
 import {
-  CreditCard,
-  Wallet,
-  PiggyBank,
-  Landmark,
-  TrendingUp,
-  Bitcoin,
   MoreHorizontal,
   Archive,
   Pencil,
@@ -22,18 +16,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { AccountIcon } from '@/components/ui/account-icon'
 import type { AccountWithType } from '@/lib/api'
 import { cn } from '@/lib/utils'
-
-const ACCOUNT_ICONS: Record<string, React.ElementType> = {
-  card: CreditCard,
-  cash: Wallet,
-  deposit: PiggyBank,
-  credit: CreditCard,
-  investment: TrendingUp,
-  crypto_wallet: Bitcoin,
-  default: Landmark,
-}
+import { getBankByName } from '@/lib/banks'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   RUB: '₽',
@@ -58,9 +44,9 @@ export function AccountCard({
   onDelete,
   onSyncBalance,
 }: AccountCardProps) {
-  const Icon = ACCOUNT_ICONS[account.type_code || 'default'] || ACCOUNT_ICONS.default
   const currencySymbol = CURRENCY_SYMBOLS[account.currency] || account.currency
   const typeName = account.type_name || 'Загрузка...'
+  const bank = account.bank_name ? getBankByName(account.bank_name) : undefined
 
   return (
     <motion.div
@@ -87,15 +73,13 @@ export function AccountCard({
           {/* Header */}
           <div className="mb-4 flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div
-                className="flex h-11 w-11 items-center justify-center rounded-xl transition-transform group-hover:scale-105"
-                style={{ backgroundColor: `${account.color || '#10b981'}20` }}
-              >
-                <Icon
-                  className="h-5 w-5"
-                  style={{ color: account.color || '#10b981' }}
-                />
-              </div>
+              <AccountIcon
+                bankName={account.bank_name}
+                typeCode={account.type_code}
+                color={account.color}
+                size="lg"
+                className="group-hover:scale-105"
+              />
               <div>
                 <h3 className="font-semibold">{account.name}</h3>
                 <div className="flex items-center gap-2">
@@ -169,7 +153,16 @@ export function AccountCard({
             {account.bank_name && (
               <div className="flex items-center justify-between">
                 <span className="text-sm text-muted-foreground">Банк</span>
-                <span className="font-medium">{account.bank_name}</span>
+                <div className="flex items-center gap-2">
+                  {bank && (
+                    <img
+                      src={bank.logo}
+                      alt={bank.name}
+                      className="h-4 w-4 object-contain"
+                    />
+                  )}
+                  <span className="font-medium">{account.bank_name}</span>
+                </div>
               </div>
             )}
           </div>

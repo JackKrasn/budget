@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { BankCombobox } from '@/components/ui/bank-combobox'
 import {
   Select,
   SelectContent,
@@ -243,10 +244,14 @@ export function EditAccountDialog({
                 <FormItem>
                   <FormLabel>Банк (опционально)</FormLabel>
                   <FormControl>
-                    <Input placeholder="Например: Тинькофф" {...field} />
+                    <BankCombobox
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      placeholder="Выберите банк..."
+                    />
                   </FormControl>
                   <FormDescription>
-                    Название банка или платформы
+                    Выберите из списка или введите свой
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
