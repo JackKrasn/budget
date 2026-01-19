@@ -9,6 +9,7 @@ import {
   AlertCircle,
   Check,
   Pencil,
+  XCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -16,18 +17,21 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useIncome, useConfirmDistribution, useUpdateDistribution, useCreateDistribution } from '@/features/incomes/hooks'
+import { useIncome, useConfirmDistribution, useCancelDistribution, useUpdateDistribution, useCreateDistribution } from '@/features/incomes/hooks'
 import { ConfirmDistributionDialog } from '@/features/incomes/components/confirm-distribution-dialog'
+import { ConfirmDistributionInfoDialog } from '@/features/incomes/components/confirm-distribution-info-dialog'
+import { ConfirmCancelDistributionDialog } from '@/features/incomes/components/confirm-cancel-distribution-dialog'
 import { EditDistributionDialog } from '@/features/incomes/components/edit-distribution-dialog'
 import { AddDistributionDialog } from '@/features/incomes/components/add-distribution-dialog'
+import { CancellationResultDialog } from '@/features/incomes/components/cancellation-result-dialog'
 import { FundIcon } from '@/components/common/category-icon'
 import { cn } from '@/lib/utils'
-import type { IncomeDistribution, ConfirmDistributionRequest } from '@/lib/api/types'
+import type { IncomeDistribution, ConfirmDistributionRequest, CancelDistributionResponse } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -56,13 +60,20 @@ export default function IncomeDetailsPage() {
   const navigate = useNavigate()
   const { data: income, error, isLoading } = useIncome(id ?? '')
   const confirmDistribution = useConfirmDistribution()
+  const cancelDistribution = useCancelDistribution()
   const updateDistribution = useUpdateDistribution()
   const createDistribution = useCreateDistribution()
 
   const [selectedDistribution, setSelectedDistribution] = useState<IncomeDistribution | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [confirmInfoDialogOpen, setConfirmInfoDialogOpen] = useState(false)
+  const [confirmCancelDialogOpen, setConfirmCancelDialogOpen] = useState(false)
+  const [cancellingDistribution, setCancellingDistribution] = useState<IncomeDistribution | null>(null)
+  const [pendingConfirmData, setPendingConfirmData] = useState<ConfirmDistributionRequest | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingDistribution, setEditingDistribution] = useState<IncomeDistribution | null>(null)
+  const [cancellationResult, setCancellationResult] = useState<CancelDistributionResponse | null>(null)
+  const [cancellationResultDialogOpen, setCancellationResultDialogOpen] = useState(false)
 
   const handleConfirmClick = (distribution: IncomeDistribution) => {
     setSelectedDistribution(distribution)
@@ -75,18 +86,28 @@ export default function IncomeDetailsPage() {
   }
 
   const handleConfirm = (data: ConfirmDistributionRequest) => {
-    if (!id || !selectedDistribution) return
+    if (!selectedDistribution) return
+
+    // Store data and show info dialog first
+    setPendingConfirmData(data)
+    setConfirmDialogOpen(false)
+    setConfirmInfoDialogOpen(true)
+  }
+
+  const handleFinalConfirm = () => {
+    if (!id || !selectedDistribution || !pendingConfirmData) return
 
     confirmDistribution.mutate(
       {
         incomeId: id,
         fundId: selectedDistribution.fund_id,
-        data,
+        data: pendingConfirmData,
       },
       {
         onSuccess: () => {
-          setConfirmDialogOpen(false)
+          setConfirmInfoDialogOpen(false)
           setSelectedDistribution(null)
+          setPendingConfirmData(null)
         },
       }
     )
@@ -117,6 +138,34 @@ export default function IncomeDetailsPage() {
       incomeId: id,
       data: { fundId, plannedAmount },
     })
+  }
+
+  const handleCancelDistribution = (distribution: IncomeDistribution) => {
+    setCancellingDistribution(distribution)
+    setConfirmCancelDialogOpen(true)
+  }
+
+  const handleConfirmCancelDistribution = () => {
+    if (!id || !cancellingDistribution) return
+
+    cancelDistribution.mutate(
+      {
+        incomeId: id,
+        fundId: cancellingDistribution.fund_id,
+      },
+      {
+        onSuccess: (data) => {
+          setConfirmCancelDialogOpen(false)
+          setCancellingDistribution(null)
+          setCancellationResult(data)
+          setCancellationResultDialogOpen(true)
+        },
+        onError: () => {
+          setConfirmCancelDialogOpen(false)
+          setCancellingDistribution(null)
+        },
+      }
+    )
   }
 
   if (!id) {
@@ -382,6 +431,11 @@ export default function IncomeDetailsPage() {
                 incomeAmount={income.amount}
                 onConfirm={() => {}}
                 onEdit={() => {}}
+                onCancel={() => handleCancelDistribution(distribution)}
+                isCancelling={
+                  cancelDistribution.isPending &&
+                  selectedDistribution?.id === distribution.id
+                }
               />
             ))}
           </div>
@@ -416,10 +470,23 @@ export default function IncomeDetailsPage() {
       {/* Confirm Distribution Dialog */}
       <ConfirmDistributionDialog
         distribution={selectedDistribution}
+        incomeDate={income.date}
         open={confirmDialogOpen}
         onOpenChange={setConfirmDialogOpen}
         onConfirm={handleConfirm}
         isConfirming={confirmDistribution.isPending}
+      />
+
+      {/* Confirm Distribution Info Dialog */}
+      <ConfirmDistributionInfoDialog
+        accountId={income.account_id || ''}
+        fundId={selectedDistribution?.fund_id || ''}
+        accountName={income.account_name || 'Счёт'}
+        fundName={selectedDistribution?.fund_name || ''}
+        amount={pendingConfirmData?.actualAmount || 0}
+        open={confirmInfoDialogOpen}
+        onOpenChange={setConfirmInfoDialogOpen}
+        onConfirm={handleFinalConfirm}
       />
 
       {/* Edit Distribution Dialog */}
@@ -430,6 +497,23 @@ export default function IncomeDetailsPage() {
         onOpenChange={setEditDialogOpen}
         onSave={handleUpdateDistribution}
         isSaving={updateDistribution.isPending}
+      />
+
+      {/* Confirm Cancel Distribution Dialog */}
+      <ConfirmCancelDistributionDialog
+        distribution={cancellingDistribution}
+        accountName={income.account_name}
+        open={confirmCancelDialogOpen}
+        onOpenChange={setConfirmCancelDialogOpen}
+        onConfirm={handleConfirmCancelDistribution}
+        isCancelling={cancelDistribution.isPending}
+      />
+
+      {/* Cancellation Result Dialog */}
+      <CancellationResultDialog
+        result={cancellationResult}
+        open={cancellationResultDialogOpen}
+        onOpenChange={setCancellationResultDialogOpen}
       />
     </div>
   )
@@ -442,7 +526,9 @@ interface DistributionCardProps {
   availableAmount?: number
   onConfirm: () => void
   onEdit: () => void
+  onCancel?: () => void
   isConfirming?: boolean
+  isCancelling?: boolean
 }
 
 function DistributionCard({
@@ -451,7 +537,9 @@ function DistributionCard({
   availableAmount,
   onConfirm,
   onEdit,
+  onCancel,
   isConfirming,
+  isCancelling,
 }: DistributionCardProps) {
   const isCompleted = distribution.is_completed
   const actualAmount = distribution.actual_amount ?? 0
@@ -554,6 +642,21 @@ function DistributionCard({
             disabled={isConfirming}
           >
             {isConfirming ? 'Подтверждение...' : 'Подтвердить'}
+          </Button>
+        </div>
+      )}
+      {isCompleted && onCancel && (
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={onCancel}
+            disabled={isCancelling}
+            className="gap-1.5 text-muted-foreground hover:text-destructive"
+            title="Отменить распределение"
+          >
+            <XCircle className="h-4 w-4" />
+            {isCancelling ? 'Отмена...' : 'Отменить'}
           </Button>
         </div>
       )}

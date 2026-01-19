@@ -78,16 +78,18 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     body: body ? JSON.stringify(body) : undefined,
   })
 
-  // Handle no content
-  if (response.status === 204) {
-    return undefined as T
-  }
-
-  const data = await response.json()
+  // Try to read JSON, but handle empty responses
+  const text = await response.text()
+  const data = text ? JSON.parse(text) : null
 
   if (!response.ok) {
     const errorResponse = data as ApiErrorResponse
     throw new ApiError(response.status, errorResponse.error)
+  }
+
+  // Return null for 204 No Content or empty responses
+  if (response.status === 204 || !text) {
+    return null as T
   }
 
   return data as T

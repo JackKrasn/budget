@@ -56,8 +56,8 @@ export function RecurringExpensesSection({
 
   const formatMoney = (amount: number) => {
     return amount.toLocaleString('ru-RU', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     })
   }
 

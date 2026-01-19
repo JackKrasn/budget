@@ -27,6 +27,8 @@ import type {
   FundTransactionsListResponse,
   FundTransactionsListParams,
   FundCurrencyAssetsResponse,
+  DeleteContributionResponse,
+  DeleteTransactionResponse,
 } from './types'
 
 const ENDPOINT = '/funds'
@@ -114,10 +116,10 @@ export const fundsApi = {
     ),
 
   /**
-   * Удалить пополнение фонда
+   * Удалить пополнение фонда (возвращает информацию об изменении балансов)
    */
   deleteContribution: (fundId: string, contributionId: string) =>
-    apiClient.delete<void>(
+    apiClient.delete<DeleteContributionResponse>(
       `${ENDPOINT}/${fundId}/contributions/${contributionId}`
     ),
 
@@ -190,4 +192,10 @@ export const fundsApi = {
       `${ENDPOINT}/${fundId}/transactions`,
       params
     ),
+
+  /**
+   * Удалить транзакцию (для покупок, продаж, переводов)
+   */
+  deleteTransaction: (fundId: string, transactionId: string) =>
+    apiClient.delete<DeleteTransactionResponse>(`${ENDPOINT}/${fundId}/transactions/${transactionId}`),
 }

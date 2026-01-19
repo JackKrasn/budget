@@ -270,8 +270,8 @@ export default function AssetsPage() {
                   <p className="text-sm text-muted-foreground">Сумма депозитов</p>
                   <p className="text-xl font-bold tabular-nums">
                     {depositsSummary.totalCurrentValue?.toLocaleString('ru-RU', {
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
                     }) || '0'} ₽
                   </p>
                 </div>

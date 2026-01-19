@@ -53,7 +53,7 @@ import type { ScheduleItem, PaymentHistoryItem, EarlyPayment } from '@/lib/api/c
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
 }

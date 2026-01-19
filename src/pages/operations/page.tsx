@@ -5,10 +5,17 @@ import {
   AlertCircle,
   Receipt,
   ArrowLeftRight,
-  TrendingDown,
   Plus,
+  Filter,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   useExpenses,
   useDeleteExpense,
@@ -27,14 +34,16 @@ import {
   useFundDeposits,
   useDeleteFundDeposit,
   FundDepositRow,
+  useAccounts,
 } from '@/features/accounts'
+import { DeleteTransactionResultDialog } from '@/features/funds/components'
 import { DateRangePicker } from '@/components/common'
-import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit } from '@/lib/api/types'
+import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
@@ -72,6 +81,8 @@ interface DayGroup {
   operations: Operation[]
   totalExpenses: number
   totalTransfers: number
+  totalAdjustments: number
+  totalFundDeposits: number
 }
 
 const container = {
@@ -99,6 +110,14 @@ export default function OperationsPage() {
 
   const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [deleteResult, setDeleteResult] = useState<DeleteTransactionResponse | null>(null)
+  const [deleteResultDialogOpen, setDeleteResultDialogOpen] = useState(false)
+  const [deletedFundName, setDeletedFundName] = useState<string>('')
+  const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
+  const [selectedOperationType, setSelectedOperationType] = useState<'all' | OperationType>('all')
+
+  // Fetch accounts for filter
+  const { data: accountsData } = useAccounts()
 
   // Data fetching
   const { data: expensesData, isLoading: isExpensesLoading, error: expensesError } = useExpenses({
@@ -116,7 +135,7 @@ export default function OperationsPage() {
     to: dateRange.to.toISOString().split('T')[0],
   })
 
-  const { data: fundDepositsData, isLoading: isFundDepositsLoading, error: fundDepositsError } = useFundDeposits({
+  const { data: fundDepositsData, isLoading: isFundDepositsLoading } = useFundDeposits({
     from_date: dateRange.from.toISOString().split('T')[0],
     to_date: dateRange.to.toISOString().split('T')[0],
   })
@@ -130,17 +149,46 @@ export default function OperationsPage() {
   const transfers = transfersData?.data ?? []
   const adjustments = adjustmentsData?.data ?? []
   const fundDeposits = fundDepositsData?.data ?? []
+  const accounts = accountsData?.data ?? []
 
   const isLoading = isExpensesLoading || isTransfersLoading || isAdjustmentsLoading || isFundDepositsLoading
 
-  // Group all operations by date
+  // Helper to check if operation involves selected account
+  const operationMatchesAccount = (op: Operation): boolean => {
+    if (selectedAccountId === 'all') return true
+
+    if (op.type === 'expense') {
+      return (op.data as ExpenseListRow).accountId === selectedAccountId
+    }
+    if (op.type === 'transfer') {
+      const t = op.data as TransferWithAccounts
+      return t.from_account_id === selectedAccountId || t.to_account_id === selectedAccountId
+    }
+    if (op.type === 'adjustment') {
+      return (op.data as BalanceAdjustmentWithAccount).account_id === selectedAccountId
+    }
+    if (op.type === 'fund_deposit') {
+      const fd = op.data as FundDeposit
+      return fd.from_account_id === selectedAccountId
+    }
+    return false
+  }
+
+  // Group all operations by date with filters
   const dayGroups = useMemo<DayGroup[]>(() => {
-    const operations: Operation[] = [
+    let operations: Operation[] = [
       ...expenses.map((e) => ({ id: e.id, type: 'expense' as const, date: e.date, data: e })),
       ...transfers.map((t) => ({ id: t.id, type: 'transfer' as const, date: t.date, data: t })),
       ...adjustments.map((a) => ({ id: a.id, type: 'adjustment' as const, date: a.date, data: a })),
       ...fundDeposits.map((fd) => ({ id: fd.id, type: 'fund_deposit' as const, date: fd.date, data: fd })),
     ]
+
+    // Apply filters
+    if (selectedOperationType !== 'all') {
+      operations = operations.filter(op => op.type === selectedOperationType)
+    }
+
+    operations = operations.filter(operationMatchesAccount)
 
     // Group by date
     const groups: Record<string, Operation[]> = {}
@@ -169,14 +217,27 @@ export default function OperationsPage() {
           .filter((op) => op.type === 'transfer')
           .reduce((sum, op) => sum + (op.data as TransferWithAccounts).amount, 0)
 
-        return { date, operations: ops, totalExpenses, totalTransfers }
+        const totalAdjustments = ops
+          .filter((op) => op.type === 'adjustment')
+          .reduce((sum, op) => sum + Math.abs((op.data as BalanceAdjustmentWithAccount).amount), 0)
+
+        const totalFundDeposits = ops
+          .filter((op) => op.type === 'fund_deposit')
+          .reduce((sum, op) => sum + (op.data as FundDeposit).amount, 0)
+
+        return { date, operations: ops, totalExpenses, totalTransfers, totalAdjustments, totalFundDeposits }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [expenses, transfers, adjustments, fundDeposits])
+  }, [expenses, transfers, adjustments, fundDeposits, selectedAccountId, selectedOperationType])
 
-  // Total summary
-  const totalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0)
-  const totalTransfers = transfers.reduce((sum, t) => sum + t.amount, 0)
+  // Total summary with filters applied
+  const totalExpenses = useMemo(() => {
+    return dayGroups.reduce((sum, group) => sum + group.totalExpenses, 0)
+  }, [dayGroups])
+
+  const totalFundDeposits = useMemo(() => {
+    return dayGroups.reduce((sum, group) => sum + group.totalFundDeposits, 0)
+  }, [dayGroups])
 
   const handleEditExpense = (expense: ExpenseListRow) => {
     setEditingExpense(expense)
@@ -201,9 +262,19 @@ export default function OperationsPage() {
     }
   }
 
-  const handleDeleteFundDeposit = (deposit: FundDeposit) => {
-    if (confirm('Удалить этот перевод в фонд?')) {
-      deleteFundDeposit.mutate(deposit.id)
+  const handleDeleteFundDeposit = async (deposit: FundDeposit) => {
+    try {
+      const result = await deleteFundDeposit.mutateAsync(deposit.id)
+
+      // Show result dialog if operation returned balance info
+      if (result && (result.accountBalance || result.fundBalance)) {
+        setDeleteResult(result)
+        setDeletedFundName(deposit.fund_name)
+        setDeleteResultDialogOpen(true)
+      }
+    } catch (error) {
+      // Error handled in mutation
+      console.error('Delete fund deposit error:', error)
     }
   }
 
@@ -239,33 +310,91 @@ export default function OperationsPage() {
         </div>
       </motion.div>
 
-      {/* Controls */}
+      {/* Controls - Refined Editorial Layout */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="flex flex-wrap items-center gap-4"
+        className="space-y-4"
       >
-        <DateRangePicker
-          from={dateRange.from}
-          to={dateRange.to}
-          onRangeChange={(from, to) => setDateRange({ from, to })}
-        />
-
-        <div className="flex-1" />
-
-        {/* Summary stats */}
-        <div className="flex items-center gap-4 text-sm">
-          <div className="flex items-center gap-2">
-            <TrendingDown className="h-4 w-4 text-rose-500" />
-            <span className="text-muted-foreground">Расходы:</span>
-            <span className="font-semibold tabular-nums">{formatMoney(totalExpenses)} ₽</span>
+        {/* Filters Section */}
+        <div className="flex flex-wrap items-center gap-3 pb-4 border-b border-border/40">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/30 border border-border/50">
+            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Фильтры</span>
           </div>
-          <div className="flex items-center gap-2">
-            <ArrowLeftRight className="h-4 w-4 text-blue-500" />
-            <span className="text-muted-foreground">Переводы:</span>
-            <span className="font-semibold tabular-nums">{formatMoney(totalTransfers)} ₽</span>
-          </div>
+
+          <DateRangePicker
+            from={dateRange.from}
+            to={dateRange.to}
+            onRangeChange={(from, to) => setDateRange({ from, to })}
+          />
+
+          {/* Account Filter */}
+          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+            <SelectTrigger className="w-[180px] border-border/50 bg-background/50">
+              <SelectValue placeholder="Все счета" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все счета</SelectItem>
+              {accounts.map((account) => (
+                <SelectItem key={account.id} value={account.id}>
+                  {account.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          {/* Operation Type Filter */}
+          <Select value={selectedOperationType} onValueChange={(value) => setSelectedOperationType(value as 'all' | OperationType)}>
+            <SelectTrigger className="w-[180px] border-border/50 bg-background/50">
+              <SelectValue placeholder="Все типы" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Все типы</SelectItem>
+              <SelectItem value="expense">Расходы</SelectItem>
+              <SelectItem value="transfer">Переводы</SelectItem>
+              <SelectItem value="adjustment">Корректировки</SelectItem>
+              <SelectItem value="fund_deposit">Переводы в фонды</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Clear filters button */}
+          {(selectedAccountId !== 'all' || selectedOperationType !== 'all') && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-xs"
+              onClick={() => {
+                setSelectedAccountId('all')
+                setSelectedOperationType('all')
+              }}
+            >
+              Сбросить
+            </Button>
+          )}
+        </div>
+
+        {/* Summary Stats - Editorial Typography */}
+        <div className="flex items-center gap-6 px-1">
+          {totalExpenses > 0 && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Расходы</span>
+              <span className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">{formatMoney(totalExpenses)} ₽</span>
+            </div>
+          )}
+          {totalFundDeposits > 0 && (
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">В фонды</span>
+              <span className="text-lg font-semibold tabular-nums text-purple-600 dark:text-purple-400">{formatMoney(totalFundDeposits)} ₽</span>
+            </div>
+          )}
+          {(totalExpenses > 0 || totalFundDeposits > 0) && (
+            <div className="flex flex-col gap-1 pl-4 border-l border-border/50">
+              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Итого</span>
+              <span className="text-lg font-semibold tabular-nums">{formatMoney(totalExpenses + totalFundDeposits)} ₽</span>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -289,6 +418,7 @@ export default function OperationsPage() {
         <>
           {dayGroups.length > 0 ? (
             <motion.div
+              key={`${selectedOperationType}-${selectedAccountId}`}
               className="space-y-6"
               variants={container}
               initial="hidden"
@@ -298,19 +428,41 @@ export default function OperationsPage() {
                 <motion.div key={group.date} variants={item}>
                   {/* Day Header */}
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-medium text-muted-foreground capitalize">
+                    <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">
                       {formatDateHeader(group.date)}
                     </h2>
                     <div className="flex items-center gap-3 text-xs">
                       {group.totalExpenses > 0 && (
-                        <span className="text-rose-500 font-medium tabular-nums">
-                          −{formatMoney(group.totalExpenses)} ₽
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Расходы:</span>
+                          <span className="text-rose-500 font-medium tabular-nums">
+                            {formatMoney(group.totalExpenses)} ₽
+                          </span>
+                        </div>
                       )}
                       {group.totalTransfers > 0 && (
-                        <span className="text-blue-500 font-medium tabular-nums">
-                          ↔ {formatMoney(group.totalTransfers)} ₽
-                        </span>
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Переводы:</span>
+                          <span className="text-blue-500 font-medium tabular-nums">
+                            {formatMoney(group.totalTransfers)} ₽
+                          </span>
+                        </div>
+                      )}
+                      {group.totalAdjustments > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">Корректировки:</span>
+                          <span className="text-amber-500 font-medium tabular-nums">
+                            {formatMoney(group.totalAdjustments)} ₽
+                          </span>
+                        </div>
+                      )}
+                      {group.totalFundDeposits > 0 && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-muted-foreground">В фонды:</span>
+                          <span className="text-purple-500 font-medium tabular-nums">
+                            {formatMoney(group.totalFundDeposits)} ₽
+                          </span>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -390,6 +542,14 @@ export default function OperationsPage() {
         expense={editingExpense}
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
+      />
+
+      {/* Delete Fund Deposit Result Dialog */}
+      <DeleteTransactionResultDialog
+        result={deleteResult}
+        fundName={deletedFundName}
+        open={deleteResultDialogOpen}
+        onOpenChange={setDeleteResultDialogOpen}
       />
     </div>
   )

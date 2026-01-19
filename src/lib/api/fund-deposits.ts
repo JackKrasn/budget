@@ -3,6 +3,7 @@ import type {
   FundDeposit,
   ListFundDepositsParams,
   ListFundDepositsResponse,
+  DeleteTransactionResponse,
 } from './types'
 
 const ENDPOINT = '/fund-deposits'
@@ -20,7 +21,7 @@ export const fundDepositsApi = {
   get: (id: string) => apiClient.get<FundDeposit>(`${ENDPOINT}/${id}`),
 
   /**
-   * Удалить перевод в фонд
+   * Удалить перевод в фонд (возвращает информацию об изменении балансов)
    */
-  delete: (id: string) => apiClient.delete<void>(`${ENDPOINT}/${id}`),
+  delete: (id: string) => apiClient.delete<DeleteTransactionResponse | null>(`${ENDPOINT}/${id}`),
 }

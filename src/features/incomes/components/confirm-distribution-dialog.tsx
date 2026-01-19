@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { DatePicker } from '@/components/ui/date-picker'
 import { FundIcon } from '@/components/common/category-icon'
 import { useFundAssets } from '@/features/funds'
 import type { IncomeDistribution, FundAssetBalance } from '@/lib/api/types'
@@ -40,27 +41,30 @@ const allocationSchema = z.object({
 const formSchema = z.object({
   actualAmount: z.number().min(0.01, 'Сумма должна быть больше 0'),
   allocations: z.array(allocationSchema),
+  date: z.date({ message: 'Дата обязательна' }),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 interface ConfirmDistributionDialogProps {
   distribution: IncomeDistribution | null
+  incomeDate?: string
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (data: { actualAmount: number; allocations: Array<{ assetId: string; amount: number }> }) => void
+  onConfirm: (data: { actualAmount: number; allocations: Array<{ assetId: string; amount: number }>; actualDate?: string }) => void
   isConfirming?: boolean
 }
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(amount)
 }
 
 export function ConfirmDistributionDialog({
   distribution,
+  incomeDate,
   open,
   onOpenChange,
   onConfirm,
@@ -78,6 +82,7 @@ export function ConfirmDistributionDialog({
     defaultValues: {
       actualAmount: 0,
       allocations: [],
+      date: new Date(),
     },
   })
 
@@ -102,13 +107,17 @@ export function ConfirmDistributionDialog({
     // Set actual amount
     form.setValue('actualAmount', distribution.planned_amount)
 
+    // Set date (use income date if provided, otherwise today)
+    const defaultDate = incomeDate ? new Date(incomeDate) : new Date()
+    form.setValue('date', defaultDate)
+
     // Set initial allocation if we have assets
     if (firstAssetId) {
       replace([{ assetId: firstAssetId, amount: distribution.planned_amount }])
     } else {
       replace([])
     }
-  }, [open, distribution?.id, assetsReady, fundAssets, form, replace, distribution?.planned_amount])
+  }, [open, distribution?.id, assetsReady, fundAssets, form, replace, distribution?.planned_amount, incomeDate])
 
   // Watch actual amount and allocations to check balance
   const actualAmount = form.watch('actualAmount')
@@ -117,9 +126,33 @@ export function ConfirmDistributionDialog({
   const remaining = actualAmount - allocatedTotal
 
   const handleSubmit = (values: FormValues) => {
+    // Helper to format date in local timezone (YYYY-MM-DD)
+    const formatLocalDate = (date: Date): string => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}`
+    }
+
+    // Helper to create ISO datetime string in local timezone
+    const toLocalISOString = (date: Date): string => {
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      return `${year}-${month}-${day}T00:00:00Z`
+    }
+
+    // Convert date to local format for comparison
+    const selectedDate = formatLocalDate(values.date)
+    const defaultDate = incomeDate
+      ? incomeDate.split('T')[0] // Extract date part from ISO string
+      : formatLocalDate(new Date())
+
     onConfirm({
       actualAmount: values.actualAmount,
       allocations: values.allocations,
+      // Only send actualDate if it's different from the income date
+      actualDate: selectedDate !== defaultDate ? toLocalISOString(values.date) : undefined,
     })
   }
 
@@ -177,6 +210,24 @@ export function ConfirmDistributionDialog({
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+            {/* Date */}
+            <FormField
+              control={form.control}
+              name="date"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Дата операции</FormLabel>
+                  <FormControl>
+                    <DatePicker
+                      value={field.value}
+                      onChange={field.onChange}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Actual Amount */}
             <FormField
               control={form.control}

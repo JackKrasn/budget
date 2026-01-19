@@ -53,8 +53,8 @@ import { DateRangePicker, ViewModeTabs, type ViewMode } from '@/components/commo
 function formatMoney(amount: number | undefined | null): string {
   const value = Number(amount) || 0
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   }).format(value)
 }
 

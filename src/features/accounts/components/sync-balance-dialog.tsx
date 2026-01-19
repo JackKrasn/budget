@@ -115,7 +115,7 @@ export function SyncBalanceDialog({
 
   const formatNumber = (num: number) =>
     num.toLocaleString('ru-RU', {
-      minimumFractionDigits: 0,
+      minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
 

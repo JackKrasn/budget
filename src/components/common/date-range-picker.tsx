@@ -59,15 +59,6 @@ export function DateRangePicker({ from, to, onRangeChange }: DateRangePickerProp
     return months.reverse() // Показываем новые месяцы сначала
   }
 
-  // Проверяем, является ли текущий период полным месяцем
-  const isCurrentMonth = () => {
-    const now = new Date()
-    const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
-    const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-
-    return from.getTime() === firstDay.getTime() && to.getTime() === lastDay.getTime()
-  }
-
   const goToPreviousMonth = () => {
     const newDate = new Date(from.getFullYear(), from.getMonth() - 1, 1)
     const firstDay = new Date(newDate.getFullYear(), newDate.getMonth(), 1)
@@ -117,14 +108,13 @@ export function DateRangePicker({ from, to, onRangeChange }: DateRangePickerProp
     return `${format(from, 'd MMM', { locale: ru })} - ${format(to, 'd MMM yyyy', { locale: ru })}`
   }
 
-  const isCurrentMonthActive = isCurrentMonth()
   const canGoNext = from < new Date()
 
   return (
     <div className="flex items-center gap-2">
       {/* Period Type Selector */}
       <Select value={periodType} onValueChange={handlePeriodTypeChange}>
-        <SelectTrigger className="w-[140px]">
+        <SelectTrigger className="w-[140px] text-foreground">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -150,10 +140,7 @@ export function DateRangePicker({ from, to, onRangeChange }: DateRangePickerProp
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className={cn(
-                    'min-w-[180px] capitalize',
-                    isCurrentMonthActive && 'bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground'
-                  )}
+                  className="min-w-[180px] capitalize text-foreground"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {formatDateRange()}
@@ -201,7 +188,7 @@ export function DateRangePicker({ from, to, onRangeChange }: DateRangePickerProp
                 variant="outline"
                 className={cn(
                   'min-w-[280px] justify-start text-left font-normal',
-                  !date && 'text-muted-foreground'
+                  date?.from ? 'text-foreground' : 'text-muted-foreground'
                 )}
               >
                 <CalendarIcon className="mr-2 h-4 w-4" />
