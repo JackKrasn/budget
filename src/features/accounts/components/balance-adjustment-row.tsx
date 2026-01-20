@@ -23,6 +23,15 @@ function formatDate(date: string): string {
   })
 }
 
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+  }
+  return symbols[currency] || currency
+}
+
 interface BalanceAdjustmentRowProps {
   adjustment: BalanceAdjustmentWithAccount
   onDelete?: () => void
@@ -83,7 +92,7 @@ export function BalanceAdjustmentRow({ adjustment, onDelete }: BalanceAdjustment
           isPositive ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'
         }`}
       >
-        {isPositive ? '+' : '-'}{formatMoney(adjustment.amount)} ₽
+        {isPositive ? '+' : '-'}{formatMoney(adjustment.amount)} {getCurrencySymbol(adjustment.account_currency)}
       </span>
 
       {/* Actions */}

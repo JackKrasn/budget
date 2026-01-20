@@ -48,6 +48,15 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+  }
+  return symbols[currency] || currency
+}
+
 function formatDateHeader(date: string): string {
   const d = new Date(date)
   const today = new Date()
@@ -82,7 +91,7 @@ interface DayGroup {
   operations: Operation[]
   totalExpenses: number
   totalTransfers: number
-  totalAdjustments: number
+  totalAdjustmentsByCurrency: Record<string, number>
   totalFundDeposits: number
 }
 
@@ -218,15 +227,20 @@ export default function OperationsPage() {
           .filter((op) => op.type === 'transfer')
           .reduce((sum, op) => sum + (op.data as TransferWithAccounts).amount, 0)
 
-        const totalAdjustments = ops
+        const totalAdjustmentsByCurrency: Record<string, number> = {}
+        ops
           .filter((op) => op.type === 'adjustment')
-          .reduce((sum, op) => sum + Math.abs((op.data as BalanceAdjustmentWithAccount).amount), 0)
+          .forEach((op) => {
+            const adj = op.data as BalanceAdjustmentWithAccount
+            const currency = adj.account_currency || 'RUB'
+            totalAdjustmentsByCurrency[currency] = (totalAdjustmentsByCurrency[currency] || 0) + Math.abs(adj.amount)
+          })
 
         const totalFundDeposits = ops
           .filter((op) => op.type === 'fund_deposit')
           .reduce((sum, op) => sum + (op.data as FundDeposit).amount, 0)
 
-        return { date, operations: ops, totalExpenses, totalTransfers, totalAdjustments, totalFundDeposits }
+        return { date, operations: ops, totalExpenses, totalTransfers, totalAdjustmentsByCurrency, totalFundDeposits }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [expenses, transfers, adjustments, fundDeposits, selectedAccountId, selectedOperationType])
@@ -458,11 +472,16 @@ export default function OperationsPage() {
                           </span>
                         </div>
                       )}
-                      {group.totalAdjustments > 0 && (
+                      {Object.keys(group.totalAdjustmentsByCurrency).length > 0 && (
                         <div className="flex items-center gap-1">
                           <span className="text-muted-foreground">Корректировки:</span>
                           <span className="text-amber-500 font-medium tabular-nums">
-                            {formatMoney(group.totalAdjustments)} ₽
+                            {Object.entries(group.totalAdjustmentsByCurrency).map(([currency, amount], index) => (
+                              <span key={currency}>
+                                {index > 0 && ', '}
+                                {formatMoney(amount)} {getCurrencySymbol(currency)}
+                              </span>
+                            ))}
                           </span>
                         </div>
                       )}
