@@ -45,6 +45,12 @@ export const TRANSACTION_TYPES: Record<
     color: 'red',
     description: 'Финансирование расхода из фонда',
   },
+  contribution: {
+    label: 'Поступление',
+    icon: 'Wallet',
+    color: 'green',
+    description: 'Поступление в фонд / начальный остаток',
+  },
 }
 
 export const ERROR_MESSAGES = {

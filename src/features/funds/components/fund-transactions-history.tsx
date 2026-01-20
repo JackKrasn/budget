@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -13,6 +13,7 @@ import {
   X,
   ExternalLink,
   Trash2,
+  Wallet,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,18 +24,32 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
-import { useFundTransactions, useDeleteContribution, useDeleteTransaction, useFund } from '../hooks'
+import { useFundTransactions, useFundContributions, useDeleteContribution, useDeleteTransaction, useFund } from '../hooks'
 import { DeleteContributionResultDialog } from './delete-contribution-result-dialog'
 import { DeleteTransactionResultDialog } from './delete-transaction-result-dialog'
 import { ConfirmDeleteTransactionDialog } from './confirm-delete-transaction-dialog'
-import type { FundTransaction, FundTransactionType, NullFloat64, DeleteContributionResponse, DeleteTransactionResponse } from '@/lib/api/types'
+import type { FundTransaction, FundTransactionType, FundContribution, NullFloat64, DeleteContributionResponse, DeleteTransactionResponse } from '@/lib/api/types'
 import { TRANSACTION_TYPES } from '../constants'
+
+// Unified history item type
+type HistoryItem =
+  | (FundTransaction & { itemType: 'transaction' })
+  | (FundContribution & { itemType: 'contribution'; transaction_type: 'contribution' })
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
+}
+
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+  }
+  return symbols[currency] || currency
 }
 
 function formatDate(date: string): string {
@@ -60,6 +75,7 @@ function getTransactionIcon(type: FundTransactionType) {
     transfer_out: ArrowUpRight,
     deposit: Plus,
     withdrawal: Receipt,
+    contribution: Wallet,
   }
   return icons[type] || ShoppingCart
 }
@@ -91,6 +107,7 @@ interface FundTransactionsHistoryProps {
 }
 
 const ALL_TRANSACTION_TYPES: FundTransactionType[] = [
+  'contribution',
   'buy',
   'sell',
   'transfer_in',
@@ -113,24 +130,66 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   const [transactionToDelete, setTransactionToDelete] = useState<FundTransaction | null>(null)
 
   const { data: fundData } = useFund(fundId)
-  const { data, isLoading } = useFundTransactions(fundId, {
-    type: selectedTypes.length === 1 ? selectedTypes[0] : undefined,
+
+  // Only fetch transactions if contribution is not the only selected type
+  const shouldFetchTransactions = selectedTypes.some(t => t !== 'contribution')
+  const { data: transactionsData, isLoading: isLoadingTransactions } = useFundTransactions(fundId, {
+    type: selectedTypes.length === 1 && selectedTypes[0] !== 'contribution' ? selectedTypes[0] : undefined,
     from: dateFrom || undefined,
     to: dateTo || undefined,
   })
+
+  // Fetch contributions
+  const shouldFetchContributions = selectedTypes.includes('contribution')
+  const { data: contributionsData, isLoading: isLoadingContributions } = useFundContributions(fundId)
 
   const deleteContribution = useDeleteContribution()
   const deleteTransaction = useDeleteTransaction()
 
   const fundName = fundData?.fund.name || ''
 
-  const transactions = data?.data ?? []
+  const transactions = transactionsData?.data ?? []
+  const contributions = contributionsData?.data ?? []
+
+  // Combine and sort by date (newest first)
+  const combinedHistory = useMemo(() => {
+    const items: HistoryItem[] = []
+
+    // Add transactions
+    if (shouldFetchTransactions) {
+      transactions.forEach(tx => {
+        items.push({ ...tx, itemType: 'transaction' })
+      })
+    }
+
+    // Add contributions (converted to HistoryItem format)
+    if (shouldFetchContributions) {
+      contributions.forEach(c => {
+        // Filter by date if filters are set
+        if (dateFrom && c.date < dateFrom) return
+        if (dateTo && c.date > dateTo) return
+
+        items.push({
+          ...c,
+          itemType: 'contribution',
+          transaction_type: 'contribution' as const
+        })
+      })
+    }
+
+    // Sort by date descending (newest first)
+    items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+
+    return items
+  }, [transactions, contributions, shouldFetchTransactions, shouldFetchContributions, dateFrom, dateTo])
 
   // Filter by selected types (client-side when multiple types selected)
   const filteredTransactions =
     selectedTypes.length === ALL_TRANSACTION_TYPES.length
-      ? transactions
-      : transactions.filter((tx) => selectedTypes.includes(tx.transaction_type))
+      ? combinedHistory
+      : combinedHistory.filter((item) => selectedTypes.includes(item.transaction_type))
+
+  const isLoading = isLoadingTransactions || isLoadingContributions
 
   const handleTypeToggle = (type: FundTransactionType) => {
     setSelectedTypes((prev) =>
@@ -330,12 +389,15 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
       {/* Transactions list */}
       {filteredTransactions.length > 0 ? (
         <div className="space-y-2">
-          {filteredTransactions.map((tx, index) => {
-            const Icon = getTransactionIcon(tx.transaction_type)
-            const color = getTransactionColor(tx.transaction_type)
-            const pricePerUnit = getNullableFloat(tx.price_per_unit)
-            const totalValue = getNullableFloat(tx.total_value)
-            const counterpart = getCounterpartLabel(tx)
+          {filteredTransactions.map((item, index) => {
+            const Icon = getTransactionIcon(item.transaction_type)
+            const color = getTransactionColor(item.transaction_type)
+            const isContribution = item.itemType === 'contribution'
+
+            // Get transaction-specific values
+            const pricePerUnit = !isContribution ? getNullableFloat(item.price_per_unit) : null
+            const totalValue = !isContribution ? getNullableFloat(item.total_value) : null
+            const counterpart = !isContribution ? getCounterpartLabel(item) : null
 
             const colorClasses = {
               green: {
@@ -365,11 +427,16 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
             }
 
             const classes = colorClasses[color as keyof typeof colorClasses] || colorClasses.green
-            const isWithdrawal = tx.transaction_type === 'withdrawal'
-            const isDeposit = tx.transaction_type === 'deposit'
-            const isIncomeDistribution = isDeposit && !!tx.contribution_income_id
-            // Can delete: deposits with contribution_id OR other transaction types (buy, sell, transfer)
-            const canDelete = (isDeposit && !!tx.contribution_id) || (!isDeposit && !isWithdrawal)
+
+            // Transaction-specific flags
+            const isWithdrawal = item.transaction_type === 'withdrawal'
+            const isDeposit = item.transaction_type === 'deposit'
+            const isIncomeDistribution = !isContribution && isDeposit && !!item.contribution_income_id
+
+            // Can delete: contributions OR deposits with contribution_id OR other transaction types (buy, sell, transfer)
+            const canDelete = isContribution ||
+              (!isContribution && isDeposit && !!item.contribution_id) ||
+              (!isContribution && !isDeposit && !isWithdrawal)
 
             const handleClick = () => {
               if (isWithdrawal) {
@@ -381,13 +448,35 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
               e.stopPropagation()
               if (!canDelete) return
 
-              setTransactionToDelete(tx)
-              setConfirmDeleteDialogOpen(true)
+              if (isContribution) {
+                // For contributions, we need to call delete contribution with the contribution id
+                deleteContribution.mutateAsync({
+                  fundId,
+                  contributionId: item.id,
+                }).then(result => {
+                  if (result && (result.fundBalances.length > 0 || result.accountBalances)) {
+                    setDeleteContributionResult(result)
+                    setDeleteContributionResultDialogOpen(true)
+                  }
+                }).catch(error => {
+                  console.error('Delete contribution error:', error)
+                })
+              } else {
+                setTransactionToDelete(item)
+                setConfirmDeleteDialogOpen(true)
+              }
             }
+
+            // Get display amount and label
+            const displayAmount = isContribution ? item.total_amount : item.amount
+            const displayCurrency = item.currency || ''
+            const displayLabel = isContribution
+              ? (item.note === 'Начальный остаток' ? 'Начальный остаток' : 'Поступление в фонд')
+              : (!isContribution ? (item.asset_ticker || item.asset_name) : '')
 
             return (
               <motion.div
-                key={tx.id}
+                key={item.id}
                 initial={{ opacity: 0, x: -10 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: index * 0.03 }}
@@ -404,13 +493,20 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className={`font-medium ${classes.text}`}>
-                      {tx.transaction_type === 'buy' || tx.transaction_type === 'sell'
-                        ? `${tx.transaction_type === 'buy' ? '+' : '-'}${formatMoney(tx.amount)}`
-                        : tx.transaction_type === 'transfer_out' || tx.transaction_type === 'withdrawal'
-                          ? `-${formatMoney(tx.amount)}`
-                          : `+${formatMoney(tx.amount)}`}{' '}
-                      {tx.asset_ticker || tx.asset_name}
+                      {isContribution
+                        ? `+${formatMoney(displayAmount)} ${getCurrencySymbol(displayCurrency)}`
+                        : item.transaction_type === 'buy' || item.transaction_type === 'sell'
+                          ? `${item.transaction_type === 'buy' ? '+' : '-'}${formatMoney(displayAmount)}`
+                          : item.transaction_type === 'transfer_out' || item.transaction_type === 'withdrawal'
+                            ? `-${formatMoney(displayAmount)}`
+                            : `+${formatMoney(displayAmount)}`}{' '}
+                      {!isContribution && displayLabel}
                     </p>
+                    {isContribution && (
+                      <Badge variant="secondary" className="text-xs">
+                        {displayLabel}
+                      </Badge>
+                    )}
                     {isIncomeDistribution && (
                       <Badge variant="secondary" className="text-xs">
                         Из дохода
@@ -421,15 +517,18 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                     )}
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{formatDate(tx.date)}</span>
+                    <span>{formatDate(item.date)}</span>
                     {pricePerUnit !== null && (
                       <span>• {formatMoney(pricePerUnit)} за ед.</span>
                     )}
-                    {totalValue !== null && (
-                      <span>• {formatMoney(totalValue)} {tx.currency}</span>
+                    {totalValue !== null && !isContribution && (
+                      <span>• {formatMoney(totalValue)} {item.currency}</span>
                     )}
                     {counterpart && <span>• {counterpart}</span>}
-                    {tx.note && <span>• {tx.note}</span>}
+                    {!isContribution && item.note && <span>• {item.note}</span>}
+                    {isContribution && item.note && item.note !== 'Начальный остаток' && (
+                      <span>• {item.note}</span>
+                    )}
                   </div>
                 </div>
                 {canDelete && (

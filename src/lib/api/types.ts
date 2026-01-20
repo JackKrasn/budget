@@ -1213,6 +1213,7 @@ export interface BalanceAdjustment {
 
 export interface BalanceAdjustmentWithAccount extends BalanceAdjustment {
   account_name: string
+  account_currency: string
 }
 
 export interface CreateBalanceAdjustmentRequest {
@@ -1289,6 +1290,7 @@ export type FundTransactionType =
   | 'transfer_out'
   | 'deposit'
   | 'withdrawal'
+  | 'contribution'
 
 export interface BuyAssetRequest {
   assetId: string
