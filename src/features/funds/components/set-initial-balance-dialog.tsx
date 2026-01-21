@@ -11,6 +11,7 @@ import {
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -25,31 +26,47 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Settings, Loader2 } from 'lucide-react'
-import { useCreateContribution } from '../hooks'
+import { Settings, Loader2, Coins, TrendingUp } from 'lucide-react'
+import { useAddFundAsset } from '../hooks'
 import { useAssets } from '@/features/assets'
-import type { FundBalance } from '@/lib/api/types'
+import type { FundBalance, AssetWithType } from '@/lib/api/types'
 
-const CURRENCIES = [
-  { value: 'RUB', label: '₽', name: 'Рубль' },
-  { value: 'USD', label: '$', name: 'Доллар' },
-  { value: 'EUR', label: '€', name: 'Евро' },
-]
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  RUB: '₽',
+  USD: '$',
+  EUR: '€',
+  GEL: '₾',
+  TRY: '₺',
+}
 
 const formSchema = z.object({
   date: z.string().min(1, 'Выберите дату'),
-  amount: z.string().min(1, 'Введите сумму'),
-  currency: z.string().min(1, 'Выберите валюту'),
+  amount: z.string().min(1, 'Введите количество'),
   assetId: z.string().min(1, 'Выберите актив'),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
-function formatMoney(amount: number): string {
+function formatMoney(amount: number, decimals: number = 2): string {
   return new Intl.NumberFormat('ru-RU', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
   }).format(amount)
+}
+
+function formatQuantity(amount: number): string {
+  // For quantities (stocks, ETF), show without decimal if whole number
+  if (Number.isInteger(amount)) {
+    return new Intl.NumberFormat('ru-RU').format(amount)
+  }
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
+  }).format(amount)
+}
+
+function isCurrencyAsset(asset: AssetWithType | undefined): boolean {
+  return asset?.type_code === 'currency'
 }
 
 interface SetInitialBalanceDialogProps {
@@ -63,7 +80,7 @@ export function SetInitialBalanceDialog({
   open,
   onOpenChange,
 }: SetInitialBalanceDialogProps) {
-  const createContribution = useCreateContribution()
+  const addFundAsset = useAddFundAsset()
   const { data: assetsData } = useAssets()
 
   const allAssets = assetsData?.data ?? []
@@ -73,14 +90,21 @@ export function SetInitialBalanceDialog({
     defaultValues: {
       date: new Date().toISOString().split('T')[0],
       amount: '',
-      currency: 'RUB',
       assetId: '',
     },
   })
 
   const watchAmount = form.watch('amount')
-  const watchCurrency = form.watch('currency')
-  const selectedCurrency = CURRENCIES.find((c) => c.value === watchCurrency)
+  const watchAssetId = form.watch('assetId')
+
+  // Find selected asset to determine its type
+  const selectedAsset = allAssets.find((a) => a.id === watchAssetId)
+  const isCurrency = isCurrencyAsset(selectedAsset)
+
+  // Get currency symbol for currency assets
+  const currencySymbol = selectedAsset
+    ? CURRENCY_SYMBOLS[selectedAsset.currency] || selectedAsset.currency
+    : ''
 
   const handleClose = () => {
     form.reset()
@@ -93,19 +117,11 @@ export function SetInitialBalanceDialog({
     const amount = parseFloat(values.amount)
 
     try {
-      await createContribution.mutateAsync({
+      await addFundAsset.mutateAsync({
         fundId: fund.fund.id,
         data: {
-          date: values.date,
-          totalAmount: amount,
-          currency: values.currency,
-          allocations: [
-            {
-              assetId: values.assetId,
-              amount: amount,
-            },
-          ],
-          note: 'Начальный остаток',
+          assetId: values.assetId,
+          amount: amount,
         },
       })
 
@@ -152,22 +168,38 @@ export function SetInitialBalanceDialog({
             {/* Live Amount Preview */}
             <AnimatePresence mode="wait">
               <motion.div
-                key={watchAmount}
+                key={`${watchAmount}-${watchAssetId}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
                 transition={{ duration: 0.2 }}
                 className="mt-2"
               >
-                <p className="text-sm text-muted-foreground">Начальный остаток</p>
+                <p className="text-sm text-muted-foreground">
+                  {isCurrency ? 'Начальный остаток' : 'Количество'}
+                </p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-bold tabular-nums tracking-tight">
-                    {amountNum > 0 ? formatMoney(amountNum) : '0'}
+                    {amountNum > 0
+                      ? isCurrency
+                        ? formatMoney(amountNum)
+                        : formatQuantity(amountNum)
+                      : '0'}
                   </span>
                   <span className="text-2xl font-medium text-muted-foreground">
-                    {selectedCurrency?.label || '₽'}
+                    {isCurrency
+                      ? currencySymbol
+                      : selectedAsset
+                        ? 'шт.'
+                        : ''}
                   </span>
                 </div>
+                {selectedAsset && !isCurrency && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {selectedAsset.name}
+                    {selectedAsset.ticker && ` (${selectedAsset.ticker})`}
+                  </p>
+                )}
               </motion.div>
             </AnimatePresence>
           </DialogHeader>
@@ -176,101 +208,11 @@ export function SetInitialBalanceDialog({
         {/* Form */}
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5 px-6 pb-6">
-            {/* Date */}
+            {/* Asset - first, so user knows what they're adding */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.15 }}
-            >
-              <FormField
-                control={form.control}
-                name="date"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-muted-foreground">
-                      Дата
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="date"
-                        className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </motion.div>
-
-            {/* Amount */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <FormField
-                control={form.control}
-                name="amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-muted-foreground">
-                      Сумма *
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        step="any"
-                        placeholder="0"
-                        className="h-12 border-0 bg-muted/50 text-lg font-medium tabular-nums transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </motion.div>
-
-            {/* Currency */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.25 }}
-            >
-              <FormField
-                control={form.control}
-                name="currency"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-muted-foreground">
-                      Валюта *
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20">
-                          <SelectValue placeholder="Выберите валюту" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {CURRENCIES.map((currency) => (
-                          <SelectItem key={currency.value} value={currency.value}>
-                            {currency.label} {currency.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </motion.div>
-
-            {/* Asset */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
             >
               <FormField
                 control={form.control}
@@ -287,11 +229,32 @@ export function SetInitialBalanceDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {allAssets.map((asset) => (
-                          <SelectItem key={asset.id} value={asset.id}>
-                            {asset.name} ({asset.ticker || asset.currency})
-                          </SelectItem>
-                        ))}
+                        {allAssets.map((asset) => {
+                          const isAssetCurrency = asset.type_code === 'currency'
+                          const icon = isAssetCurrency ? (
+                            <Coins className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                          )
+                          return (
+                            <SelectItem key={asset.id} value={asset.id}>
+                              <div className="flex items-center gap-2">
+                                {icon}
+                                <span>{asset.name}</span>
+                                {asset.ticker && (
+                                  <span className="text-muted-foreground">
+                                    ({asset.ticker})
+                                  </span>
+                                )}
+                                {isAssetCurrency && (
+                                  <span className="text-muted-foreground">
+                                    {CURRENCY_SYMBOLS[asset.currency] || asset.currency}
+                                  </span>
+                                )}
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -300,11 +263,56 @@ export function SetInitialBalanceDialog({
               />
             </motion.div>
 
+            {/* Amount/Quantity */}
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <FormField
+                control={form.control}
+                name="amount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-sm text-muted-foreground">
+                      {isCurrency ? 'Сумма' : 'Количество'} *
+                    </FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step={isCurrency ? '0.01' : '1'}
+                          min="0"
+                          placeholder="0"
+                          className="h-12 border-0 bg-muted/50 text-lg font-medium tabular-nums transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20 pr-12"
+                          {...field}
+                        />
+                        {selectedAsset && (
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            {isCurrency ? currencySymbol : 'шт.'}
+                          </span>
+                        )}
+                      </div>
+                    </FormControl>
+                    {selectedAsset && !isCurrency && (
+                      <FormDescription>
+                        Укажите количество единиц актива
+                      </FormDescription>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </motion.div>
+
+            {/* Date - hidden for now, using current date */}
+            <input type="hidden" {...form.register('date')} />
+
             {/* Actions */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.35 }}
+              transition={{ delay: 0.25 }}
               className="flex gap-3 pt-2"
             >
               <Button
@@ -318,9 +326,9 @@ export function SetInitialBalanceDialog({
               <Button
                 type="submit"
                 className="h-12 flex-1 font-medium"
-                disabled={createContribution.isPending}
+                disabled={addFundAsset.isPending}
               >
-                {createContribution.isPending ? (
+                {addFundAsset.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Сохранение...
