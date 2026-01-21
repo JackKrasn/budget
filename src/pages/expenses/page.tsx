@@ -781,11 +781,7 @@ export default function ExpensesPage() {
                             <motion.div key={op.id} variants={item}>
                               <TransferRow
                                 transfer={transfer}
-                                onDelete={() => {
-                                  if (confirm('Удалить этот перевод?')) {
-                                    deleteTransfer.mutate(transfer.id)
-                                  }
-                                }}
+                                onDelete={() => deleteTransfer.mutate(transfer.id)}
                               />
                             </motion.div>
                           )
@@ -1029,11 +1025,7 @@ export default function ExpensesPage() {
                     <motion.div key={transfer.id} variants={item}>
                       <TransferRow
                         transfer={transfer}
-                        onDelete={() => {
-                          if (confirm('Удалить этот перевод?')) {
-                            deleteTransfer.mutate(transfer.id)
-                          }
-                        }}
+                        onDelete={() => deleteTransfer.mutate(transfer.id)}
                       />
                     </motion.div>
                   ))}

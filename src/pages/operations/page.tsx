@@ -266,9 +266,7 @@ export default function OperationsPage() {
   }
 
   const handleDeleteTransfer = (transfer: TransferWithAccounts) => {
-    if (confirm('Удалить этот перевод?')) {
-      deleteTransfer.mutate(transfer.id)
-    }
+    deleteTransfer.mutate(transfer.id)
   }
 
   const handleDeleteAdjustment = (adjustment: BalanceAdjustmentWithAccount) => {
