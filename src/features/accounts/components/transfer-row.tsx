@@ -3,21 +3,12 @@ import { motion } from 'framer-motion'
 import { ArrowRight, ArrowUpDown, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog'
-import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ConfirmDeleteTransferDialog } from './confirm-delete-transfer-dialog'
 import type { TransferWithAccounts } from '@/lib/api/types'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -153,26 +144,12 @@ export function TransferRow({ transfer, onDelete }: TransferRowProps) {
       </motion.div>
 
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Удалить перевод?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Перевод {formatMoney(transfer.amount)} {fromCurrencySymbol} из "{transfer.from_account_name}"
-              в "{transfer.to_account_name}" будет удалён. Балансы счетов будут восстановлены.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Отмена</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              Удалить
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDeleteTransferDialog
+        transfer={transfer}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+      />
 
       {/* Transfer Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
