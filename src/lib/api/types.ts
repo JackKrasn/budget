@@ -1249,7 +1249,11 @@ export interface Transfer {
   from_account_id: UUID
   to_account_id: UUID
   amount: number
-  currency: string
+  to_amount?: number
+  from_currency: string
+  to_currency: string
+  exchange_rate?: number
+  fee_amount?: number
   date: ISODate
   description?: string
   created_at: ISODate
@@ -1264,7 +1268,9 @@ export interface CreateTransferRequest {
   fromAccountId: string
   toAccountId: string
   amount: number
-  currency: string
+  toAmount?: number // Сумма зачисления (обязательно если валюты разные)
+  exchangeRate?: number // Курс обмена (опционально)
+  feeAmount?: number // Комиссия (опционально, списывается со счёта-источника)
   date: string
   description?: string
 }
