@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Settings, Loader2, Coins, TrendingUp } from 'lucide-react'
-import { useAddFundAsset } from '../hooks'
+import { useCreateContribution } from '../hooks'
 import { useAssets } from '@/features/assets'
 import type { FundBalance, AssetWithType } from '@/lib/api/types'
 
@@ -80,7 +80,7 @@ export function SetInitialBalanceDialog({
   open,
   onOpenChange,
 }: SetInitialBalanceDialogProps) {
-  const addFundAsset = useAddFundAsset()
+  const createContribution = useCreateContribution()
   const { data: assetsData } = useAssets()
 
   const allAssets = assetsData?.data ?? []
@@ -112,16 +112,26 @@ export function SetInitialBalanceDialog({
   }
 
   async function onSubmit(values: FormValues) {
-    if (!fund) return
+    if (!fund || !selectedAsset) return
 
     const amount = parseFloat(values.amount)
 
     try {
-      await addFundAsset.mutateAsync({
+      await createContribution.mutateAsync({
         fundId: fund.fund.id,
         data: {
-          assetId: values.assetId,
-          amount: amount,
+          date: values.date,
+          totalAmount: amount,
+          currency: selectedAsset.currency,
+          allocations: [
+            {
+              assetId: values.assetId,
+              amount: amount,
+            },
+          ],
+          note: isCurrency
+            ? 'Начальный остаток'
+            : `Начальный остаток: ${selectedAsset.name}${selectedAsset.ticker ? ` (${selectedAsset.ticker})` : ''}`,
         },
       })
 
@@ -326,9 +336,9 @@ export function SetInitialBalanceDialog({
               <Button
                 type="submit"
                 className="h-12 flex-1 font-medium"
-                disabled={addFundAsset.isPending}
+                disabled={createContribution.isPending}
               >
-                {addFundAsset.isPending ? (
+                {createContribution.isPending ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Сохранение...
