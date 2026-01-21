@@ -44,6 +44,9 @@ const formSchema = z.object({
   fromAccountId: z.string().min(1, 'Выберите счёт списания'),
   toAccountId: z.string().min(1, 'Выберите счёт зачисления'),
   amount: z.string().min(1, 'Введите сумму'),
+  toAmount: z.string().optional(),
+  exchangeRate: z.string().optional(),
+  feeAmount: z.string().optional(),
   date: z.string().min(1, 'Выберите дату'),
   description: z.string().optional(),
 }).refine((data) => data.fromAccountId !== data.toAccountId, {
@@ -76,6 +79,9 @@ export function TransferDialog({
       fromAccountId: defaultFromAccountId || '',
       toAccountId: defaultToAccountId || '',
       amount: '',
+      toAmount: '',
+      exchangeRate: '',
+      feeAmount: '',
       date: new Date().toISOString().split('T')[0],
       description: '',
     },
@@ -98,6 +104,9 @@ export function TransferDialog({
         fromAccountId: defaultFromAccountId || '',
         toAccountId: defaultToAccountId || '',
         amount: '',
+        toAmount: '',
+        exchangeRate: '',
+        feeAmount: '',
         date: new Date().toISOString().split('T')[0],
         description: '',
       })
@@ -105,10 +114,36 @@ export function TransferDialog({
   }, [open, defaultFromAccountId, defaultToAccountId, form])
 
   const watchedFromAccountId = form.watch('fromAccountId')
+  const watchedToAccountId = form.watch('toAccountId')
+  const watchedAmount = form.watch('amount')
+  const watchedToAmount = form.watch('toAmount')
+
   const fromAccount = accounts.find((a) => a.id === watchedFromAccountId)
-  const currencySymbol = fromAccount
-    ? CURRENCY_SYMBOLS[fromAccount.currency] || fromAccount.currency
+  const toAccount = accounts.find((a) => a.id === watchedToAccountId)
+
+  const fromCurrency = fromAccount?.currency
+  const toCurrency = toAccount?.currency
+  const isDifferentCurrencies = fromCurrency && toCurrency && fromCurrency !== toCurrency
+
+  const fromCurrencySymbol = fromCurrency
+    ? CURRENCY_SYMBOLS[fromCurrency] || fromCurrency
     : '₽'
+  const toCurrencySymbol = toCurrency
+    ? CURRENCY_SYMBOLS[toCurrency] || toCurrency
+    : '₽'
+
+  // Auto-calculate exchange rate when both amounts are entered
+  // Rate shows: how much fromCurrency per 1 toCurrency (e.g., 80.55 RUB per 1 USD)
+  useEffect(() => {
+    if (isDifferentCurrencies && watchedAmount && watchedToAmount) {
+      const amount = parseFloat(watchedAmount)
+      const toAmount = parseFloat(watchedToAmount)
+      if (amount > 0 && toAmount > 0) {
+        const rate = amount / toAmount
+        form.setValue('exchangeRate', rate.toFixed(2))
+      }
+    }
+  }, [watchedAmount, watchedToAmount, isDifferentCurrencies, form])
 
   const handleSwapAccounts = () => {
     const from = form.getValues('fromAccountId')
@@ -125,14 +160,27 @@ export function TransferDialog({
         return
       }
 
-      // Get currency from source account
-      const currency = fromAccount?.currency || 'RUB'
+      // Validate toAmount is required for different currencies
+      if (isDifferentCurrencies) {
+        const toAmount = values.toAmount ? parseFloat(values.toAmount) : 0
+        if (isNaN(toAmount) || toAmount <= 0) {
+          form.setError('toAmount', { message: 'Введите сумму зачисления' })
+          return
+        }
+      }
+
+      // Parse optional numeric fields
+      const toAmount = values.toAmount ? parseFloat(values.toAmount) : undefined
+      const exchangeRate = values.exchangeRate ? parseFloat(values.exchangeRate) : undefined
+      const feeAmount = values.feeAmount ? parseFloat(values.feeAmount) : undefined
 
       await createTransfer.mutateAsync({
         fromAccountId: values.fromAccountId,
         toAccountId: values.toAccountId,
         amount,
-        currency,
+        ...(isDifferentCurrencies && toAmount ? { toAmount } : {}),
+        ...(exchangeRate ? { exchangeRate } : {}),
+        ...(feeAmount && feeAmount > 0 ? { feeAmount } : {}),
         date: values.date,
         description: values.description || undefined,
       })
@@ -298,7 +346,9 @@ export function TransferDialog({
               name="amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Сумма</FormLabel>
+                  <FormLabel>
+                    {isDifferentCurrencies ? 'Сумма списания' : 'Сумма'}
+                  </FormLabel>
                   <FormControl>
                     <div className="relative">
                       <Input
@@ -310,19 +360,162 @@ export function TransferDialog({
                         {...field}
                       />
                       <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                        {currencySymbol}
+                        {fromCurrencySymbol}
                       </span>
                     </div>
                   </FormControl>
                   {fromAccount && (
                     <FormDescription>
-                      Доступно: {formatNumber(fromAccount.current_balance)} {currencySymbol}
+                      Доступно: {formatNumber(fromAccount.current_balance)} {fromCurrencySymbol}
                     </FormDescription>
                   )}
                   <FormMessage />
                 </FormItem>
               )}
             />
+
+            {/* Currency Conversion Fields - shown only when currencies differ */}
+            {isDifferentCurrencies && (
+              <div className="space-y-4 rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
+                <div className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400">
+                  <ArrowUpDown className="h-4 w-4" />
+                  Конвертация {fromCurrency} → {toCurrency}
+                </div>
+
+                {/* To Amount */}
+                <FormField
+                  control={form.control}
+                  name="toAmount"
+                  render={({ field }) => {
+                    const amountNotEntered = !watchedAmount || parseFloat(watchedAmount) <= 0
+                    return (
+                      <FormItem>
+                        <FormLabel>Сумма зачисления</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              placeholder={amountNotEntered ? 'Сначала введите сумму списания' : '0'}
+                              className="pr-10"
+                              disabled={amountNotEntered}
+                              {...field}
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              {toCurrencySymbol}
+                            </span>
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )
+                  }}
+                />
+
+                {/* Exchange Rate */}
+                <FormField
+                  control={form.control}
+                  name="exchangeRate"
+                  render={({ field }) => {
+                    const rate = field.value ? parseFloat(field.value) : 0
+                    // For reverse rate use more precision for small values
+                    const reverseRate = rate > 0
+                      ? (1 / rate < 1 ? (1 / rate).toFixed(4) : (1 / rate).toFixed(2))
+                      : '?'
+                    return (
+                      <FormItem>
+                        <FormLabel>Курс обмена</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Рассчитывается автоматически"
+                              className="pr-24"
+                              {...field}
+                              readOnly
+                            />
+                            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">
+                              {fromCurrencySymbol}/{toCurrencySymbol}
+                            </span>
+                          </div>
+                        </FormControl>
+                        <FormDescription>
+                          1 {toCurrencySymbol} = {field.value || '?'} {fromCurrencySymbol}
+                          {' · '}
+                          1 {fromCurrencySymbol} = {reverseRate} {toCurrencySymbol}
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )
+                  }}
+                />
+
+                {/* Fee Amount */}
+                <FormField
+                  control={form.control}
+                  name="feeAmount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Комиссия (опционально)</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <Input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0"
+                            className="pr-10"
+                            {...field}
+                          />
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            {fromCurrencySymbol}
+                          </span>
+                        </div>
+                      </FormControl>
+                      <FormDescription>
+                        Дополнительно спишется со счёта-источника
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+            )}
+
+            {/* Fee Amount for same currency transfers */}
+            {!isDifferentCurrencies && (
+              <FormField
+                control={form.control}
+                name="feeAmount"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Комиссия (опционально)</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          placeholder="0"
+                          className="pr-10"
+                          {...field}
+                        />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          {fromCurrencySymbol}
+                        </span>
+                      </div>
+                    </FormControl>
+                    <FormDescription>
+                      Дополнительно спишется со счёта-источника
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Date */}
             <FormField
