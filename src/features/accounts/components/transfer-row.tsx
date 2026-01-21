@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, ArrowUpDown, MoreHorizontal, Trash2 } from 'lucide-react'
+import { ArrowRight, ArrowUpDown, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -8,12 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+import { ConfirmDeleteTransferDialog } from './confirm-delete-transfer-dialog'
 import type { TransferWithAccounts } from '@/lib/api/types'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -53,6 +48,7 @@ interface TransferRowProps {
 
 export function TransferRow({ transfer, onDelete }: TransferRowProps) {
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const fromCurrencySymbol = CURRENCY_SYMBOLS[transfer.from_currency] || transfer.from_currency
   const toCurrencySymbol = CURRENCY_SYMBOLS[transfer.to_currency] || transfer.to_currency
@@ -67,6 +63,11 @@ export function TransferRow({ transfer, onDelete }: TransferRowProps) {
       ? (1 / parseFloat(exchangeRate)).toFixed(4)
       : (1 / parseFloat(exchangeRate)).toFixed(2))
     : null
+
+  const handleDelete = () => {
+    setDeleteDialogOpen(false)
+    onDelete?.()
+  }
 
   return (
     <>
@@ -128,32 +129,27 @@ export function TransferRow({ transfer, onDelete }: TransferRowProps) {
           )}
         </div>
 
-        {/* Actions */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              onClick={(e) => {
-                e.stopPropagation()
-                onDelete?.()
-              }}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Удалить
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Delete button */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10"
+          onClick={(e) => {
+            e.stopPropagation()
+            setDeleteDialogOpen(true)
+          }}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </motion.div>
+
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDeleteTransferDialog
+        transfer={transfer}
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+      />
 
       {/* Transfer Details Dialog */}
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
