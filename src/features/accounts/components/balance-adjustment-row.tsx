@@ -1,12 +1,15 @@
+import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { RefreshCw, MoreHorizontal, Trash2, TrendingUp, TrendingDown } from 'lucide-react'
+import { RefreshCw, MoreHorizontal, Trash2, TrendingUp, TrendingDown, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { EditAdjustmentDialog } from './edit-adjustment-dialog'
 import type { BalanceAdjustmentWithAccount } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
@@ -38,6 +41,7 @@ interface BalanceAdjustmentRowProps {
 }
 
 export function BalanceAdjustmentRow({ adjustment, onDelete }: BalanceAdjustmentRowProps) {
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const isPositive = adjustment.amount >= 0
 
   return (
@@ -107,6 +111,11 @@ export function BalanceAdjustmentRow({ adjustment, onDelete }: BalanceAdjustment
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={() => setEditDialogOpen(true)}>
+            <Pencil className="mr-2 h-4 w-4" />
+            Редактировать
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem
             onClick={onDelete}
             className="text-destructive focus:text-destructive"
@@ -116,6 +125,13 @@ export function BalanceAdjustmentRow({ adjustment, onDelete }: BalanceAdjustment
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Edit Adjustment Dialog */}
+      <EditAdjustmentDialog
+        adjustment={adjustment}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
     </motion.div>
   )
 }

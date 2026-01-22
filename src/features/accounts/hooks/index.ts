@@ -20,6 +20,7 @@ export {
   useBalanceAdjustments,
   useAccountBalanceAdjustments,
   useCreateBalanceAdjustment,
+  useUpdateBalanceAdjustment,
   useSetBalance,
   useDeleteBalanceAdjustment,
 } from './use-balance-adjustments'
@@ -31,6 +32,7 @@ export {
   useTransfers,
   useTransfer,
   useCreateTransfer,
+  useUpdateTransfer,
   useDeleteTransfer,
 } from './use-transfers'
 

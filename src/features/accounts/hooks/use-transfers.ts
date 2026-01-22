@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { transfersApi } from '@/lib/api'
-import type { CreateTransferRequest, TransfersListParams } from '@/lib/api'
+import type { CreateTransferRequest, UpdateTransferRequest, TransfersListParams } from '@/lib/api'
 import { toast } from 'sonner'
 import { accountKeys } from './use-accounts'
 
@@ -52,6 +52,28 @@ export function useCreateTransfer() {
         queryClient.invalidateQueries({ queryKey: accountKeys.lists() }),
       ])
       toast.success('Перевод выполнен')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Обновить перевод
+ */
+export function useUpdateTransfer() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateTransferRequest }) =>
+      transfersApi.update(id, data),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: transferKeys.lists() }),
+        queryClient.invalidateQueries({ queryKey: accountKeys.lists() }),
+      ])
+      toast.success('Перевод обновлён')
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)

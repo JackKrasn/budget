@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { balanceAdjustmentsApi } from '@/lib/api'
 import type {
   CreateBalanceAdjustmentRequest,
+  UpdateAdjustmentRequest,
   SetBalanceRequest,
   BalanceAdjustmentsListParams,
 } from '@/lib/api'
@@ -80,6 +81,26 @@ export function useSetBalance() {
         queryKey: accountKeys.detail(variables.accountId),
       })
       toast.success('Баланс синхронизирован')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Обновить корректировку баланса
+ */
+export function useUpdateBalanceAdjustment() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateAdjustmentRequest }) =>
+      balanceAdjustmentsApi.update(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: balanceAdjustmentKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      toast.success('Корректировка обновлена')
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)
