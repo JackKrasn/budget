@@ -69,10 +69,28 @@ const formSchema = z.object({
 
 type FormValues = z.infer<typeof formSchema>
 
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  RUB: '₽',
+  USD: '$',
+  EUR: '€',
+  GEL: '₾',
+  TRY: '₺',
+}
+
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
+  }).format(amount)
+}
+
+function formatQuantity(amount: number): string {
+  if (Number.isInteger(amount)) {
+    return new Intl.NumberFormat('ru-RU').format(amount)
+  }
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 6,
   }).format(amount)
 }
 
@@ -161,7 +179,7 @@ export function TransferAssetDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="overflow-hidden border-0 bg-gradient-to-b from-background to-background/95 p-0 shadow-2xl sm:max-w-[580px]">
+      <DialogContent className="overflow-hidden border-0 bg-gradient-to-b from-background to-background/95 p-0 shadow-2xl sm:max-w-[720px]">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             {/* Header with Transfer Flow Visualization */}
@@ -233,17 +251,27 @@ export function TransferAssetDialog({
                               value={field.value}
                             >
                               <FormControl>
-                                <SelectTrigger className="h-auto min-h-[52px] border-0 bg-muted/50 px-3 py-2 transition-all hover:bg-muted/70 focus:ring-2 focus:ring-orange-500/20 [&>span]:text-left [&>span]:w-full">
+                                <SelectTrigger className="h-auto min-h-[52px] border-0 bg-muted/50 px-3 py-2 transition-all hover:bg-muted/70 focus:ring-2 focus:ring-orange-500/20 [&>span]:text-left [&>span]:w-full [&>span]:whitespace-normal [&>span]:break-words">
                                   <SelectValue placeholder="Выберите актив" />
                                 </SelectTrigger>
                               </FormControl>
-                              <SelectContent>
-                                {fundAssets.map((a) => (
-                                  <SelectItem key={a.asset.id} value={a.asset.id}>
-                                    {a.asset.name} • {formatMoney(a.amount)}{' '}
-                                    {a.asset.currency}
-                                  </SelectItem>
-                                ))}
+                              <SelectContent className="max-w-[300px]">
+                                {fundAssets.map((a) => {
+                                  const isCurrency = a.asset.typeCode === 'currency'
+                                  const unit = isCurrency
+                                    ? CURRENCY_SYMBOLS[a.asset.currency] || a.asset.currency
+                                    : 'шт.'
+                                  return (
+                                    <SelectItem key={a.asset.id} value={a.asset.id} className="whitespace-normal">
+                                      <div className="flex flex-col gap-0.5">
+                                        <span className="font-medium">{a.asset.name}</span>
+                                        <span className="text-xs text-muted-foreground">
+                                          {isCurrency ? formatMoney(a.amount) : formatQuantity(a.amount)} {unit}
+                                        </span>
+                                      </div>
+                                    </SelectItem>
+                                  )
+                                })}
                               </SelectContent>
                             </Select>
                             <FormMessage />
@@ -252,23 +280,29 @@ export function TransferAssetDialog({
                       />
 
                       {/* Selected asset info */}
-                      {selectedAsset && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="mt-2 overflow-hidden"
-                        >
-                          <div className="rounded-lg bg-muted/30 px-2 py-1.5">
-                            <p className="text-xs text-muted-foreground">
-                              Доступно
-                            </p>
-                            <p className="font-mono text-sm font-medium tabular-nums">
-                              {formatMoney(selectedAsset.amount)}{' '}
-                              {selectedAsset.asset.currency}
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
+                      {selectedAsset && (() => {
+                        const isCurrency = selectedAsset.asset.typeCode === 'currency'
+                        const unit = isCurrency
+                          ? CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency
+                          : 'шт.'
+                        return (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-2 overflow-hidden"
+                          >
+                            <div className="rounded-lg bg-muted/30 px-2 py-1.5">
+                              <p className="text-xs text-muted-foreground">
+                                Доступно
+                              </p>
+                              <p className="font-mono text-sm font-medium tabular-nums">
+                                {isCurrency ? formatMoney(selectedAsset.amount) : formatQuantity(selectedAsset.amount)}{' '}
+                                {unit}
+                              </p>
+                            </div>
+                          </motion.div>
+                        )
+                      })()}
                     </div>
                   </motion.div>
 
@@ -281,23 +315,26 @@ export function TransferAssetDialog({
                   >
                     {/* Transfer Amount Badge */}
                     <AnimatePresence mode="wait">
-                      {amountNum > 0 && selectedAsset && (
-                        <motion.div
-                          key={amountNum}
-                          initial={{ opacity: 0, y: -10, scale: 0.8 }}
-                          animate={{ opacity: 1, y: 0, scale: 1 }}
-                          exit={{ opacity: 0, y: 10, scale: 0.8 }}
-                          className={`rounded-full px-2.5 py-1 text-center ${
-                            hasInsufficientAmount
-                              ? 'bg-destructive/10 text-destructive'
-                              : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
-                          }`}
-                        >
-                          <span className="font-mono text-xs font-bold tabular-nums">
-                            {formatMoney(amountNum)}
-                          </span>
-                        </motion.div>
-                      )}
+                      {amountNum > 0 && selectedAsset && (() => {
+                        const isCurrency = selectedAsset.asset.typeCode === 'currency'
+                        return (
+                          <motion.div
+                            key={amountNum}
+                            initial={{ opacity: 0, y: -10, scale: 0.8 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            exit={{ opacity: 0, y: 10, scale: 0.8 }}
+                            className={`rounded-full px-2.5 py-1 text-center ${
+                              hasInsufficientAmount
+                                ? 'bg-destructive/10 text-destructive'
+                                : 'bg-orange-500/10 text-orange-600 dark:text-orange-400'
+                            }`}
+                          >
+                            <span className="font-mono text-xs font-bold tabular-nums">
+                              {isCurrency ? formatMoney(amountNum) : formatQuantity(amountNum)}
+                            </span>
+                          </motion.div>
+                        )
+                      })()}
                     </AnimatePresence>
 
                     {/* Animated Arrows */}
@@ -406,25 +443,31 @@ export function TransferAssetDialog({
                       />
 
                       {/* Amount to be credited */}
-                      {selectedTargetFund && amountNum > 0 && selectedAsset && (
-                        <motion.div
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          className="mt-auto overflow-hidden pt-2"
-                        >
-                          <div className="rounded-lg bg-emerald-500/10 px-3 py-2">
-                            <p className="text-xs text-emerald-600 dark:text-emerald-400">
-                              Будет зачислено
-                            </p>
-                            <p className="font-mono text-sm font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
-                              +{formatMoney(amountNum)}{' '}
-                              <span className="opacity-70">
-                                {selectedAsset.asset.currency}
-                              </span>
-                            </p>
-                          </div>
-                        </motion.div>
-                      )}
+                      {selectedTargetFund && amountNum > 0 && selectedAsset && (() => {
+                        const isCurrency = selectedAsset.asset.typeCode === 'currency'
+                        const unit = isCurrency
+                          ? CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency
+                          : 'шт.'
+                        return (
+                          <motion.div
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            className="mt-auto overflow-hidden pt-2"
+                          >
+                            <div className="rounded-lg bg-emerald-500/10 px-3 py-2">
+                              <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                                Будет зачислено
+                              </p>
+                              <p className="font-mono text-sm font-medium tabular-nums text-emerald-600 dark:text-emerald-400">
+                                +{isCurrency ? formatMoney(amountNum) : formatQuantity(amountNum)}{' '}
+                                <span className="opacity-70">
+                                  {unit}
+                                </span>
+                              </p>
+                            </div>
+                          </motion.div>
+                        )
+                      })()}
                     </div>
                   </motion.div>
                 </motion.div>
@@ -442,30 +485,38 @@ export function TransferAssetDialog({
                 <FormField
                   control={form.control}
                   name="amount"
-                  render={({ field }) => (
-                    <FormItem>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">
-                          Количество
-                        </span>
-                        <FormControl>
-                          <Input
-                            type="number"
-                            step="any"
-                            placeholder="0"
-                            className="h-12 flex-1 border-0 bg-muted/50 text-center font-mono text-xl font-medium tabular-nums transition-all focus:bg-muted/70 focus:ring-2 focus:ring-orange-500/20"
-                            {...field}
-                          />
-                        </FormControl>
-                        {selectedAsset && (
-                          <span className="text-lg text-muted-foreground">
-                            {selectedAsset.asset.currency}
+                  render={({ field }) => {
+                    const isCurrency = selectedAsset?.asset.typeCode === 'currency'
+                    const unit = selectedAsset
+                      ? isCurrency
+                        ? CURRENCY_SYMBOLS[selectedAsset.asset.currency] || selectedAsset.asset.currency
+                        : 'шт.'
+                      : ''
+                    return (
+                      <FormItem>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-muted-foreground">
+                            {isCurrency ? 'Сумма' : 'Количество'}
                           </span>
-                        )}
-                      </div>
-                      <FormMessage />
-                    </FormItem>
-                  )}
+                          <FormControl>
+                            <Input
+                              type="number"
+                              step={isCurrency ? '0.01' : '1'}
+                              placeholder="0"
+                              className="h-12 flex-1 border-0 bg-muted/50 text-center font-mono text-xl font-medium tabular-nums transition-all focus:bg-muted/70 focus:ring-2 focus:ring-orange-500/20"
+                              {...field}
+                            />
+                          </FormControl>
+                          {selectedAsset && (
+                            <span className="text-lg text-muted-foreground">
+                              {unit}
+                            </span>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )
+                  }}
                 />
               </motion.div>
 
