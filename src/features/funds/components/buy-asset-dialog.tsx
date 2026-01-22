@@ -50,6 +50,13 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(price)
+}
+
 interface BuyAssetDialogProps {
   fund: FundBalance | null
   open: boolean
@@ -260,7 +267,7 @@ export function BuyAssetDialog({
                             <SelectItem key={a.id} value={a.id}>
                               {a.name}
                               {a.ticker && ` (${a.ticker})`}
-                              {price > 0 && ` • ${formatMoney(price)} ₽`}
+                              {price > 0 && ` • ${formatPrice(price)} ₽`}
                             </SelectItem>
                           )
                         })}
