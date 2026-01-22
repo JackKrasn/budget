@@ -440,10 +440,10 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
             const isDeposit = item.transaction_type === 'deposit'
             const isIncomeDistribution = !isContribution && isDeposit && !!item.contribution_income_id
 
-            // Can delete: contributions OR deposits with contribution_id OR other transaction types (buy, sell, transfer)
+            // Can delete: contributions OR all deposits OR other transaction types (buy, sell, transfer)
+            // Only withdrawals cannot be deleted (they are managed through expenses)
             const canDelete = isContribution ||
-              (!isContribution && isDeposit && !!item.contribution_id) ||
-              (!isContribution && !isDeposit && !isWithdrawal)
+              (!isContribution && !isWithdrawal)
 
             const handleClick = () => {
               if (isWithdrawal) {
