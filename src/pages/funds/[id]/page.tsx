@@ -120,6 +120,13 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(price)
+}
+
 export default function FundDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -485,7 +492,7 @@ export default function FundDetailsPage() {
                                 {formatMoney(asset.valueBase)} ₽
                               </p>
                               <p className="text-sm text-muted-foreground">
-                                {asset.amount} шт. × {formatMoney(asset.amount > 0 ? asset.valueBase / asset.amount : 0)} ₽
+                                {asset.amount} шт. × {formatPrice(asset.amount > 0 ? asset.valueBase / asset.amount : 0)} ₽
                               </p>
                             </>
                           )}

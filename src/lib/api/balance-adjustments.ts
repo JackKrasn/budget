@@ -4,6 +4,7 @@ import type {
   BalanceAdjustmentsListResponse,
   BalanceAdjustmentsListParams,
   CreateBalanceAdjustmentRequest,
+  UpdateAdjustmentRequest,
   SetBalanceRequest,
 } from './types'
 
@@ -32,6 +33,12 @@ export const balanceAdjustmentsApi = {
    */
   setBalance: (data: SetBalanceRequest) =>
     apiClient.post<BalanceAdjustment>(`${ENDPOINT}/set-balance`, data),
+
+  /**
+   * Обновить корректировку
+   */
+  update: (id: string, data: UpdateAdjustmentRequest) =>
+    apiClient.patch<BalanceAdjustment>(`${ENDPOINT}/${id}`, data),
 
   /**
    * Удалить корректировку

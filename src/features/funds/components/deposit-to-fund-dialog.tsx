@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Plus, Loader2 } from 'lucide-react'
+import { AccountIcon } from '@/components/ui/account-icon'
 import { useDepositToFund, useFundCurrencyAssets } from '../hooks'
 import { useAccounts } from '@/features/accounts'
 import { useAssets } from '@/features/assets'
@@ -247,8 +248,19 @@ export function DepositToFundDialog({
                       <SelectContent>
                         {accounts.map((a) => (
                           <SelectItem key={a.id} value={a.id}>
-                            {a.name} ({formatMoney(a.current_balance)}{' '}
-                            {a.currency})
+                            <div className="flex items-center gap-2">
+                              <AccountIcon
+                                bankName={a.bank_name}
+                                typeCode={a.type_code}
+                                color={a.color}
+                                size="sm"
+                                showBackground={false}
+                              />
+                              <span>{a.name}</span>
+                              <span className="text-muted-foreground">
+                                ({formatMoney(a.current_balance)} {a.currency})
+                              </span>
+                            </div>
                           </SelectItem>
                         ))}
                       </SelectContent>

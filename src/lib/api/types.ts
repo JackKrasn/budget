@@ -1242,6 +1242,12 @@ export interface BalanceAdjustmentsListParams {
   [key: string]: string | number | boolean | undefined
 }
 
+export interface UpdateAdjustmentRequest {
+  amount?: number
+  reason?: string
+  date?: string
+}
+
 // === Transfers (Переводы между счетами) ===
 
 export interface Transfer {
@@ -1285,6 +1291,15 @@ export interface TransfersListParams {
   to?: string
   accountId?: string
   [key: string]: string | number | boolean | undefined
+}
+
+export interface UpdateTransferRequest {
+  fromAmount?: number
+  toAmount?: number
+  exchangeRate?: number
+  feeAmount?: number
+  date?: string
+  description?: string | null
 }
 
 // === Fund Asset Operations ===

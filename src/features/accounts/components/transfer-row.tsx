@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { ArrowRight, ArrowUpDown, Trash2 } from 'lucide-react'
+import { ArrowRight, ArrowUpDown, Trash2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { ConfirmDeleteTransferDialog } from './confirm-delete-transfer-dialog'
+import { EditTransferDialog } from './edit-transfer-dialog'
 import type { TransferWithAccounts } from '@/lib/api/types'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
@@ -48,6 +49,7 @@ interface TransferRowProps {
 
 export function TransferRow({ transfer, onDelete }: TransferRowProps) {
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
   const fromCurrencySymbol = CURRENCY_SYMBOLS[transfer.from_currency] || transfer.from_currency
@@ -129,19 +131,39 @@ export function TransferRow({ transfer, onDelete }: TransferRowProps) {
           )}
         </div>
 
-        {/* Delete button */}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8 shrink-0 opacity-0 transition-opacity group-hover:opacity-100 text-destructive hover:text-destructive hover:bg-destructive/10"
-          onClick={(e) => {
-            e.stopPropagation()
-            setDeleteDialogOpen(true)
-          }}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 shrink-0 opacity-0 transition-opacity group-hover:opacity-100">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted"
+            onClick={(e) => {
+              e.stopPropagation()
+              setEditDialogOpen(true)
+            }}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+            onClick={(e) => {
+              e.stopPropagation()
+              setDeleteDialogOpen(true)
+            }}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </motion.div>
+
+      {/* Edit Transfer Dialog */}
+      <EditTransferDialog
+        transfer={transfer}
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+      />
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDeleteTransferDialog

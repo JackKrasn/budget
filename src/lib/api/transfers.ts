@@ -5,6 +5,7 @@ import type {
   TransfersListResponse,
   TransfersListParams,
   CreateTransferRequest,
+  UpdateTransferRequest,
 } from './types'
 
 const ENDPOINT = '/transfers'
@@ -26,6 +27,12 @@ export const transfersApi = {
    */
   create: (data: CreateTransferRequest) =>
     apiClient.post<Transfer>(ENDPOINT, data),
+
+  /**
+   * Обновить перевод
+   */
+  update: (id: string, data: UpdateTransferRequest) =>
+    apiClient.patch<Transfer>(`${ENDPOINT}/${id}`, data),
 
   /**
    * Удалить перевод

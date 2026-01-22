@@ -43,6 +43,13 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function formatPrice(price: number): string {
+  return new Intl.NumberFormat('ru-RU', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 4,
+  }).format(price)
+}
+
 function getCurrencySymbol(currency: string): string {
   const symbols: Record<string, string> = {
     RUB: '₽',
@@ -433,10 +440,10 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
             const isDeposit = item.transaction_type === 'deposit'
             const isIncomeDistribution = !isContribution && isDeposit && !!item.contribution_income_id
 
-            // Can delete: contributions OR deposits with contribution_id OR other transaction types (buy, sell, transfer)
+            // Can delete: contributions OR all deposits OR other transaction types (buy, sell, transfer)
+            // Only withdrawals cannot be deleted (they are managed through expenses)
             const canDelete = isContribution ||
-              (!isContribution && isDeposit && !!item.contribution_id) ||
-              (!isContribution && !isDeposit && !isWithdrawal)
+              (!isContribution && !isWithdrawal)
 
             const handleClick = () => {
               if (isWithdrawal) {
@@ -519,7 +526,7 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                   <div className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span>{formatDate(item.date)}</span>
                     {pricePerUnit !== null && (
-                      <span>• {formatMoney(pricePerUnit)} за ед.</span>
+                      <span>• {formatPrice(pricePerUnit)} за ед.</span>
                     )}
                     {totalValue !== null && !isContribution && (
                       <span>• {formatMoney(totalValue)} {item.currency}</span>
