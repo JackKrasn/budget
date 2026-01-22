@@ -156,12 +156,6 @@ export function EditTransferDialog({
 
   if (!transfer) return null
 
-  const formatNumber = (num: number) =>
-    num.toLocaleString('ru-RU', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })
-
   const exchangeRateValue = form.watch('exchangeRate')
   const rate = exchangeRateValue ? parseFloat(exchangeRateValue) : 0
   const reverseRate = rate > 0
