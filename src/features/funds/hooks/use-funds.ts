@@ -16,7 +16,7 @@ import type {
   UpdateFundTransactionRequest,
 } from '@/lib/api'
 import { toast } from 'sonner'
-import { accountKeys } from '@/features/accounts'
+import { accountKeys, fundDepositKeys } from '@/features/accounts'
 import { incomeKeys } from '@/features/incomes'
 
 // === Query Keys ===
@@ -271,6 +271,8 @@ export function useDeleteContribution() {
       // Invalidate accounts in case contribution affected account balance
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accountKeys.details() })
+      // Invalidate fund deposits list for operations page
+      queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
 
       // Only show success toast if no balance info (balance info will be shown in dialog)
       if (!data?.fundBalances || data.fundBalances.length === 0) {
@@ -401,6 +403,8 @@ export function useDepositToFund() {
       })
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      // Invalidate fund deposits list for operations page
+      queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
       toast.success('Фонд пополнен')
     },
     onError: (error) => {
@@ -524,6 +528,8 @@ export function useDeleteTransaction() {
       // Invalidate accounts in case deposit/withdrawal affected account balance
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       queryClient.invalidateQueries({ queryKey: accountKeys.details() })
+      // Invalidate fund deposits list for operations page
+      queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
       toast.success('Транзакция удалена')
     },
     onError: (error) => {
