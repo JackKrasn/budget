@@ -149,6 +149,9 @@ export default function FundDetailsPage() {
   const [depositFromAccountOpen, setDepositFromAccountOpen] = useState(false)
   const [transferAssetOpen, setTransferAssetOpen] = useState(false)
   const [setInitialBalanceOpen, setSetInitialBalanceOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
+  const [selectedAssetName, setSelectedAssetName] = useState<string | null>(null)
 
   const { data: fund, isLoading, error } = useFund(id!)
   const updateFund = useUpdateFund()
@@ -498,7 +501,7 @@ export default function FundDetailsPage() {
       </motion.div>
 
       {/* Tabs */}
-      <Tabs defaultValue="overview">
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="bg-muted/50">
           <TabsTrigger value="overview" className="gap-1.5">
             <BarChart3 className="h-4 w-4" />
@@ -531,7 +534,12 @@ export default function FundDetailsPage() {
                         initial={{ opacity: 0, x: -10 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.05 }}
-                        className="flex items-center justify-between rounded-xl bg-muted/50 p-4"
+                        className="flex items-center justify-between rounded-xl bg-muted/50 p-4 cursor-pointer hover:bg-muted/70 transition-colors"
+                        onClick={() => {
+                          setSelectedAssetId(asset.asset.id)
+                          setSelectedAssetName(asset.asset.name)
+                          setActiveTab('history')
+                        }}
                       >
                         <div>
                           <p className="font-medium">{asset.asset.name}</p>
@@ -617,7 +625,15 @@ export default function FundDetailsPage() {
         <TabsContent value="history" className="mt-6">
           <Card>
             <CardContent className="pt-6">
-              <FundTransactionsHistory fundId={id!} />
+              <FundTransactionsHistory
+                fundId={id!}
+                assetId={selectedAssetId || undefined}
+                assetName={selectedAssetName || undefined}
+                onClearAssetFilter={() => {
+                  setSelectedAssetId(null)
+                  setSelectedAssetName(null)
+                }}
+              />
             </CardContent>
           </Card>
         </TabsContent>

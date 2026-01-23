@@ -113,6 +113,9 @@ function getCounterpartLabel(tx: FundTransaction): string {
 
 interface FundTransactionsHistoryProps {
   fundId: string
+  assetId?: string
+  assetName?: string
+  onClearAssetFilter?: () => void
 }
 
 const ALL_TRANSACTION_TYPES: FundTransactionType[] = [
@@ -125,7 +128,7 @@ const ALL_TRANSACTION_TYPES: FundTransactionType[] = [
   'withdrawal',
 ]
 
-export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps) {
+export function FundTransactionsHistory({ fundId, assetId, assetName, onClearAssetFilter }: FundTransactionsHistoryProps) {
   const navigate = useNavigate()
   const [selectedTypes, setSelectedTypes] = useState<FundTransactionType[]>(ALL_TRANSACTION_TYPES)
   const [dateFrom, setDateFrom] = useState('')
@@ -148,6 +151,7 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
     type: selectedTypes.length === 1 && selectedTypes[0] !== 'contribution' ? selectedTypes[0] : undefined,
     from: dateFrom || undefined,
     to: dateTo || undefined,
+    assetId: assetId || undefined,
   })
 
   // Fetch contributions
@@ -255,7 +259,7 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   }
 
   const hasActiveFilters =
-    selectedTypes.length < ALL_TRANSACTION_TYPES.length || dateFrom !== '' || dateTo !== ''
+    selectedTypes.length < ALL_TRANSACTION_TYPES.length || dateFrom !== '' || dateTo !== '' || !!assetId
 
   if (isLoading) {
     return (
@@ -269,9 +273,24 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-muted-foreground">
-          История операций
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            История операций
+          </h3>
+          {assetId && assetName && (
+            <Badge variant="secondary" className="gap-1">
+              {assetName}
+              {onClearAssetFilter && (
+                <button
+                  onClick={onClearAssetFilter}
+                  className="ml-1 hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </Badge>
+          )}
+        </div>
         <Popover open={filterOpen} onOpenChange={setFilterOpen}>
           <PopoverTrigger asChild>
             <Button
