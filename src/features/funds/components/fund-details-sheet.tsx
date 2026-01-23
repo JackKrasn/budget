@@ -110,6 +110,17 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+    GEL: '₾',
+    TRY: '₺',
+  }
+  return symbols[currency] || currency
+}
+
 interface FundDetailsSheetProps {
   fund: FundBalance | null
   open: boolean
@@ -228,6 +239,18 @@ export function FundDetailsSheet({
   const Icon =
     FUND_ICONS.find((i) => i.value === fundData.icon)?.icon || Wallet
 
+  // Group currency assets by currency for balance display
+  const currencyBalances = assets
+    .filter((a) => a.asset.typeCode === 'currency')
+    .reduce(
+      (acc, a) => {
+        const currency = a.asset.currency || 'RUB'
+        acc[currency] = (acc[currency] || 0) + a.amount
+        return acc
+      },
+      {} as Record<string, number>
+    )
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto border-0 bg-gradient-to-b from-background to-background/95 p-0 sm:max-w-lg">
@@ -309,6 +332,21 @@ export function FundDetailsSheet({
                   ₽
                 </span>
               </div>
+              {/* Currency balances */}
+              {Object.keys(currencyBalances).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-3">
+                  {Object.entries(currencyBalances).map(([currency, amount]) => (
+                    <div key={currency} className="flex items-baseline gap-1">
+                      <span className="text-lg font-semibold tabular-nums">
+                        {formatMoney(amount)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {getCurrencySymbol(currency)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {activeRule && (
                 <p className="mt-1 text-sm text-muted-foreground">
                   {activeRule.rule_type === 'percentage'
