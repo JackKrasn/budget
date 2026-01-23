@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   Form,
   FormControl,
@@ -48,6 +48,11 @@ import {
   AlertCircle,
   Plus,
   ArrowRightLeft,
+  Banknote,
+  LineChart,
+  Landmark,
+  ChevronRight,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -65,7 +70,7 @@ import {
   FundTransactionsHistory,
   SetInitialBalanceDialog,
 } from '@/features/funds'
-import type { FundStatus, RuleType, FundBalance } from '@/lib/api/types'
+import type { FundStatus, RuleType, FundBalance, FundAssetBalance } from '@/lib/api/types'
 
 const FUND_ICONS = [
   { value: 'trending-up', icon: TrendingUp, label: 'Инвестиции' },
@@ -94,6 +99,16 @@ const FUND_COLORS = [
   '#f97316',
   '#6366f1',
 ]
+
+// Asset type configuration for grouping
+const ASSET_TYPE_CONFIG: Record<string, { label: string; icon: typeof Banknote; color: string }> = {
+  currency: { label: 'Валюта', icon: Banknote, color: '#10b981' },
+  etf: { label: 'ETF', icon: LineChart, color: '#8b5cf6' },
+  stock: { label: 'Акции', icon: TrendingUp, color: '#3b82f6' },
+  bond: { label: 'Облигации', icon: Landmark, color: '#f59e0b' },
+  crypto: { label: 'Криптовалюта', icon: Sparkles, color: '#ec4899' },
+  other: { label: 'Другое', icon: Wallet, color: '#6b7280' },
+}
 
 const formSchema = z.object({
   name: z.string().min(1, 'Введите название фонда'),
@@ -138,6 +153,114 @@ function getCurrencySymbol(currency: string): string {
   return symbols[currency] || currency
 }
 
+// Animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+    },
+  },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: 'easeOut' } },
+}
+
+const assetCardVariants = {
+  hidden: { opacity: 0, x: -20 },
+  show: { opacity: 1, x: 0, transition: { duration: 0.3 } },
+}
+
+// Asset Group Component
+interface AssetGroupProps {
+  typeCode: string
+  assets: FundAssetBalance[]
+  onAssetClick: (asset: FundAssetBalance) => void
+}
+
+function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
+  const config = ASSET_TYPE_CONFIG[typeCode] || ASSET_TYPE_CONFIG.other
+  const Icon = config.icon
+  const totalValue = assets.reduce((sum, a) => sum + a.valueBase, 0)
+
+  return (
+    <motion.div
+      variants={itemVariants}
+      className="space-y-3"
+    >
+      {/* Group Header */}
+      <div className="flex items-center gap-3">
+        <div
+          className="flex h-8 w-8 items-center justify-center rounded-lg"
+          style={{ backgroundColor: `${config.color}15` }}
+        >
+          <Icon className="h-4 w-4" style={{ color: config.color }} />
+        </div>
+        <div className="flex-1">
+          <h3 className="text-sm font-semibold">{config.label}</h3>
+          <p className="text-xs text-muted-foreground">
+            {assets.length} {assets.length === 1 ? 'актив' : assets.length < 5 ? 'актива' : 'активов'}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-sm font-semibold tabular-nums">
+            {formatMoney(totalValue)} ₽
+          </p>
+        </div>
+      </div>
+
+      {/* Assets List */}
+      <div className="space-y-2 pl-11">
+        {assets.map((asset, index) => (
+          <motion.div
+            key={asset.asset.id}
+            variants={assetCardVariants}
+            custom={index}
+            className="group flex items-center justify-between rounded-xl bg-muted/40 p-3 cursor-pointer transition-all hover:bg-muted/60 hover:shadow-sm"
+            onClick={() => onAssetClick(asset)}
+          >
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <p className="font-medium truncate">{asset.asset.name}</p>
+                {asset.asset.ticker && (
+                  <Badge variant="outline" className="text-xs font-mono">
+                    {asset.asset.ticker}
+                  </Badge>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {typeCode === 'currency'
+                  ? `${formatMoney(asset.amount)} ${getCurrencySymbol(asset.asset.currency)}`
+                  : `${asset.amount} шт. × ${formatPrice(asset.amount > 0 ? asset.valueBase / asset.amount : 0)} ₽`
+                }
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="text-right">
+                <p className="font-semibold tabular-nums">
+                  {typeCode === 'currency'
+                    ? `${formatMoney(asset.amount)} ${getCurrencySymbol(asset.asset.currency)}`
+                    : `${formatMoney(asset.valueBase)} ₽`
+                  }
+                </p>
+                {typeCode === 'currency' && asset.asset.currency !== 'RUB' && (
+                  <p className="text-xs text-muted-foreground">
+                    ≈ {formatMoney(asset.valueBase)} ₽
+                  </p>
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+            </div>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  )
+}
+
 export default function FundDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -167,7 +290,30 @@ export default function FundDetailsPage() {
   const baseCurrency = fund?.baseCurrency ?? 'RUB'
   const assets = fund?.assets ?? []
 
-  // Separate currency assets and other assets
+  // Group assets by type
+  const assetGroups = useMemo(() => {
+    const groups: Record<string, FundAssetBalance[]> = {}
+
+    assets.forEach((asset) => {
+      const typeCode = asset.asset.typeCode || 'other'
+      if (!groups[typeCode]) {
+        groups[typeCode] = []
+      }
+      groups[typeCode].push(asset)
+    })
+
+    // Sort groups by predefined order
+    const order = ['currency', 'etf', 'stock', 'bond', 'crypto', 'other']
+    const sortedEntries = Object.entries(groups).sort(([a], [b]) => {
+      const indexA = order.indexOf(a) === -1 ? 999 : order.indexOf(a)
+      const indexB = order.indexOf(b) === -1 ? 999 : order.indexOf(b)
+      return indexA - indexB
+    })
+
+    return sortedEntries
+  }, [assets])
+
+  // Separate currency assets for header display
   const currencyAssets = assets.filter((a) => a.asset.typeCode === 'currency')
   const otherAssets = assets.filter((a) => a.asset.typeCode !== 'currency')
 
@@ -276,6 +422,12 @@ export default function FundDetailsPage() {
     }
   }
 
+  const handleAssetClick = (asset: FundAssetBalance) => {
+    setSelectedAssetId(asset.asset.id)
+    setSelectedAssetName(asset.asset.name)
+    setActiveTab('history')
+  }
+
   if (!id) {
     return (
       <Alert variant="destructive">
@@ -330,7 +482,7 @@ export default function FundDetailsPage() {
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
+        transition={{ duration: 0.4 }}
       >
         <Button variant="ghost" onClick={() => navigate('/funds')} className="mb-4">
           <ArrowLeft className="mr-2 h-4 w-4" />
@@ -344,7 +496,8 @@ export default function FundDetailsPage() {
             background: `linear-gradient(135deg, ${fundData.color}15 0%, ${fundData.color}05 50%, transparent 100%)`,
           }}
         >
-          <div className="absolute inset-0 opacity-30">
+          {/* Decorative elements */}
+          <div className="absolute inset-0 opacity-30 pointer-events-none">
             <div
               className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl"
               style={{ backgroundColor: `${fundData.color}30` }}
@@ -352,6 +505,10 @@ export default function FundDetailsPage() {
             <div
               className="absolute -left-16 bottom-0 h-40 w-40 rounded-full blur-3xl"
               style={{ backgroundColor: `${fundData.color}20` }}
+            />
+            <div
+              className="absolute right-1/4 top-1/2 h-24 w-24 rounded-full blur-2xl"
+              style={{ backgroundColor: `${fundData.color}15` }}
             />
           </div>
 
@@ -370,7 +527,12 @@ export default function FundDetailsPage() {
                 <Icon className="h-8 w-8 text-white" />
               </motion.div>
               <div>
-                <div className="flex items-center gap-3 mb-1">
+                <motion.div
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.2 }}
+                  className="flex items-center gap-3 mb-1"
+                >
                   <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
                     {fundData.name}
                   </h1>
@@ -392,67 +554,94 @@ export default function FundDetailsPage() {
                   {fundData.is_virtual && (
                     <Badge variant="outline">Виртуальный</Badge>
                   )}
-                </div>
+                </motion.div>
                 {activeRule && (
-                  <p className="text-sm text-muted-foreground">
+                  <motion.p
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: 0.3 }}
+                    className="text-sm text-muted-foreground"
+                  >
                     {activeRule.rule_type === 'percentage'
                       ? `${activeRule.value}% от дохода`
                       : `${formatMoney(activeRule.value || 0)} ₽ фиксированно`}
-                  </p>
+                  </motion.p>
                 )}
               </div>
             </div>
 
-            <div className="flex flex-col items-end gap-2">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="flex flex-col items-end gap-3"
+            >
               <div className="text-right">
                 <p className="text-sm text-muted-foreground">Общий баланс</p>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold tabular-nums tracking-tight">
+                  <motion.span
+                    initial={{ scale: 0.5 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: 'spring', stiffness: 200, delay: 0.3 }}
+                    className="text-4xl font-bold tabular-nums tracking-tight"
+                  >
                     {formatMoney(totalBase)}
-                  </span>
+                  </motion.span>
                   <span className="text-2xl font-medium text-muted-foreground">₽</span>
                 </div>
 
                 {/* Breakdown by asset type */}
-                <div className="mt-2 space-y-1">
-                  {/* Currency balances */}
-                  {Object.keys(currencyBalances).length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">Валюта</p>
-                      <div className="flex flex-wrap gap-3 justify-end">
-                        {Object.entries(currencyBalances).map(([currency, amount]) => (
-                          <div key={currency} className="flex items-baseline gap-1">
-                            <span className="text-lg font-semibold tabular-nums">
-                              {formatMoney(amount)}
-                            </span>
-                            <span className="text-sm text-muted-foreground">
-                              {getCurrencySymbol(currency)}
-                            </span>
-                          </div>
-                        ))}
+                <AnimatePresence>
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    transition={{ delay: 0.4 }}
+                    className="mt-2 space-y-1"
+                  >
+                    {/* Currency balances */}
+                    {Object.keys(currencyBalances).length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Валюта</p>
+                        <div className="flex flex-wrap gap-3 justify-end">
+                          {Object.entries(currencyBalances).map(([currency, amount]) => (
+                            <div key={currency} className="flex items-baseline gap-1">
+                              <span className="text-lg font-semibold tabular-nums">
+                                {formatMoney(amount)}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {getCurrencySymbol(currency)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Other assets total */}
-                  {otherAssets.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">Другие активы</p>
-                      <div className="flex items-baseline gap-1 justify-end">
-                        <span className="text-lg font-semibold tabular-nums">
-                          ≈ {formatMoney(otherAssetsTotalBase)}
-                        </span>
-                        <span className="text-sm text-muted-foreground">₽</span>
+                    {/* Other assets total */}
+                    {otherAssets.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-0.5">Другие активы</p>
+                        <div className="flex items-baseline gap-1 justify-end">
+                          <span className="text-lg font-semibold tabular-nums">
+                            ≈ {formatMoney(otherAssetsTotalBase)}
+                          </span>
+                          <span className="text-sm text-muted-foreground">₽</span>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                className="flex flex-wrap gap-2"
+              >
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5"
+                  className="gap-1.5 bg-background/50 backdrop-blur-sm"
                   onClick={() => setBuyAssetOpen(true)}
                 >
                   <ShoppingBag className="h-4 w-4" />
@@ -461,7 +650,7 @@ export default function FundDetailsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5"
+                  className="gap-1.5 bg-background/50 backdrop-blur-sm"
                   onClick={() => setDepositFromAccountOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -470,7 +659,7 @@ export default function FundDetailsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5"
+                  className="gap-1.5 bg-background/50 backdrop-blur-sm"
                   onClick={() => setTransferAssetOpen(true)}
                 >
                   <ArrowRightLeft className="h-4 w-4" />
@@ -479,7 +668,7 @@ export default function FundDetailsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5"
+                  className="gap-1.5 bg-background/50 backdrop-blur-sm"
                   onClick={() => setSetInitialBalanceOpen(true)}
                 >
                   <Settings className="h-4 w-4" />
@@ -488,537 +677,547 @@ export default function FundDetailsPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="gap-1.5"
+                  className="gap-1.5 bg-background/50 backdrop-blur-sm"
                   onClick={() => setWithdrawalOpen(true)}
                 >
                   <ArrowDownRight className="h-4 w-4" />
                   Списать
                 </Button>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
           </div>
         </div>
       </motion.div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="bg-muted/50">
-          <TabsTrigger value="overview" className="gap-1.5">
-            <BarChart3 className="h-4 w-4" />
-            Обзор
-          </TabsTrigger>
-          <TabsTrigger value="history" className="gap-1.5">
-            <History className="h-4 w-4" />
-            История
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="gap-1.5">
-            <Settings className="h-4 w-4" />
-            Настройки
-          </TabsTrigger>
-        </TabsList>
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.3 }}
+      >
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="bg-muted/50">
+            <TabsTrigger value="overview" className="gap-1.5">
+              <BarChart3 className="h-4 w-4" />
+              Обзор
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-1.5">
+              <History className="h-4 w-4" />
+              История
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-1.5">
+              <Settings className="h-4 w-4" />
+              Настройки
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Overview Tab */}
-        <TabsContent value="overview" className="mt-6">
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {/* Assets */}
-            <Card className="md:col-span-2 lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="text-lg">Активы в фонде</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {assets.length > 0 ? (
-                  <div className="space-y-3">
-                    {assets.map((asset, index) => (
-                      <motion.div
-                        key={asset.asset.id}
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="flex items-center justify-between rounded-xl bg-muted/50 p-4 cursor-pointer hover:bg-muted/70 transition-colors"
-                        onClick={() => {
-                          setSelectedAssetId(asset.asset.id)
-                          setSelectedAssetName(asset.asset.name)
-                          setActiveTab('history')
-                        }}
-                      >
-                        <div>
-                          <p className="font-medium">{asset.asset.name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {asset.asset.ticker || asset.asset.typeCode}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          {asset.asset.typeCode === 'currency' ? (
-                            <>
-                              <p className="font-semibold tabular-nums">
-                                {formatMoney(asset.amount)} {asset.asset.currency}
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                ≈ {formatMoney(asset.valueBase)} ₽
-                              </p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="font-semibold tabular-nums">
-                                {formatMoney(asset.valueBase)} ₽
-                              </p>
-                              <p className="text-sm text-muted-foreground">
-                                {asset.amount} шт. × {formatPrice(asset.amount > 0 ? asset.valueBase / asset.amount : 0)} ₽
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </motion.div>
-                    ))}
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="mt-6">
+            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+              {/* Assets grouped by type */}
+              <Card className="md:col-span-2 lg:col-span-2 overflow-hidden">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Активы в фонде</CardTitle>
+                    <Badge variant="secondary" className="font-mono">
+                      {assets.length}
+                    </Badge>
                   </div>
-                ) : (
-                  <div className="flex h-32 flex-col items-center justify-center rounded-xl bg-muted/30 text-center">
-                    <Wallet className="mb-2 h-8 w-8 text-muted-foreground/50" />
-                    <p className="text-sm text-muted-foreground">Нет активов в фонде</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Distribution Rule */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Распределение</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {activeRule ? (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Тип</span>
-                      <Badge variant="secondary">
-                        {activeRule.rule_type === 'percentage' ? 'Процент' : 'Фикс. сумма'}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Значение</span>
-                      <span className="font-semibold">
-                        {activeRule.rule_type === 'percentage'
-                          ? `${activeRule.value}%`
-                          : `${formatMoney(activeRule.value || 0)} ₽`}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Статус</span>
-                      <Badge variant={activeRule.is_active ? 'default' : 'secondary'}>
-                        {activeRule.is_active ? 'Активно' : 'Неактивно'}
-                      </Badge>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="flex h-24 flex-col items-center justify-center text-center">
-                    <p className="text-sm text-muted-foreground">
-                      Правило не настроено
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* History Tab */}
-        <TabsContent value="history" className="mt-6">
-          <Card>
-            <CardContent className="pt-6">
-              <FundTransactionsHistory
-                fundId={id!}
-                assetId={selectedAssetId || undefined}
-                assetName={selectedAssetName || undefined}
-                onClearAssetFilter={() => {
-                  setSelectedAssetId(null)
-                  setSelectedAssetName(null)
-                }}
-              />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Settings Tab */}
-        <TabsContent value="settings" className="mt-6">
-          <div className="grid gap-6 md:grid-cols-2">
-            {/* Fund Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Настройки фонда</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
-                    {/* Name */}
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm text-muted-foreground">
-                            Название
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              disabled={!isEditing}
-                              className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Status */}
-                    <FormField
-                      control={form.control}
-                      name="status"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm text-muted-foreground">
-                            Статус
-                          </FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            disabled={!isEditing}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="active">Активен</SelectItem>
-                              <SelectItem value="paused">Приостановлен</SelectItem>
-                              <SelectItem value="completed">Завершён</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Icon */}
-                    <FormField
-                      control={form.control}
-                      name="icon"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm text-muted-foreground">
-                            Иконка
-                          </FormLabel>
-                          <div className="grid grid-cols-6 gap-2">
-                            {FUND_ICONS.map((item) => {
-                              const ItemIcon = item.icon
-                              return (
-                                <button
-                                  key={item.value}
-                                  type="button"
-                                  onClick={() => isEditing && field.onChange(item.value)}
-                                  disabled={!isEditing}
-                                  className={cn(
-                                    'flex h-11 w-11 items-center justify-center rounded-xl bg-muted/50 transition-all',
-                                    isEditing && 'hover:bg-muted',
-                                    field.value === item.value &&
-                                      'bg-primary/10 ring-2 ring-primary',
-                                    !isEditing && 'opacity-50'
-                                  )}
-                                  title={item.label}
-                                >
-                                  <ItemIcon className="h-5 w-5" />
-                                </button>
-                              )
-                            })}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Color */}
-                    <FormField
-                      control={form.control}
-                      name="color"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm text-muted-foreground">
-                            Цвет
-                          </FormLabel>
-                          <div className="flex flex-wrap gap-2">
-                            {FUND_COLORS.map((color) => (
-                              <button
-                                key={color}
-                                type="button"
-                                onClick={() => isEditing && field.onChange(color)}
-                                disabled={!isEditing}
-                                className={cn(
-                                  'h-9 w-9 rounded-xl transition-all',
-                                  field.value === color
-                                    ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110'
-                                    : '',
-                                  isEditing && 'hover:scale-105',
-                                  !isEditing && 'opacity-50'
-                                )}
-                                style={{ backgroundColor: color }}
-                              />
-                            ))}
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    {/* Type */}
-                    <FormField
-                      control={form.control}
-                      name="isVirtual"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-sm text-muted-foreground">
-                            Тип фонда
-                          </FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            value={field.value}
-                            disabled={!isEditing}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="false">Реальный</SelectItem>
-                              <SelectItem value="true">Виртуальный</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="flex gap-3 pt-2">
-                      {isEditing ? (
-                        <>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            className="flex-1 h-12"
-                            onClick={() => {
-                              form.reset()
-                              setIsEditing(false)
-                            }}
-                          >
-                            Отмена
-                          </Button>
-                          <Button
-                            type="submit"
-                            className="flex-1 h-12 font-medium"
-                            disabled={updateFund.isPending}
-                          >
-                            {updateFund.isPending ? (
-                              <>
-                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Сохранение...
-                              </>
-                            ) : (
-                              'Сохранить'
-                            )}
-                          </Button>
-                        </>
-                      ) : (
-                        <Button
-                          type="button"
-                          className="w-full h-12 font-medium"
-                          onClick={() => setIsEditing(true)}
-                        >
-                          Редактировать
-                        </Button>
-                      )}
-                    </div>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-
-            {/* Distribution Rule */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">Правило распределения</CardTitle>
-                  {activeRule && !isEditingRule && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsEditingRule(true)}
+                </CardHeader>
+                <CardContent>
+                  {assets.length > 0 ? (
+                    <motion.div
+                      className="space-y-6"
+                      variants={containerVariants}
+                      initial="hidden"
+                      animate="show"
                     >
-                      Изменить
-                    </Button>
+                      {assetGroups.map(([typeCode, typeAssets]) => (
+                        <AssetGroup
+                          key={typeCode}
+                          typeCode={typeCode}
+                          assets={typeAssets}
+                          onAssetClick={handleAssetClick}
+                        />
+                      ))}
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="flex h-32 flex-col items-center justify-center rounded-xl bg-muted/30 text-center"
+                    >
+                      <Wallet className="mb-2 h-8 w-8 text-muted-foreground/50" />
+                      <p className="text-sm text-muted-foreground">Нет активов в фонде</p>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="mt-2"
+                        onClick={() => setBuyAssetOpen(true)}
+                      >
+                        Добавить актив
+                      </Button>
+                    </motion.div>
                   )}
-                </div>
-              </CardHeader>
-              <CardContent>
-                {isEditingRule || !activeRule ? (
-                  <Form {...ruleForm}>
-                    <form
-                      onSubmit={ruleForm.handleSubmit(onRuleSubmit)}
+                </CardContent>
+              </Card>
+
+              {/* Distribution Rule */}
+              <Card className="h-fit">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-lg">Распределение</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {activeRule ? (
+                    <motion.div
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
                       className="space-y-4"
                     >
-                      <div className="grid grid-cols-2 gap-3">
-                        <FormField
-                          control={ruleForm.control}
-                          name="ruleType"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm text-muted-foreground">
-                                Тип
-                              </FormLabel>
-                              <Select onValueChange={field.onChange} value={field.value}>
-                                <FormControl>
-                                  <SelectTrigger className="h-11 border-0 bg-muted/50">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                </FormControl>
-                                <SelectContent>
-                                  <SelectItem value="percentage">Процент</SelectItem>
-                                  <SelectItem value="fixed">Фикс. сумма</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </FormItem>
-                          )}
-                        />
-
-                        <FormField
-                          control={ruleForm.control}
-                          name="ruleValue"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel className="text-sm text-muted-foreground">
-                                {ruleType === 'percentage' ? 'Процент' : 'Сумма'}
-                              </FormLabel>
-                              <FormControl>
-                                <div className="relative">
-                                  <Input
-                                    type="number"
-                                    placeholder={ruleType === 'percentage' ? '10' : '5000'}
-                                    {...field}
-                                    className="h-11 border-0 bg-muted/50 pr-8"
-                                  />
-                                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
-                                    {ruleType === 'percentage' ? '%' : '₽'}
-                                  </span>
-                                </div>
-                              </FormControl>
-                            </FormItem>
-                          )}
-                        />
+                      <div
+                        className="rounded-xl p-4"
+                        style={{ backgroundColor: `${fundData.color}10` }}
+                      >
+                        <p className="text-3xl font-bold tabular-nums" style={{ color: fundData.color }}>
+                          {activeRule.rule_type === 'percentage'
+                            ? `${activeRule.value}%`
+                            : `${formatMoney(activeRule.value || 0)} ₽`}
+                        </p>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          {activeRule.rule_type === 'percentage'
+                            ? 'от каждого дохода'
+                            : 'фиксированная сумма'}
+                        </p>
                       </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Статус</span>
+                        <Badge variant={activeRule.is_active ? 'default' : 'secondary'}>
+                          {activeRule.is_active ? 'Активно' : 'Неактивно'}
+                        </Badge>
+                      </div>
+                    </motion.div>
+                  ) : (
+                    <div className="flex h-24 flex-col items-center justify-center text-center">
+                      <p className="text-sm text-muted-foreground">
+                        Правило не настроено
+                      </p>
+                      <Button
+                        variant="link"
+                        size="sm"
+                        className="mt-1"
+                        onClick={() => {
+                          setActiveTab('settings')
+                          setIsEditingRule(true)
+                        }}
+                      >
+                        Настроить
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
+          {/* History Tab */}
+          <TabsContent value="history" className="mt-6">
+            <Card>
+              <CardContent className="pt-6">
+                <FundTransactionsHistory
+                  fundId={id!}
+                  assetId={selectedAssetId || undefined}
+                  assetName={selectedAssetName || undefined}
+                  onClearAssetFilter={() => {
+                    setSelectedAssetId(null)
+                    setSelectedAssetName(null)
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Settings Tab */}
+          <TabsContent value="settings" className="mt-6">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Fund Settings */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Настройки фонда</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                      {/* Name */}
                       <FormField
-                        control={ruleForm.control}
-                        name="isActive"
+                        control={form.control}
+                        name="name"
                         render={({ field }) => (
-                          <FormItem className="flex items-center gap-3">
+                          <FormItem>
+                            <FormLabel className="text-sm text-muted-foreground">
+                              Название
+                            </FormLabel>
                             <FormControl>
-                              <input
-                                type="checkbox"
-                                checked={field.value}
-                                onChange={field.onChange}
-                                className="h-4 w-4 rounded"
+                              <Input
+                                {...field}
+                                disabled={!isEditing}
+                                className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20"
                               />
                             </FormControl>
-                            <FormLabel className="cursor-pointer text-sm">
-                              Правило активно
-                            </FormLabel>
+                            <FormMessage />
                           </FormItem>
                         )}
                       />
 
-                      <div className="flex gap-3">
-                        {activeRule && (
-                          <Button
-                            type="button"
-                            variant="destructive"
-                            size="sm"
-                            className="h-10"
-                            onClick={handleDeleteRule}
-                            disabled={deleteRule.isPending}
-                          >
-                            Удалить
-                          </Button>
+                      {/* Status */}
+                      <FormField
+                        control={form.control}
+                        name="status"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm text-muted-foreground">
+                              Статус
+                            </FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              disabled={!isEditing}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="active">Активен</SelectItem>
+                                <SelectItem value="paused">Приостановлен</SelectItem>
+                                <SelectItem value="completed">Завершён</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
                         )}
-                        <div className="flex flex-1 gap-3">
-                          {(isEditingRule || activeRule) && (
+                      />
+
+                      {/* Icon */}
+                      <FormField
+                        control={form.control}
+                        name="icon"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm text-muted-foreground">
+                              Иконка
+                            </FormLabel>
+                            <div className="grid grid-cols-6 gap-2">
+                              {FUND_ICONS.map((item) => {
+                                const ItemIcon = item.icon
+                                return (
+                                  <button
+                                    key={item.value}
+                                    type="button"
+                                    onClick={() => isEditing && field.onChange(item.value)}
+                                    disabled={!isEditing}
+                                    className={cn(
+                                      'flex h-11 w-11 items-center justify-center rounded-xl bg-muted/50 transition-all',
+                                      isEditing && 'hover:bg-muted',
+                                      field.value === item.value &&
+                                        'bg-primary/10 ring-2 ring-primary',
+                                      !isEditing && 'opacity-50'
+                                    )}
+                                    title={item.label}
+                                  >
+                                    <ItemIcon className="h-5 w-5" />
+                                  </button>
+                                )
+                              })}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Color */}
+                      <FormField
+                        control={form.control}
+                        name="color"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm text-muted-foreground">
+                              Цвет
+                            </FormLabel>
+                            <div className="flex flex-wrap gap-2">
+                              {FUND_COLORS.map((color) => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={() => isEditing && field.onChange(color)}
+                                  disabled={!isEditing}
+                                  className={cn(
+                                    'h-9 w-9 rounded-xl transition-all',
+                                    field.value === color
+                                      ? 'ring-2 ring-foreground ring-offset-2 ring-offset-background scale-110'
+                                      : '',
+                                    isEditing && 'hover:scale-105',
+                                    !isEditing && 'opacity-50'
+                                  )}
+                                  style={{ backgroundColor: color }}
+                                />
+                              ))}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Type */}
+                      <FormField
+                        control={form.control}
+                        name="isVirtual"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-sm text-muted-foreground">
+                              Тип фонда
+                            </FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value}
+                              disabled={!isEditing}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="false">Реальный</SelectItem>
+                                <SelectItem value="true">Виртуальный</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <div className="flex gap-3 pt-2">
+                        {isEditing ? (
+                          <>
                             <Button
                               type="button"
                               variant="ghost"
-                              size="sm"
-                              className="flex-1 h-10"
+                              className="flex-1 h-12"
                               onClick={() => {
-                                ruleForm.reset()
-                                setIsEditingRule(false)
+                                form.reset()
+                                setIsEditing(false)
                               }}
                             >
                               Отмена
                             </Button>
-                          )}
+                            <Button
+                              type="submit"
+                              className="flex-1 h-12 font-medium"
+                              disabled={updateFund.isPending}
+                            >
+                              {updateFund.isPending ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Сохранение...
+                                </>
+                              ) : (
+                                'Сохранить'
+                              )}
+                            </Button>
+                          </>
+                        ) : (
                           <Button
-                            type="submit"
-                            size="sm"
-                            className="flex-1 h-10"
-                            disabled={createRule.isPending || updateRule.isPending}
+                            type="button"
+                            className="w-full h-12 font-medium"
+                            onClick={() => setIsEditing(true)}
                           >
-                            {createRule.isPending || updateRule.isPending
-                              ? 'Сохранение...'
-                              : activeRule
-                                ? 'Сохранить'
-                                : 'Создать'}
+                            Редактировать
                           </Button>
-                        </div>
+                        )}
                       </div>
                     </form>
                   </Form>
-                ) : (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Тип</span>
-                      <Badge variant="secondary">
-                        {activeRule.rule_type === 'percentage' ? 'Процент' : 'Фикс. сумма'}
-                      </Badge>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Значение</span>
-                      <span className="font-semibold">
-                        {activeRule.rule_type === 'percentage'
-                          ? `${activeRule.value}%`
-                          : `${formatMoney(activeRule.value || 0)} ₽`}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Статус</span>
-                      <Badge variant={activeRule.is_active ? 'default' : 'secondary'}>
-                        {activeRule.is_active ? 'Активно' : 'Неактивно'}
-                      </Badge>
-                    </div>
-                  </div>
-                )}
+                </CardContent>
+              </Card>
 
-                {!activeRule && !isEditingRule && (
-                  <Button
-                    variant="outline"
-                    className="w-full h-11 border-dashed mt-4"
-                    onClick={() => setIsEditingRule(true)}
-                  >
-                    Добавить правило
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-      </Tabs>
+              {/* Distribution Rule */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Правило распределения</CardTitle>
+                    {activeRule && !isEditingRule && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setIsEditingRule(true)}
+                      >
+                        Изменить
+                      </Button>
+                    )}
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {isEditingRule || !activeRule ? (
+                    <Form {...ruleForm}>
+                      <form
+                        onSubmit={ruleForm.handleSubmit(onRuleSubmit)}
+                        className="space-y-4"
+                      >
+                        <div className="grid grid-cols-2 gap-3">
+                          <FormField
+                            control={ruleForm.control}
+                            name="ruleType"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-sm text-muted-foreground">
+                                  Тип
+                                </FormLabel>
+                                <Select onValueChange={field.onChange} value={field.value}>
+                                  <FormControl>
+                                    <SelectTrigger className="h-11 border-0 bg-muted/50">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    <SelectItem value="percentage">Процент</SelectItem>
+                                    <SelectItem value="fixed">Фикс. сумма</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={ruleForm.control}
+                            name="ruleValue"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-sm text-muted-foreground">
+                                  {ruleType === 'percentage' ? 'Процент' : 'Сумма'}
+                                </FormLabel>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input
+                                      type="number"
+                                      placeholder={ruleType === 'percentage' ? '10' : '5000'}
+                                      {...field}
+                                      className="h-11 border-0 bg-muted/50 pr-8"
+                                    />
+                                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                                      {ruleType === 'percentage' ? '%' : '₽'}
+                                    </span>
+                                  </div>
+                                </FormControl>
+                              </FormItem>
+                            )}
+                          />
+                        </div>
+
+                        <FormField
+                          control={ruleForm.control}
+                          name="isActive"
+                          render={({ field }) => (
+                            <FormItem className="flex items-center gap-3">
+                              <FormControl>
+                                <input
+                                  type="checkbox"
+                                  checked={field.value}
+                                  onChange={field.onChange}
+                                  className="h-4 w-4 rounded"
+                                />
+                              </FormControl>
+                              <FormLabel className="cursor-pointer text-sm">
+                                Правило активно
+                              </FormLabel>
+                            </FormItem>
+                          )}
+                        />
+
+                        <div className="flex gap-3">
+                          {activeRule && (
+                            <Button
+                              type="button"
+                              variant="destructive"
+                              size="sm"
+                              className="h-10"
+                              onClick={handleDeleteRule}
+                              disabled={deleteRule.isPending}
+                            >
+                              Удалить
+                            </Button>
+                          )}
+                          <div className="flex flex-1 gap-3">
+                            {(isEditingRule || activeRule) && (
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="flex-1 h-10"
+                                onClick={() => {
+                                  ruleForm.reset()
+                                  setIsEditingRule(false)
+                                }}
+                              >
+                                Отмена
+                              </Button>
+                            )}
+                            <Button
+                              type="submit"
+                              size="sm"
+                              className="flex-1 h-10"
+                              disabled={createRule.isPending || updateRule.isPending}
+                            >
+                              {createRule.isPending || updateRule.isPending
+                                ? 'Сохранение...'
+                                : activeRule
+                                  ? 'Сохранить'
+                                  : 'Создать'}
+                            </Button>
+                          </div>
+                        </div>
+                      </form>
+                    </Form>
+                  ) : (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Тип</span>
+                        <Badge variant="secondary">
+                          {activeRule.rule_type === 'percentage' ? 'Процент' : 'Фикс. сумма'}
+                        </Badge>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Значение</span>
+                        <span className="font-semibold">
+                          {activeRule.rule_type === 'percentage'
+                            ? `${activeRule.value}%`
+                            : `${formatMoney(activeRule.value || 0)} ₽`}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Статус</span>
+                        <Badge variant={activeRule.is_active ? 'default' : 'secondary'}>
+                          {activeRule.is_active ? 'Активно' : 'Неактивно'}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+
+                  {!activeRule && !isEditingRule && (
+                    <Button
+                      variant="outline"
+                      className="w-full h-11 border-dashed mt-4"
+                      onClick={() => setIsEditingRule(true)}
+                    >
+                      Добавить правило
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </motion.div>
 
       {/* Dialogs */}
       <ContributionDialog
