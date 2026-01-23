@@ -1338,7 +1338,6 @@ export interface BuyAssetResponse {
 
 export interface DepositToFundRequest {
   accountId: string
-  assetId: string
   amount: number
   date?: string
   note?: string
@@ -1348,7 +1347,7 @@ export interface DepositToFundResponse {
   success: boolean
   accountId: string
   accountName: string
-  assetId: string
+  currency: string
   amount: number
 }
 
@@ -1430,8 +1429,6 @@ export interface FundDeposit {
   fund_color: string | null
   from_account_id: UUID
   account_name: string
-  asset_id: UUID
-  asset_name: string
   amount: number
   currency: string
   contribution_id: string | null

@@ -1,4 +1,3 @@
-import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -29,14 +28,12 @@ import {
 import { Textarea } from '@/components/ui/textarea'
 import { Plus, Loader2 } from 'lucide-react'
 import { AccountIcon } from '@/components/ui/account-icon'
-import { useDepositToFund, useFundCurrencyAssets } from '../hooks'
+import { useDepositToFund } from '../hooks'
 import { useAccounts } from '@/features/accounts'
-import { useAssets } from '@/features/assets'
 import type { FundBalance } from '@/lib/api/types'
 
 const formSchema = z.object({
   accountId: z.string().min(1, 'Выберите счёт'),
-  assetId: z.string().min(1, 'Выберите валютный актив'),
   amount: z.string().min(1, 'Введите сумму'),
   date: z.string().min(1, 'Выберите дату'),
   note: z.string().optional(),
@@ -64,39 +61,13 @@ export function DepositToFundDialog({
 }: DepositToFundDialogProps) {
   const depositToFund = useDepositToFund()
   const { data: accountsData } = useAccounts()
-  const { data: currencyAssetsData } = useFundCurrencyAssets(fund?.fund.id ?? '')
-  const { data: allAssetsData } = useAssets({ typeCode: 'currency' })
 
   const accounts = (accountsData?.data ?? []).filter((a) => a?.id != null)
-
-  // Мемоизируем валютные активы чтобы избежать бесконечного цикла в useEffect
-  const currencyAssets = useMemo(() => {
-    // Используем валютные активы из API фонда, либо из активов фонда, либо все доступные валютные активы
-    const apiFundCurrencyAssets = (currencyAssetsData?.data ?? []).filter(
-      (a) => a?.asset?.id != null
-    )
-    const fundCurrencyAssets = (fund?.assets ?? []).filter(
-      (a) => a?.asset?.id != null && a.asset.typeCode === 'currency'
-    )
-    const allCurrencyAssets = (allAssetsData?.data ?? []).filter(
-      (a) => a?.id != null
-    )
-
-    // Если в фонде есть активы - используем их, иначе показываем все доступные валютные активы
-    if (apiFundCurrencyAssets.length > 0) {
-      return apiFundCurrencyAssets
-    } else if (fundCurrencyAssets.length > 0) {
-      return fundCurrencyAssets
-    } else {
-      return allCurrencyAssets.map((asset) => ({ asset }))
-    }
-  }, [currencyAssetsData?.data, fund?.assets, allAssetsData?.data])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       accountId: '',
-      assetId: '',
       amount: '',
       date: new Date().toISOString().split('T')[0],
       note: '',
@@ -105,25 +76,8 @@ export function DepositToFundDialog({
 
   const watchAmount = form.watch('amount')
   const watchAccountId = form.watch('accountId')
-  const watchAssetId = form.watch('assetId')
 
   const selectedAccount = accounts.find((a) => a?.id === watchAccountId)
-  const selectedAsset = currencyAssets.find((a) => a?.asset?.id === watchAssetId)
-
-  // Автоматически устанавливаем валютный актив при выборе счёта
-  useEffect(() => {
-    if (selectedAccount?.currency && currencyAssets.length > 0 && !watchAssetId) {
-      // Ищем валютный актив с той же валютой, что и у выбранного счёта
-      const matchingAsset = currencyAssets.find(
-        (a) => a?.asset?.currency === selectedAccount.currency
-      )
-
-      // Устанавливаем только если актив ещё не выбран и найден подходящий
-      if (matchingAsset?.asset?.id) {
-        form.setValue('assetId', matchingAsset.asset.id)
-      }
-    }
-  }, [selectedAccount?.currency, currencyAssets, watchAssetId, form])
 
   const handleClose = () => {
     form.reset()
@@ -140,7 +94,6 @@ export function DepositToFundDialog({
         fundId: fund.fund.id,
         data: {
           accountId: values.accountId,
-          assetId: values.assetId,
           amount,
           date: values.date,
           note: values.note || undefined,
@@ -207,9 +160,7 @@ export function DepositToFundDialog({
                     {amountNum > 0 ? formatMoney(amountNum) : '0'}
                   </span>
                   <span className="text-2xl font-medium text-muted-foreground">
-                    {selectedAccount?.currency ||
-                      selectedAsset?.asset.currency ||
-                      '₽'}
+                    {selectedAccount?.currency || '₽'}
                   </span>
                 </div>
                 {hasInsufficientFunds && (
@@ -271,45 +222,11 @@ export function DepositToFundDialog({
               />
             </motion.div>
 
-            {/* Currency Asset */}
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.2 }}
-            >
-              <FormField
-                control={form.control}
-                name="assetId"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-sm text-muted-foreground">
-                      Валютный актив *
-                    </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger className="h-12 border-0 bg-muted/50 transition-all focus:bg-muted/70 focus:ring-2 focus:ring-primary/20">
-                          <SelectValue placeholder="Выберите валютный актив" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {currencyAssets.map((a) => (
-                          <SelectItem key={a.asset.id} value={a.asset.id}>
-                            {a.asset.name} ({a.asset.currency})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </motion.div>
-
             {/* Amount */}
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.25 }}
+              transition={{ delay: 0.2 }}
             >
               <FormField
                 control={form.control}
@@ -338,7 +255,7 @@ export function DepositToFundDialog({
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.3 }}
+              transition={{ delay: 0.25 }}
             >
               <FormField
                 control={form.control}
@@ -365,7 +282,7 @@ export function DepositToFundDialog({
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.35 }}
+              transition={{ delay: 0.3 }}
             >
               <FormField
                 control={form.control}
@@ -392,7 +309,7 @@ export function DepositToFundDialog({
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
+              transition={{ delay: 0.35 }}
               className="flex gap-3 pt-2"
             >
               <Button

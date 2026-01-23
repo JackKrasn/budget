@@ -118,7 +118,11 @@ const formSchema = z.object({
 type FormValues = z.infer<typeof formSchema>
 
 interface CreateDepositDialogProps {
-  children: React.ReactNode
+  children?: React.ReactNode
+  fundId?: string
+  fundName?: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 // Animated number display component
@@ -139,17 +143,32 @@ function AnimatedValue({ value, suffix = '' }: { value: number; suffix?: string 
   )
 }
 
-export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
-  const [open, setOpen] = useState(false)
+export function CreateDepositDialog({
+  children,
+  fundId: preselectedFundId,
+  fundName: preselectedFundName,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: CreateDepositDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [step, setStep] = useState(1)
   const createDeposit = useCreateDeposit()
-  const { data: fundsData, isLoading: isLoadingFunds } = useFunds({ status: 'active' })
+
+  // Support both controlled and uncontrolled modes
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = isControlled ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen
+
+  // Only fetch funds if no preselected fund
+  const { data: fundsData, isLoading: isLoadingFunds } = useFunds(
+    preselectedFundId ? undefined : { status: 'active' }
+  )
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      fundId: '',
+      fundId: preselectedFundId || '',
       currency: 'RUB',
       principalAmount: '',
       interestRate: '',
@@ -242,13 +261,24 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
     setOpen(isOpen)
     if (!isOpen) {
       setStep(1)
-      form.reset()
+      form.reset({
+        name: '',
+        fundId: preselectedFundId || '',
+        currency: 'RUB',
+        principalAmount: '',
+        interestRate: '',
+        termMonths: '12',
+        accrualPeriod: 'monthly',
+        hasCapitalization: true,
+        startDate: new Date(),
+        notes: '',
+      })
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-[680px] gap-0 border-border/50 shadow-2xl">
         {/* Premium Header with gradient */}
         <div className="relative overflow-hidden">
@@ -337,52 +367,66 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                       )}
                     />
 
-                    {/* Fund Selection - Card Style */}
-                    <FormField
-                      control={form.control}
-                      name="fundId"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            Привязка к фонду
-                          </FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            disabled={isLoadingFunds}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-12 bg-muted/30 border-muted-foreground/10 transition-all hover:bg-muted/50 focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
-                                <SelectValue placeholder="Выберите фонд" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {fundsData?.data.map((fundBalance) => {
-                                const FundIcon = FUND_ICONS[fundBalance.fund.icon] || Wallet
-                                return (
-                                  <SelectItem
-                                    key={fundBalance.fund.id}
-                                    value={fundBalance.fund.id}
-                                    className="py-3"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                                        <FundIcon className="h-4 w-4 text-primary" />
+                    {/* Fund Selection - Card Style (hidden if preselected) */}
+                    {preselectedFundId ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Фонд
+                        </p>
+                        <div className="flex items-center gap-3 h-12 px-4 rounded-md bg-muted/30 border border-muted-foreground/10">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                            <Wallet className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="font-medium">{preselectedFundName}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <FormField
+                        control={form.control}
+                        name="fundId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Привязка к фонду
+                            </FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              disabled={isLoadingFunds}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-12 bg-muted/30 border-muted-foreground/10 transition-all hover:bg-muted/50 focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
+                                  <SelectValue placeholder="Выберите фонд" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {fundsData?.data.map((fundBalance) => {
+                                  const FundIcon = FUND_ICONS[fundBalance.fund.icon] || Wallet
+                                  return (
+                                    <SelectItem
+                                      key={fundBalance.fund.id}
+                                      value={fundBalance.fund.id}
+                                      className="py-3"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                                          <FundIcon className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <span className="font-medium">{fundBalance.fund.name}</span>
                                       </div>
-                                      <span className="font-medium">{fundBalance.fund.name}</span>
-                                    </div>
-                                  </SelectItem>
-                                )
-                              })}
-                            </SelectContent>
-                          </Select>
-                          <FormDescription className="text-xs">
-                            Депозит отобразится как актив выбранного фонда
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                                    </SelectItem>
+                                  )
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription className="text-xs">
+                              Депозит отобразится как актив выбранного фонда
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
                     {/* Currency Selection - Visual Cards */}
                     <FormField

@@ -49,10 +49,8 @@ import {
   Plus,
   ArrowRightLeft,
   Banknote,
-  LineChart,
   Landmark,
   ChevronRight,
-  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -70,6 +68,7 @@ import {
   FundTransactionsHistory,
   SetInitialBalanceDialog,
 } from '@/features/funds'
+import { CreateDepositDialog } from '@/features/deposits'
 import type { FundStatus, RuleType, FundBalance, FundAssetBalance } from '@/lib/api/types'
 
 const FUND_ICONS = [
@@ -103,10 +102,11 @@ const FUND_COLORS = [
 // Asset type configuration for grouping
 const ASSET_TYPE_CONFIG: Record<string, { label: string; icon: typeof Banknote; color: string }> = {
   currency: { label: 'Валюта', icon: Banknote, color: '#10b981' },
-  etf: { label: 'ETF', icon: LineChart, color: '#8b5cf6' },
+  deposit: { label: 'Депозиты', icon: Landmark, color: '#f59e0b' },
+  etf: { label: 'ETF', icon: TrendingUp, color: '#8b5cf6' },
   stock: { label: 'Акции', icon: TrendingUp, color: '#3b82f6' },
-  bond: { label: 'Облигации', icon: Landmark, color: '#f59e0b' },
-  crypto: { label: 'Криптовалюта', icon: Sparkles, color: '#ec4899' },
+  bond: { label: 'Облигации', icon: Landmark, color: '#06b6d4' },
+  crypto: { label: 'Криптовалюта', icon: Wallet, color: '#ec4899' },
   other: { label: 'Другое', icon: Wallet, color: '#6b7280' },
 }
 
@@ -232,7 +232,7 @@ function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {typeCode === 'currency'
+                {typeCode === 'currency' || typeCode === 'deposit'
                   ? `${formatMoney(asset.amount)} ${getCurrencySymbol(asset.asset.currency)}`
                   : `${asset.amount} шт. × ${formatPrice(asset.amount > 0 ? asset.valueBase / asset.amount : 0)} ₽`
                 }
@@ -241,12 +241,12 @@ function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
             <div className="flex items-center gap-2">
               <div className="text-right">
                 <p className="font-semibold tabular-nums">
-                  {typeCode === 'currency'
+                  {typeCode === 'currency' || typeCode === 'deposit'
                     ? `${formatMoney(asset.amount)} ${getCurrencySymbol(asset.asset.currency)}`
                     : `${formatMoney(asset.valueBase)} ₽`
                   }
                 </p>
-                {typeCode === 'currency' && asset.asset.currency !== 'RUB' && (
+                {(typeCode === 'currency' || typeCode === 'deposit') && asset.asset.currency !== 'RUB' && (
                   <p className="text-xs text-muted-foreground">
                     ≈ {formatMoney(asset.valueBase)} ₽
                   </p>
@@ -272,6 +272,7 @@ export default function FundDetailsPage() {
   const [depositFromAccountOpen, setDepositFromAccountOpen] = useState(false)
   const [transferAssetOpen, setTransferAssetOpen] = useState(false)
   const [setInitialBalanceOpen, setSetInitialBalanceOpen] = useState(false)
+  const [createDepositOpen, setCreateDepositOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const [selectedAssetName, setSelectedAssetName] = useState<string | null>(null)
@@ -303,7 +304,7 @@ export default function FundDetailsPage() {
     })
 
     // Sort groups by predefined order
-    const order = ['currency', 'etf', 'stock', 'bond', 'crypto', 'other']
+    const order = ['currency', 'deposit', 'etf', 'stock', 'bond', 'crypto', 'other']
     const sortedEntries = Object.entries(groups).sort(([a], [b]) => {
       const indexA = order.indexOf(a) === -1 ? 999 : order.indexOf(a)
       const indexB = order.indexOf(b) === -1 ? 999 : order.indexOf(b)
@@ -646,6 +647,15 @@ export default function FundDetailsPage() {
                 >
                   <ShoppingBag className="h-4 w-4" />
                   Купить актив
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 bg-background/50 backdrop-blur-sm"
+                  onClick={() => setCreateDepositOpen(true)}
+                >
+                  <Landmark className="h-4 w-4" />
+                  Открыть депозит
                 </Button>
                 <Button
                   size="sm"
@@ -1249,6 +1259,12 @@ export default function FundDetailsPage() {
         fund={fundBalance}
         open={setInitialBalanceOpen}
         onOpenChange={setSetInitialBalanceOpen}
+      />
+      <CreateDepositDialog
+        fundId={fundData.id}
+        fundName={fundData.name}
+        open={createDepositOpen}
+        onOpenChange={setCreateDepositOpen}
       />
     </div>
   )
