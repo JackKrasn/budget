@@ -127,6 +127,17 @@ function formatPrice(price: number): string {
   }).format(price)
 }
 
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+    GEL: '₾',
+    TRY: '₺',
+  }
+  return symbols[currency] || currency
+}
+
 export default function FundDetailsPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
@@ -152,6 +163,23 @@ export default function FundDetailsPage() {
   const totalBase = fund?.totalBase ?? 0
   const baseCurrency = fund?.baseCurrency ?? 'RUB'
   const assets = fund?.assets ?? []
+
+  // Separate currency assets and other assets
+  const currencyAssets = assets.filter((a) => a.asset.typeCode === 'currency')
+  const otherAssets = assets.filter((a) => a.asset.typeCode !== 'currency')
+
+  // Group currency assets by currency for balance display
+  const currencyBalances = currencyAssets.reduce(
+    (acc, a) => {
+      const currency = a.asset.currency || 'RUB'
+      acc[currency] = (acc[currency] || 0) + a.amount
+      return acc
+    },
+    {} as Record<string, number>
+  )
+
+  // Calculate total value of other assets in base currency
+  const otherAssetsTotalBase = otherAssets.reduce((sum, a) => sum + a.valueBase, 0)
 
   const Icon = FUND_ICONS.find((i) => i.value === fundData?.icon)?.icon || Wallet
 
@@ -374,12 +402,47 @@ export default function FundDetailsPage() {
 
             <div className="flex flex-col items-end gap-2">
               <div className="text-right">
-                <p className="text-sm text-muted-foreground">Баланс</p>
+                <p className="text-sm text-muted-foreground">Общий баланс</p>
                 <div className="flex items-baseline gap-2">
                   <span className="text-4xl font-bold tabular-nums tracking-tight">
                     {formatMoney(totalBase)}
                   </span>
                   <span className="text-2xl font-medium text-muted-foreground">₽</span>
+                </div>
+
+                {/* Breakdown by asset type */}
+                <div className="mt-2 space-y-1">
+                  {/* Currency balances */}
+                  {Object.keys(currencyBalances).length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Валюта</p>
+                      <div className="flex flex-wrap gap-3 justify-end">
+                        {Object.entries(currencyBalances).map(([currency, amount]) => (
+                          <div key={currency} className="flex items-baseline gap-1">
+                            <span className="text-lg font-semibold tabular-nums">
+                              {formatMoney(amount)}
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {getCurrencySymbol(currency)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Other assets total */}
+                  {otherAssets.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Другие активы</p>
+                      <div className="flex items-baseline gap-1 justify-end">
+                        <span className="text-lg font-semibold tabular-nums">
+                          ≈ {formatMoney(otherAssetsTotalBase)}
+                        </span>
+                        <span className="text-sm text-muted-foreground">₽</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
