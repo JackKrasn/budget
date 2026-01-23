@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { TrendingUp, MoreVertical, Trash2, Loader2 } from 'lucide-react'
+import { TrendingUp, MoreVertical, Trash2, Loader2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -13,6 +13,7 @@ import type { FundDeposit } from '@/lib/api/types'
 
 interface FundDepositRowProps {
   deposit: FundDeposit
+  onEdit?: (deposit: FundDeposit) => void
   onDelete?: (id: string) => void
   isDeleting?: boolean
 }
@@ -29,7 +30,7 @@ function getFundIcon(_icon: string | null): React.ReactNode {
   return <TrendingUp className="h-4 w-4" />
 }
 
-export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRowProps) {
+export function FundDepositRow({ deposit, onEdit, onDelete, isDeleting }: FundDepositRowProps) {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
 
   const handleDeleteClick = () => {
@@ -102,7 +103,7 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
       </div>
 
       {/* Actions */}
-      {onDelete && (
+      {(onEdit || onDelete) && (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button
@@ -119,13 +120,21 @@ export function FundDepositRow({ deposit, onDelete, isDeleting }: FundDepositRow
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem
-              className="text-destructive focus:text-destructive"
-              onClick={handleDeleteClick}
-            >
-              <Trash2 className="mr-2 h-4 w-4" />
-              Удалить
-            </DropdownMenuItem>
+            {onEdit && (
+              <DropdownMenuItem onClick={() => onEdit(deposit)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Редактировать
+              </DropdownMenuItem>
+            )}
+            {onDelete && (
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={handleDeleteClick}
+              >
+                <Trash2 className="mr-2 h-4 w-4" />
+                Удалить
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       )}

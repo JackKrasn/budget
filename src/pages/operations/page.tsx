@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Loader2,
@@ -34,12 +35,14 @@ import {
   useFundDeposits,
   useDeleteFundDeposit,
   FundDepositRow,
+  EditFundDepositDialog,
+  BalanceChangeResultDialog,
   useAccounts,
 } from '@/features/accounts'
 import { AccountIcon } from '@/components/ui/account-icon'
 import { DeleteTransactionResultDialog } from '@/features/funds/components'
 import { DateRangePicker } from '@/components/common'
-import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse } from '@/lib/api/types'
+import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse, UpdateFundDepositResponse } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -113,6 +116,8 @@ const item = {
 }
 
 export default function OperationsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date()
     const from = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -122,14 +127,40 @@ export default function OperationsPage() {
 
   const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingDeposit, setEditingDeposit] = useState<FundDeposit | null>(null)
+  const [editDepositDialogOpen, setEditDepositDialogOpen] = useState(false)
   const [deleteResult, setDeleteResult] = useState<DeleteTransactionResponse | null>(null)
   const [deleteResultDialogOpen, setDeleteResultDialogOpen] = useState(false)
+  const [updateResult, setUpdateResult] = useState<UpdateFundDepositResponse | null>(null)
+  const [updateResultDialogOpen, setUpdateResultDialogOpen] = useState(false)
   const [deletedFundName, setDeletedFundName] = useState<string>('')
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
+  const [updatedFundName, setUpdatedFundName] = useState<string>('')
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
+    return searchParams.get('accountId') || 'all'
+  })
   const [selectedOperationType, setSelectedOperationType] = useState<'all' | OperationType>('all')
 
   // Fetch accounts for filter
   const { data: accountsData } = useAccounts()
+
+  // Sync URL params with state
+  useEffect(() => {
+    const accountIdFromUrl = searchParams.get('accountId')
+    if (accountIdFromUrl && accountIdFromUrl !== selectedAccountId) {
+      setSelectedAccountId(accountIdFromUrl)
+    }
+  }, [searchParams])
+
+  // Update URL when account filter changes
+  const handleAccountChange = (value: string) => {
+    setSelectedAccountId(value)
+    if (value === 'all') {
+      searchParams.delete('accountId')
+    } else {
+      searchParams.set('accountId', value)
+    }
+    setSearchParams(searchParams, { replace: true })
+  }
 
   // Data fetching
   const { data: expensesData, isLoading: isExpensesLoading, error: expensesError } = useExpenses({
@@ -312,6 +343,19 @@ export default function OperationsPage() {
     }
   }
 
+  const handleEditFundDeposit = (deposit: FundDeposit) => {
+    setEditingDeposit(deposit)
+    setEditDepositDialogOpen(true)
+  }
+
+  const handleEditFundDepositSuccess = (result: UpdateFundDepositResponse) => {
+    if (result.accountBalance || result.fundBalance) {
+      setUpdateResult(result)
+      setUpdatedFundName(result.deposit.fund_name || editingDeposit?.fund_name || '')
+      setUpdateResultDialogOpen(true)
+    }
+  }
+
   const handleDeleteFundDeposit = async (deposit: FundDeposit) => {
     try {
       const result = await deleteFundDeposit.mutateAsync(deposit.id)
@@ -381,7 +425,7 @@ export default function OperationsPage() {
           />
 
           {/* Account Filter */}
-          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+          <Select value={selectedAccountId} onValueChange={handleAccountChange}>
             <SelectTrigger className="w-[180px] border-border/50 bg-background/50">
               <SelectValue placeholder="Все счета" />
             </SelectTrigger>
@@ -425,7 +469,7 @@ export default function OperationsPage() {
               size="sm"
               className="text-xs"
               onClick={() => {
-                setSelectedAccountId('all')
+                handleAccountChange('all')
                 setSelectedOperationType('all')
               }}
             >
@@ -592,6 +636,7 @@ export default function OperationsPage() {
                           <FundDepositRow
                             key={op.id}
                             deposit={deposit}
+                            onEdit={() => handleEditFundDeposit(deposit)}
                             onDelete={() => handleDeleteFundDeposit(deposit)}
                           />
                         )
@@ -629,12 +674,31 @@ export default function OperationsPage() {
         onOpenChange={setEditDialogOpen}
       />
 
+      {/* Edit Fund Deposit Dialog */}
+      <EditFundDepositDialog
+        deposit={editingDeposit}
+        open={editDepositDialogOpen}
+        onOpenChange={setEditDepositDialogOpen}
+        onSuccess={handleEditFundDepositSuccess}
+      />
+
       {/* Delete Fund Deposit Result Dialog */}
       <DeleteTransactionResultDialog
         result={deleteResult}
         fundName={deletedFundName}
         open={deleteResultDialogOpen}
         onOpenChange={setDeleteResultDialogOpen}
+      />
+
+      {/* Update Fund Deposit Result Dialog */}
+      <BalanceChangeResultDialog
+        title="Перевод обновлён"
+        message={updateResult?.message}
+        fundName={updatedFundName}
+        accountBalance={updateResult?.accountBalance}
+        fundBalance={updateResult?.fundBalance}
+        open={updateResultDialogOpen}
+        onOpenChange={setUpdateResultDialogOpen}
       />
     </div>
   )

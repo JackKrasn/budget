@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   MoreHorizontal,
@@ -5,6 +6,7 @@ import {
   Pencil,
   Trash2,
   RefreshCw,
+  Receipt,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -44,9 +46,18 @@ export function AccountCard({
   onDelete,
   onSyncBalance,
 }: AccountCardProps) {
+  const navigate = useNavigate()
   const currencySymbol = CURRENCY_SYMBOLS[account.currency] || account.currency
   const typeName = account.type_name || 'Загрузка...'
   const bank = account.bank_name ? getBankByName(account.bank_name) : undefined
+
+  const handleCardClick = () => {
+    navigate(`/operations?accountId=${account.id}`)
+  }
+
+  const handleMenuClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+  }
 
   return (
     <motion.div
@@ -57,9 +68,10 @@ export function AccountCard({
     >
       <Card
         className={cn(
-          'group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5',
+          'group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5 cursor-pointer',
           account.is_archived && 'opacity-60'
         )}
+        onClick={handleCardClick}
       >
         {/* Gradient overlay */}
         <div
@@ -95,39 +107,45 @@ export function AccountCard({
               </div>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={onSyncBalance}>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Синхронизировать баланс
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onEdit}>
-                  <Pencil className="mr-2 h-4 w-4" />
-                  Редактировать
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={onArchive}>
-                  <Archive className="mr-2 h-4 w-4" />
-                  {account.is_archived ? 'Восстановить' : 'В архив'}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={onDelete}
-                  className="text-destructive focus:text-destructive"
-                >
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  Удалить
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div onClick={handleMenuClick}>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleCardClick}>
+                    <Receipt className="mr-2 h-4 w-4" />
+                    Операции
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onSyncBalance}>
+                    <RefreshCw className="mr-2 h-4 w-4" />
+                    Синхронизировать баланс
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onEdit}>
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Редактировать
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={onArchive}>
+                    <Archive className="mr-2 h-4 w-4" />
+                    {account.is_archived ? 'Восстановить' : 'В архив'}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={onDelete}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Удалить
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
 
           {/* Balance */}

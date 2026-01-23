@@ -1453,3 +1453,16 @@ export interface ListFundDepositsResponse {
   data: FundDeposit[]
   total: number
 }
+
+export interface UpdateFundDepositRequest {
+  amount?: number
+  date?: string
+  note?: string
+}
+
+export interface UpdateFundDepositResponse {
+  message: string
+  deposit: FundDeposit
+  accountBalance?: BalanceChange
+  fundBalance?: BalanceChange
+}
