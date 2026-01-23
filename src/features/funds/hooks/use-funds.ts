@@ -262,10 +262,15 @@ export function useDeleteContribution() {
       queryClient.invalidateQueries({ queryKey: fundKeys.contributions(variables.fundId) })
       queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
       queryClient.invalidateQueries({ queryKey: fundKeys.history(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.transactions(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.currencyAssets(variables.fundId) })
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
       // Invalidate income queries in case this was an income distribution contribution
       queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
       queryClient.invalidateQueries({ queryKey: incomeKeys.details() })
+      // Invalidate accounts in case contribution affected account balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: accountKeys.details() })
 
       // Only show success toast if no balance info (balance info will be shown in dialog)
       if (!data?.fundBalances || data.fundBalances.length === 0) {
@@ -512,7 +517,13 @@ export function useDeleteTransaction() {
       queryClient.invalidateQueries({
         queryKey: fundKeys.transactions(variables.fundId),
       })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.currencyAssets(variables.fundId),
+      })
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      // Invalidate accounts in case deposit/withdrawal affected account balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: accountKeys.details() })
       toast.success('Транзакция удалена')
     },
     onError: (error) => {
