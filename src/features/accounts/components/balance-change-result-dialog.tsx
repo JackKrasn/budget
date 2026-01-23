@@ -9,11 +9,14 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import type { DeleteTransactionResponse } from '@/lib/api/types'
+import type { BalanceChange } from '@/lib/api/types'
 
-interface DeleteTransactionResultDialogProps {
-  result: DeleteTransactionResponse | null
-  fundName: string
+interface BalanceChangeResultDialogProps {
+  title?: string
+  message?: string
+  fundName?: string
+  accountBalance?: BalanceChange
+  fundBalance?: BalanceChange
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -37,16 +40,19 @@ function getCurrencySymbol(currency?: string): string {
   return symbols[currency] || currency
 }
 
-export function DeleteTransactionResultDialog({
-  result,
+export function BalanceChangeResultDialog({
+  title = 'Операция выполнена',
+  message,
   fundName,
+  accountBalance,
+  fundBalance,
   open,
   onOpenChange,
-}: DeleteTransactionResultDialogProps) {
-  if (!result) return null
-
-  const { fundBalance, accountBalance } = result
+}: BalanceChangeResultDialogProps) {
   const hasAccountBalance = !!accountBalance
+  const hasFundBalance = !!fundBalance
+
+  if (!hasAccountBalance && !hasFundBalance) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -57,57 +63,61 @@ export function DeleteTransactionResultDialog({
               <CheckCircle2 className="h-6 w-6 text-emerald-500" />
             </div>
             <div>
-              <DialogTitle>Транзакция удалена</DialogTitle>
-              <DialogDescription>
-                {result.message}
-              </DialogDescription>
+              <DialogTitle>{title}</DialogTitle>
+              {message && (
+                <DialogDescription>{message}</DialogDescription>
+              )}
             </div>
           </div>
         </DialogHeader>
 
         <div className="space-y-4">
           {/* Fund balance change */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <PiggyBank className="h-4 w-4 text-muted-foreground" />
-              <h4 className="text-sm font-medium">Фонд: {fundName} ({fundBalance.assetName})</h4>
+          {hasFundBalance && (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <PiggyBank className="h-4 w-4 text-muted-foreground" />
+                <h4 className="text-sm font-medium">
+                  Фонд: {fundName || fundBalance.assetName}
+                </h4>
+              </div>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Было</p>
+                      <p className="text-lg font-semibold tabular-nums">
+                        {formatMoney(fundBalance.before)} {getCurrencySymbol(fundBalance.currency)}
+                      </p>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-0.5">Стало</p>
+                      <p className={`text-lg font-semibold tabular-nums ${
+                        fundBalance.change > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-rose-600 dark:text-rose-400'
+                      }`}>
+                        {formatMoney(fundBalance.after)} {getCurrencySymbol(fundBalance.currency)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-2 pt-2 border-t border-border/50">
+                    <p className="text-xs text-muted-foreground">
+                      Изменение:{' '}
+                      <span className={`font-medium ${
+                        fundBalance.change > 0
+                          ? 'text-emerald-600 dark:text-emerald-400'
+                          : 'text-rose-600 dark:text-rose-400'
+                      }`}>
+                        {fundBalance.change > 0 ? '+' : ''}{formatMoney(fundBalance.change)} {getCurrencySymbol(fundBalance.currency)}
+                      </span>
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-            <Card>
-              <CardContent className="p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">До удаления</p>
-                    <p className="text-lg font-semibold tabular-nums">
-                      {formatMoney(fundBalance.before)} {getCurrencySymbol(fundBalance.currency)}
-                    </p>
-                  </div>
-                  <ArrowRight className="h-5 w-5 text-muted-foreground" />
-                  <div>
-                    <p className="text-xs text-muted-foreground mb-0.5">После удаления</p>
-                    <p className={`text-lg font-semibold tabular-nums ${
-                      fundBalance.change > 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-rose-600 dark:text-rose-400'
-                    }`}>
-                      {formatMoney(fundBalance.after)} {getCurrencySymbol(fundBalance.currency)}
-                    </p>
-                  </div>
-                </div>
-                <div className="mt-2 pt-2 border-t border-border/50">
-                  <p className="text-xs text-muted-foreground">
-                    Изменение:{' '}
-                    <span className={`font-medium ${
-                      fundBalance.change > 0
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-rose-600 dark:text-rose-400'
-                    }`}>
-                      {fundBalance.change > 0 ? '+' : ''}{formatMoney(fundBalance.change)} {getCurrencySymbol(fundBalance.currency)}
-                    </span>
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          )}
 
           {/* Account balance change (if present) */}
           {hasAccountBalance && (
@@ -120,14 +130,14 @@ export function DeleteTransactionResultDialog({
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">До удаления</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Было</p>
                       <p className="text-lg font-semibold tabular-nums">
                         {formatMoney(accountBalance.before)} {getCurrencySymbol(accountBalance.currency)}
                       </p>
                     </div>
                     <ArrowRight className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-xs text-muted-foreground mb-0.5">После удаления</p>
+                      <p className="text-xs text-muted-foreground mb-0.5">Стало</p>
                       <p className={`text-lg font-semibold tabular-nums ${
                         accountBalance.change > 0
                           ? 'text-emerald-600 dark:text-emerald-400'

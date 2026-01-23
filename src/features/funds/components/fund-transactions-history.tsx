@@ -14,6 +14,8 @@ import {
   ExternalLink,
   Trash2,
   Wallet,
+  Pencil,
+  CalendarDays,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +30,7 @@ import { useFundTransactions, useFundContributions, useDeleteContribution, useDe
 import { DeleteContributionResultDialog } from './delete-contribution-result-dialog'
 import { DeleteTransactionResultDialog } from './delete-transaction-result-dialog'
 import { ConfirmDeleteTransactionDialog } from './confirm-delete-transaction-dialog'
+import { EditFundTransactionDialog } from './edit-fund-transaction-dialog'
 import type { FundTransaction, FundTransactionType, FundContribution, NullFloat64, DeleteContributionResponse, DeleteTransactionResponse } from '@/lib/api/types'
 import { TRANSACTION_TYPES } from '../constants'
 
@@ -35,6 +38,11 @@ import { TRANSACTION_TYPES } from '../constants'
 type HistoryItem =
   | (FundTransaction & { itemType: 'transaction' })
   | (FundContribution & { itemType: 'contribution'; transaction_type: 'contribution' })
+
+interface DayGroup {
+  date: string
+  items: HistoryItem[]
+}
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -55,15 +63,29 @@ function getCurrencySymbol(currency: string): string {
     RUB: '₽',
     USD: '$',
     EUR: '€',
+    GEL: '₾',
+    TRY: '₺',
   }
   return symbols[currency] || currency
 }
 
-function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('ru-RU', {
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
+function formatDateHeader(date: string): string {
+  const d = new Date(date)
+  const today = new Date()
+  const yesterday = new Date(today)
+  yesterday.setDate(yesterday.getDate() - 1)
+
+  if (d.toDateString() === today.toDateString()) {
+    return 'Сегодня'
+  }
+  if (d.toDateString() === yesterday.toDateString()) {
+    return 'Вчера'
+  }
+
+  return d.toLocaleDateString('ru-RU', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
   })
 }
 
@@ -111,6 +133,9 @@ function getCounterpartLabel(tx: FundTransaction): string {
 
 interface FundTransactionsHistoryProps {
   fundId: string
+  assetId?: string
+  assetName?: string
+  onClearAssetFilter?: () => void
 }
 
 const ALL_TRANSACTION_TYPES: FundTransactionType[] = [
@@ -123,7 +148,7 @@ const ALL_TRANSACTION_TYPES: FundTransactionType[] = [
   'withdrawal',
 ]
 
-export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps) {
+export function FundTransactionsHistory({ fundId, assetId, assetName, onClearAssetFilter }: FundTransactionsHistoryProps) {
   const navigate = useNavigate()
   const [selectedTypes, setSelectedTypes] = useState<FundTransactionType[]>(ALL_TRANSACTION_TYPES)
   const [dateFrom, setDateFrom] = useState('')
@@ -135,11 +160,14 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   const [deleteTransactionResultDialogOpen, setDeleteTransactionResultDialogOpen] = useState(false)
   const [confirmDeleteDialogOpen, setConfirmDeleteDialogOpen] = useState(false)
   const [transactionToDelete, setTransactionToDelete] = useState<FundTransaction | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [transactionToEdit, setTransactionToEdit] = useState<FundTransaction | null>(null)
 
   const { data: fundData } = useFund(fundId)
 
   // Only fetch transactions if contribution is not the only selected type
   const shouldFetchTransactions = selectedTypes.some(t => t !== 'contribution')
+  // Note: assetId filtering is done client-side as backend doesn't support it
   const { data: transactionsData, isLoading: isLoadingTransactions } = useFundTransactions(fundId, {
     type: selectedTypes.length === 1 && selectedTypes[0] !== 'contribution' ? selectedTypes[0] : undefined,
     from: dateFrom || undefined,
@@ -158,19 +186,24 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   const transactions = transactionsData?.data ?? []
   const contributions = contributionsData?.data ?? []
 
-  // Combine and sort by date (newest first)
-  const combinedHistory = useMemo(() => {
+  // Combine, filter by type, and group by date
+  const dayGroups = useMemo<DayGroup[]>(() => {
     const items: HistoryItem[] = []
 
     // Add transactions
     if (shouldFetchTransactions) {
       transactions.forEach(tx => {
+        // Filter by assetId if set
+        if (assetId && tx.asset_id !== assetId) return
+
         items.push({ ...tx, itemType: 'transaction' })
       })
     }
 
     // Add contributions (converted to HistoryItem format)
-    if (shouldFetchContributions) {
+    // Note: Contributions don't have asset_id - they are fund-level operations
+    // When filtering by asset, we hide contributions as they don't belong to specific assets
+    if (shouldFetchContributions && !assetId) {
       contributions.forEach(c => {
         // Filter by date if filters are set
         if (dateFrom && c.date < dateFrom) return
@@ -184,17 +217,29 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
       })
     }
 
-    // Sort by date descending (newest first)
-    items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    // Filter by selected types
+    const filteredItems = selectedTypes.length === ALL_TRANSACTION_TYPES.length
+      ? items
+      : items.filter((item) => selectedTypes.includes(item.transaction_type))
 
-    return items
-  }, [transactions, contributions, shouldFetchTransactions, shouldFetchContributions, dateFrom, dateTo])
+    // Group by date
+    const groups: Record<string, HistoryItem[]> = {}
+    filteredItems.forEach((item) => {
+      const dateKey = item.date.split('T')[0]
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
+      }
+      groups[dateKey].push(item)
+    })
 
-  // Filter by selected types (client-side when multiple types selected)
-  const filteredTransactions =
-    selectedTypes.length === ALL_TRANSACTION_TYPES.length
-      ? combinedHistory
-      : combinedHistory.filter((item) => selectedTypes.includes(item.transaction_type))
+    // Sort and return
+    return Object.entries(groups)
+      .map(([date, dayItems]) => ({
+        date,
+        items: dayItems.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      }))
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  }, [transactions, contributions, shouldFetchTransactions, shouldFetchContributions, dateFrom, dateTo, assetId, selectedTypes])
 
   const isLoading = isLoadingTransactions || isLoadingContributions
 
@@ -251,7 +296,9 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   }
 
   const hasActiveFilters =
-    selectedTypes.length < ALL_TRANSACTION_TYPES.length || dateFrom !== '' || dateTo !== ''
+    selectedTypes.length < ALL_TRANSACTION_TYPES.length || dateFrom !== '' || dateTo !== '' || !!assetId
+
+  const totalTransactions = dayGroups.reduce((sum, group) => sum + group.items.length, 0)
 
   if (isLoading) {
     return (
@@ -261,13 +308,60 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
     )
   }
 
+  const colorClasses = {
+    green: {
+      bg: 'bg-emerald-500/10',
+      iconBg: 'bg-emerald-500/20',
+      icon: 'text-emerald-500',
+      text: 'text-emerald-600 dark:text-emerald-400',
+    },
+    blue: {
+      bg: 'bg-blue-500/10',
+      iconBg: 'bg-blue-500/20',
+      icon: 'text-blue-500',
+      text: 'text-blue-600 dark:text-blue-400',
+    },
+    orange: {
+      bg: 'bg-orange-500/10',
+      iconBg: 'bg-orange-500/20',
+      icon: 'text-orange-500',
+      text: 'text-orange-600 dark:text-orange-400',
+    },
+    red: {
+      bg: 'bg-rose-500/10',
+      iconBg: 'bg-rose-500/20',
+      icon: 'text-rose-500',
+      text: 'text-rose-600 dark:text-rose-400',
+    },
+  }
+
   return (
     <div className="space-y-4">
       {/* Filters */}
       <div className="flex items-center justify-between gap-2">
-        <h3 className="text-sm font-medium text-muted-foreground">
-          История операций
-        </h3>
+        <div className="flex items-center gap-2">
+          <h3 className="text-sm font-medium text-muted-foreground">
+            История операций
+          </h3>
+          {assetId && assetName && (
+            <Badge variant="secondary" className="gap-1">
+              {assetName}
+              {onClearAssetFilter && (
+                <button
+                  onClick={onClearAssetFilter}
+                  className="ml-1 hover:text-foreground"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              )}
+            </Badge>
+          )}
+          {totalTransactions > 0 && (
+            <span className="text-xs text-muted-foreground">
+              ({totalTransactions})
+            </span>
+          )}
+        </div>
         <Popover open={filterOpen} onOpenChange={setFilterOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -393,174 +487,184 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
         })}
       </div>
 
-      {/* Transactions list */}
-      {filteredTransactions.length > 0 ? (
-        <div className="space-y-2">
-          {filteredTransactions.map((item, index) => {
-            const Icon = getTransactionIcon(item.transaction_type)
-            const color = getTransactionColor(item.transaction_type)
-            const isContribution = item.itemType === 'contribution'
+      {/* Transactions list grouped by day */}
+      {dayGroups.length > 0 ? (
+        <div className="space-y-6">
+          {dayGroups.map((group, groupIndex) => (
+            <motion.div
+              key={group.date}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: groupIndex * 0.05, duration: 0.3 }}
+            >
+              {/* Day Header */}
+              <div className="sticky top-0 z-10 -mx-1 mb-3 flex items-center gap-2 bg-background/95 px-1 py-2 backdrop-blur-sm">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-muted/60">
+                  <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
+                </div>
+                <h3 className="text-sm font-medium capitalize text-foreground/80">
+                  {formatDateHeader(group.date)}
+                </h3>
+                <div className="h-px flex-1 bg-border/50" />
+                <span className="text-xs text-muted-foreground">
+                  {group.items.length} {group.items.length === 1 ? 'операция' : group.items.length < 5 ? 'операции' : 'операций'}
+                </span>
+              </div>
 
-            // Get transaction-specific values
-            const pricePerUnit = !isContribution ? getNullableFloat(item.price_per_unit) : null
-            const totalValue = !isContribution ? getNullableFloat(item.total_value) : null
-            const counterpart = !isContribution ? getCounterpartLabel(item) : null
+              {/* Day Transactions */}
+              <div className="space-y-2 pl-9">
+                {group.items.map((item) => {
+                  const Icon = getTransactionIcon(item.transaction_type)
+                  const color = getTransactionColor(item.transaction_type)
+                  const isContribution = item.itemType === 'contribution'
 
-            const colorClasses = {
-              green: {
-                bg: 'bg-emerald-500/10',
-                iconBg: 'bg-emerald-500/20',
-                icon: 'text-emerald-500',
-                text: 'text-emerald-600 dark:text-emerald-400',
-              },
-              blue: {
-                bg: 'bg-blue-500/10',
-                iconBg: 'bg-blue-500/20',
-                icon: 'text-blue-500',
-                text: 'text-blue-600 dark:text-blue-400',
-              },
-              orange: {
-                bg: 'bg-orange-500/10',
-                iconBg: 'bg-orange-500/20',
-                icon: 'text-orange-500',
-                text: 'text-orange-600 dark:text-orange-400',
-              },
-              red: {
-                bg: 'bg-rose-500/10',
-                iconBg: 'bg-rose-500/20',
-                icon: 'text-rose-500',
-                text: 'text-rose-600 dark:text-rose-400',
-              },
-            }
+                  // Get transaction-specific values
+                  const pricePerUnit = !isContribution ? getNullableFloat(item.price_per_unit) : null
+                  const totalValue = !isContribution ? getNullableFloat(item.total_value) : null
+                  const counterpart = !isContribution ? getCounterpartLabel(item) : null
 
-            const classes = colorClasses[color as keyof typeof colorClasses] || colorClasses.green
+                  const classes = colorClasses[color as keyof typeof colorClasses] || colorClasses.green
 
-            // Transaction-specific flags
-            const isWithdrawal = item.transaction_type === 'withdrawal'
-            const isDeposit = item.transaction_type === 'deposit'
-            const isIncomeDistribution = !isContribution && isDeposit && !!item.contribution_income_id
+                  // Transaction-specific flags
+                  const isWithdrawal = item.transaction_type === 'withdrawal'
+                  const isDeposit = item.transaction_type === 'deposit'
+                  const isIncomeDistribution = !isContribution && isDeposit && !!item.contribution_income_id
 
-            // Can delete: contributions OR all deposits OR other transaction types (buy, sell, transfer)
-            // Only withdrawals cannot be deleted (they are managed through expenses)
-            const canDelete = isContribution ||
-              (!isContribution && !isWithdrawal)
+                  // Can delete: contributions OR all deposits OR other transaction types (buy, sell, transfer)
+                  // Only withdrawals cannot be deleted (they are managed through expenses)
+                  const canDelete = isContribution ||
+                    (!isContribution && !isWithdrawal)
 
-            const handleClick = () => {
-              if (isWithdrawal) {
-                navigate(`/expenses?fund=${fundId}`)
-              }
-            }
-
-            const handleDeleteClick = (e: React.MouseEvent) => {
-              e.stopPropagation()
-              if (!canDelete) return
-
-              if (isContribution) {
-                // For contributions, we need to call delete contribution with the contribution id
-                deleteContribution.mutateAsync({
-                  fundId,
-                  contributionId: item.id,
-                }).then(result => {
-                  if (result && (result.fundBalances.length > 0 || result.accountBalances)) {
-                    setDeleteContributionResult(result)
-                    setDeleteContributionResultDialogOpen(true)
+                  const handleClick = () => {
+                    if (isWithdrawal) {
+                      navigate(`/expenses?fund=${fundId}`)
+                    }
                   }
-                }).catch(error => {
-                  console.error('Delete contribution error:', error)
-                })
-              } else {
-                setTransactionToDelete(item)
-                setConfirmDeleteDialogOpen(true)
-              }
-            }
 
-            // Get display amount and label
-            const displayAmount = isContribution ? item.total_amount : item.amount
-            const displayCurrency = item.currency || ''
-            const displayLabel = isContribution
-              ? (item.note === 'Начальный остаток' ? 'Начальный остаток' : 'Поступление в фонд')
-              : (!isContribution ? (item.asset_ticker || item.asset_name) : '')
+                  const handleDeleteClick = (e: React.MouseEvent) => {
+                    e.stopPropagation()
+                    if (!canDelete) return
 
-            return (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.03 }}
-                className={`flex items-center gap-3 rounded-xl ${classes.bg} p-3 ${
-                  isWithdrawal ? 'cursor-pointer hover:ring-2 hover:ring-rose-500/30 transition-all' : ''
-                }`}
-                onClick={handleClick}
-              >
-                <div
-                  className={`flex h-10 w-10 items-center justify-center rounded-xl ${classes.iconBg}`}
-                >
-                  <Icon className={`h-5 w-5 ${classes.icon}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className={`font-medium ${classes.text}`}>
-                      {isContribution
-                        ? `+${formatMoney(displayAmount)} ${getCurrencySymbol(displayCurrency)}`
-                        : item.transaction_type === 'buy' || item.transaction_type === 'sell'
-                          ? `${item.transaction_type === 'buy' ? '+' : '-'}${formatMoney(displayAmount)}`
-                          : item.transaction_type === 'transfer_out' || item.transaction_type === 'withdrawal'
-                            ? `-${formatMoney(displayAmount)}`
-                            : `+${formatMoney(displayAmount)}`}{' '}
-                      {!isContribution && displayLabel}
-                    </p>
-                    {isContribution && (
-                      <Badge variant="secondary" className="text-xs">
-                        {displayLabel}
-                      </Badge>
-                    )}
-                    {isIncomeDistribution && (
-                      <Badge variant="secondary" className="text-xs">
-                        Из дохода
-                      </Badge>
-                    )}
-                    {isWithdrawal && (
-                      <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{formatDate(item.date)}</span>
-                    {pricePerUnit !== null && (
-                      <span>• {formatPrice(pricePerUnit)} за ед.</span>
-                    )}
-                    {totalValue !== null && !isContribution && (
-                      <span>• {formatMoney(totalValue)} {item.currency}</span>
-                    )}
-                    {counterpart && <span>• {counterpart}</span>}
-                    {!isContribution && item.note && <span>• {item.note}</span>}
-                    {isContribution && item.note && item.note !== 'Начальный остаток' && (
-                      <span>• {item.note}</span>
-                    )}
-                  </div>
-                </div>
-                {canDelete && (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-destructive"
-                    onClick={handleDeleteClick}
-                    disabled={deleteContribution.isPending || deleteTransaction.isPending}
-                  >
-                    {deleteContribution.isPending || deleteTransaction.isPending ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                )}
-              </motion.div>
-            )
-          })}
+                    if (isContribution) {
+                      // For contributions, we need to call delete contribution with the contribution id
+                      deleteContribution.mutateAsync({
+                        fundId,
+                        contributionId: item.id,
+                      }).then(result => {
+                        if (result && (result.fundBalances.length > 0 || result.accountBalances)) {
+                          setDeleteContributionResult(result)
+                          setDeleteContributionResultDialogOpen(true)
+                        }
+                      }).catch(error => {
+                        console.error('Delete contribution error:', error)
+                      })
+                    } else {
+                      setTransactionToDelete(item)
+                      setConfirmDeleteDialogOpen(true)
+                    }
+                  }
+
+                  // Get display amount and label
+                  const displayAmount = isContribution ? item.total_amount : item.amount
+                  const displayCurrency = item.currency || ''
+                  const displayLabel = isContribution
+                    ? (item.note === 'Начальный остаток' ? 'Начальный остаток' : 'Поступление в фонд')
+                    : (!isContribution ? (item.asset_ticker || item.asset_name) : '')
+
+                  return (
+                    <div
+                      key={item.id}
+                      className={`group flex items-center gap-3 rounded-xl ${classes.bg} p-3 transition-all ${
+                        isWithdrawal ? 'cursor-pointer hover:ring-2 hover:ring-rose-500/30' : 'hover:shadow-sm'
+                      }`}
+                      onClick={handleClick}
+                    >
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl ${classes.iconBg} transition-transform group-hover:scale-105`}
+                      >
+                        <Icon className={`h-4 w-4 ${classes.icon}`} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <p className={`font-medium ${classes.text}`}>
+                            {isContribution
+                              ? `+${formatMoney(displayAmount)} ${getCurrencySymbol(displayCurrency)}`
+                              : item.transaction_type === 'buy' || item.transaction_type === 'sell'
+                                ? `${item.transaction_type === 'buy' ? '+' : '-'}${formatMoney(displayAmount)}`
+                                : item.transaction_type === 'transfer_out' || item.transaction_type === 'withdrawal'
+                                  ? `-${formatMoney(displayAmount)}`
+                                  : `+${formatMoney(displayAmount)}`}{' '}
+                            {!isContribution && displayLabel}
+                          </p>
+                          {isContribution && (
+                            <Badge variant="secondary" className="text-xs">
+                              {displayLabel}
+                            </Badge>
+                          )}
+                          {isIncomeDistribution && (
+                            <Badge variant="secondary" className="text-xs">
+                              Из дохода
+                            </Badge>
+                          )}
+                          {isWithdrawal && (
+                            <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                          {pricePerUnit !== null && (
+                            <span>{formatPrice(pricePerUnit)} за ед.</span>
+                          )}
+                          {totalValue !== null && !isContribution && (
+                            <span>• {formatMoney(totalValue)} {item.currency}</span>
+                          )}
+                          {counterpart && <span>• {counterpart}</span>}
+                          {!isContribution && item.note && <span>• {item.note}</span>}
+                          {isContribution && item.note && item.note !== 'Начальный остаток' && (
+                            <span>• {item.note}</span>
+                          )}
+                        </div>
+                      </div>
+                      {/* Edit button - only for non-contribution transactions */}
+                      {!isContribution && !isWithdrawal && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover:opacity-100"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setTransactionToEdit(item as FundTransaction)
+                            setEditDialogOpen(true)
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 shrink-0 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                          onClick={handleDeleteClick}
+                          disabled={deleteContribution.isPending || deleteTransaction.isPending}
+                        >
+                          {deleteContribution.isPending || deleteTransaction.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="h-4 w-4" />
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          ))}
         </div>
       ) : (
         <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
           className="flex h-32 flex-col items-center justify-center rounded-xl bg-muted/30 text-center"
         >
           <ShoppingCart className="mb-2 h-8 w-8 text-muted-foreground/50" />
@@ -596,6 +700,17 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
         onOpenChange={setConfirmDeleteDialogOpen}
         onConfirm={handleConfirmDelete}
         isDeleting={deleteContribution.isPending || deleteTransaction.isPending}
+      />
+
+      {/* Edit Fund Transaction Dialog */}
+      <EditFundTransactionDialog
+        transaction={transactionToEdit}
+        fundId={fundId}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open)
+          if (!open) setTransactionToEdit(null)
+        }}
       />
     </div>
   )

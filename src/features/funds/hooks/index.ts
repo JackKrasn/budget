@@ -27,6 +27,7 @@ export {
   useDepositToFund,
   useTransferAsset,
   useFundTransactions,
+  useUpdateFundTransaction,
   useDeleteTransaction,
 } from './use-funds'
 

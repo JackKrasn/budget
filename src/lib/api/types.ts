@@ -1067,6 +1067,10 @@ export interface CreateIncomeDistributionRequest {
 
 export interface UpdateDistributionRequest {
   plannedAmount: number
+  // Только для подтверждённых распределений:
+  actualAmount?: number // фактическая сумма (если отличается от plannedAmount)
+  actualDate?: string // фактическая дата "YYYY-MM-DD"
+  allocations?: DistributionAllocation[] // ОБЯЗАТЕЛЬНО для подтверждённых
 }
 
 export interface DistributionAllocation {
@@ -1090,6 +1094,7 @@ export interface CancelDistributionResponse {
 export interface BalanceChange {
   assetId: string
   assetName: string
+  currency?: string
   before: number
   after: number
   change: number
@@ -1402,6 +1407,15 @@ export interface FundTransactionsListParams {
   [key: string]: string | number | boolean | undefined
 }
 
+// Обновление транзакции фонда
+export interface UpdateFundTransactionRequest {
+  amount?: number // количество единиц актива
+  pricePerUnit?: number // цена за единицу
+  totalValue?: number // общая стоимость (для buy/sell)
+  date?: string // формат "YYYY-MM-DD"
+  note?: string // примечание
+}
+
 export interface FundCurrencyAssetsResponse {
   data: FundAssetBalance[]
 }
@@ -1438,4 +1452,17 @@ export interface ListFundDepositsParams {
 export interface ListFundDepositsResponse {
   data: FundDeposit[]
   total: number
+}
+
+export interface UpdateFundDepositRequest {
+  amount?: number
+  date?: string
+  note?: string
+}
+
+export interface UpdateFundDepositResponse {
+  message: string
+  deposit: FundDeposit
+  accountBalance?: BalanceChange
+  fundBalance?: BalanceChange
 }

@@ -110,6 +110,17 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function getCurrencySymbol(currency: string): string {
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+    GEL: '₾',
+    TRY: '₺',
+  }
+  return symbols[currency] || currency
+}
+
 interface FundDetailsSheetProps {
   fund: FundBalance | null
   open: boolean
@@ -228,6 +239,23 @@ export function FundDetailsSheet({
   const Icon =
     FUND_ICONS.find((i) => i.value === fundData.icon)?.icon || Wallet
 
+  // Separate currency assets and other assets
+  const currencyAssets = assets.filter((a) => a.asset.typeCode === 'currency')
+  const otherAssets = assets.filter((a) => a.asset.typeCode !== 'currency')
+
+  // Group currency assets by currency for balance display
+  const currencyBalances = currencyAssets.reduce(
+    (acc, a) => {
+      const currency = a.asset.currency || 'RUB'
+      acc[currency] = (acc[currency] || 0) + a.amount
+      return acc
+    },
+    {} as Record<string, number>
+  )
+
+  // Calculate total value of other assets in base currency
+  const otherAssetsTotalBase = otherAssets.reduce((sum, a) => sum + a.valueBase, 0)
+
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent className="w-full overflow-y-auto border-0 bg-gradient-to-b from-background to-background/95 p-0 sm:max-w-lg">
@@ -300,7 +328,7 @@ export function FundDetailsSheet({
               transition={{ delay: 0.15 }}
               className="mt-2"
             >
-              <p className="text-sm text-muted-foreground">Баланс</p>
+              <p className="text-sm text-muted-foreground">Общий баланс</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-4xl font-bold tabular-nums tracking-tight">
                   {formatMoney(totalBase)}
@@ -309,8 +337,44 @@ export function FundDetailsSheet({
                   ₽
                 </span>
               </div>
+
+              {/* Breakdown by asset type */}
+              <div className="mt-3 space-y-2">
+                {/* Currency balances */}
+                {Object.keys(currencyBalances).length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Валюта</p>
+                    <div className="flex flex-wrap gap-3">
+                      {Object.entries(currencyBalances).map(([currency, amount]) => (
+                        <div key={currency} className="flex items-baseline gap-1">
+                          <span className="text-lg font-semibold tabular-nums">
+                            {formatMoney(amount)}
+                          </span>
+                          <span className="text-sm text-muted-foreground">
+                            {getCurrencySymbol(currency)}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Other assets total */}
+                {otherAssets.length > 0 && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Другие активы</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-lg font-semibold tabular-nums">
+                        ≈ {formatMoney(otherAssetsTotalBase)}
+                      </span>
+                      <span className="text-sm text-muted-foreground">₽</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               {activeRule && (
-                <p className="mt-1 text-sm text-muted-foreground">
+                <p className="mt-2 text-sm text-muted-foreground">
                   {activeRule.rule_type === 'percentage'
                     ? `${activeRule.value}% от дохода`
                     : `${formatMoney(activeRule.value || 0)} ₽ фиксированно`}

@@ -29,6 +29,8 @@ import type {
   FundCurrencyAssetsResponse,
   DeleteContributionResponse,
   DeleteTransactionResponse,
+  UpdateFundTransactionRequest,
+  FundTransaction,
 } from './types'
 
 const ENDPOINT = '/funds'
@@ -192,6 +194,12 @@ export const fundsApi = {
       `${ENDPOINT}/${fundId}/transactions`,
       params
     ),
+
+  /**
+   * Обновить транзакцию фонда
+   */
+  updateTransaction: (fundId: string, transactionId: string, data: UpdateFundTransactionRequest) =>
+    apiClient.patch<FundTransaction>(`${ENDPOINT}/${fundId}/transactions/${transactionId}`, data),
 
   /**
    * Удалить транзакцию (для покупок, продаж, переводов)

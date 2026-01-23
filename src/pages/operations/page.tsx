@@ -1,4 +1,5 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   Loader2,
@@ -34,12 +35,14 @@ import {
   useFundDeposits,
   useDeleteFundDeposit,
   FundDepositRow,
+  EditFundDepositDialog,
+  BalanceChangeResultDialog,
   useAccounts,
 } from '@/features/accounts'
 import { AccountIcon } from '@/components/ui/account-icon'
 import { DeleteTransactionResultDialog } from '@/features/funds/components'
 import { DateRangePicker } from '@/components/common'
-import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse } from '@/lib/api/types'
+import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse, UpdateFundDepositResponse } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -53,6 +56,8 @@ function getCurrencySymbol(currency: string): string {
     RUB: '₽',
     USD: '$',
     EUR: '€',
+    GEL: '₾',
+    TRY: '₺',
   }
   return symbols[currency] || currency
 }
@@ -89,10 +94,10 @@ interface Operation {
 interface DayGroup {
   date: string
   operations: Operation[]
-  totalExpenses: number
-  totalTransfers: number
+  totalExpensesByCurrency: Record<string, number>
+  totalTransfersByCurrency: Record<string, number>
   totalAdjustmentsByCurrency: Record<string, number>
-  totalFundDeposits: number
+  totalFundDepositsByCurrency: Record<string, number>
 }
 
 const container = {
@@ -111,6 +116,8 @@ const item = {
 }
 
 export default function OperationsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+
   const [dateRange, setDateRange] = useState(() => {
     const now = new Date()
     const from = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -120,14 +127,40 @@ export default function OperationsPage() {
 
   const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editingDeposit, setEditingDeposit] = useState<FundDeposit | null>(null)
+  const [editDepositDialogOpen, setEditDepositDialogOpen] = useState(false)
   const [deleteResult, setDeleteResult] = useState<DeleteTransactionResponse | null>(null)
   const [deleteResultDialogOpen, setDeleteResultDialogOpen] = useState(false)
+  const [updateResult, setUpdateResult] = useState<UpdateFundDepositResponse | null>(null)
+  const [updateResultDialogOpen, setUpdateResultDialogOpen] = useState(false)
   const [deletedFundName, setDeletedFundName] = useState<string>('')
-  const [selectedAccountId, setSelectedAccountId] = useState<string>('all')
+  const [updatedFundName, setUpdatedFundName] = useState<string>('')
+  const [selectedAccountId, setSelectedAccountId] = useState<string>(() => {
+    return searchParams.get('accountId') || 'all'
+  })
   const [selectedOperationType, setSelectedOperationType] = useState<'all' | OperationType>('all')
 
   // Fetch accounts for filter
   const { data: accountsData } = useAccounts()
+
+  // Sync URL params with state
+  useEffect(() => {
+    const accountIdFromUrl = searchParams.get('accountId')
+    if (accountIdFromUrl && accountIdFromUrl !== selectedAccountId) {
+      setSelectedAccountId(accountIdFromUrl)
+    }
+  }, [searchParams])
+
+  // Update URL when account filter changes
+  const handleAccountChange = (value: string) => {
+    setSelectedAccountId(value)
+    if (value === 'all') {
+      searchParams.delete('accountId')
+    } else {
+      searchParams.set('accountId', value)
+    }
+    setSearchParams(searchParams, { replace: true })
+  }
 
   // Data fetching
   const { data: expensesData, isLoading: isExpensesLoading, error: expensesError } = useExpenses({
@@ -219,14 +252,27 @@ export default function OperationsPage() {
           return typeOrder[a.type] - typeOrder[b.type]
         })
 
-        const totalExpenses = ops
+        // Group expenses by currency
+        const totalExpensesByCurrency: Record<string, number> = {}
+        ops
           .filter((op) => op.type === 'expense')
-          .reduce((sum, op) => sum + (op.data as ExpenseListRow).amount, 0)
+          .forEach((op) => {
+            const expense = op.data as ExpenseListRow
+            const currency = expense.currency || 'RUB'
+            totalExpensesByCurrency[currency] = (totalExpensesByCurrency[currency] || 0) + expense.amount
+          })
 
-        const totalTransfers = ops
+        // Group transfers by source currency
+        const totalTransfersByCurrency: Record<string, number> = {}
+        ops
           .filter((op) => op.type === 'transfer')
-          .reduce((sum, op) => sum + (op.data as TransferWithAccounts).amount, 0)
+          .forEach((op) => {
+            const transfer = op.data as TransferWithAccounts
+            const currency = transfer.from_currency || 'RUB'
+            totalTransfersByCurrency[currency] = (totalTransfersByCurrency[currency] || 0) + transfer.amount
+          })
 
+        // Group adjustments by currency
         const totalAdjustmentsByCurrency: Record<string, number> = {}
         ops
           .filter((op) => op.type === 'adjustment')
@@ -236,23 +282,45 @@ export default function OperationsPage() {
             totalAdjustmentsByCurrency[currency] = (totalAdjustmentsByCurrency[currency] || 0) + Math.abs(adj.amount)
           })
 
-        const totalFundDeposits = ops
+        // Group fund deposits by currency
+        const totalFundDepositsByCurrency: Record<string, number> = {}
+        ops
           .filter((op) => op.type === 'fund_deposit')
-          .reduce((sum, op) => sum + (op.data as FundDeposit).amount, 0)
+          .forEach((op) => {
+            const deposit = op.data as FundDeposit
+            const currency = deposit.currency || 'RUB'
+            totalFundDepositsByCurrency[currency] = (totalFundDepositsByCurrency[currency] || 0) + deposit.amount
+          })
 
-        return { date, operations: ops, totalExpenses, totalTransfers, totalAdjustmentsByCurrency, totalFundDeposits }
+        return { date, operations: ops, totalExpensesByCurrency, totalTransfersByCurrency, totalAdjustmentsByCurrency, totalFundDepositsByCurrency }
       })
       .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
   }, [expenses, transfers, adjustments, fundDeposits, selectedAccountId, selectedOperationType])
 
-  // Total summary with filters applied
-  const totalExpenses = useMemo(() => {
-    return dayGroups.reduce((sum, group) => sum + group.totalExpenses, 0)
+  // Total summary with filters applied - grouped by currency
+  const totalExpensesByCurrency = useMemo(() => {
+    const totals: Record<string, number> = {}
+    dayGroups.forEach((group) => {
+      Object.entries(group.totalExpensesByCurrency).forEach(([currency, amount]) => {
+        totals[currency] = (totals[currency] || 0) + amount
+      })
+    })
+    return totals
   }, [dayGroups])
 
-  const totalFundDeposits = useMemo(() => {
-    return dayGroups.reduce((sum, group) => sum + group.totalFundDeposits, 0)
+  const totalFundDepositsByCurrency = useMemo(() => {
+    const totals: Record<string, number> = {}
+    dayGroups.forEach((group) => {
+      Object.entries(group.totalFundDepositsByCurrency).forEach(([currency, amount]) => {
+        totals[currency] = (totals[currency] || 0) + amount
+      })
+    })
+    return totals
   }, [dayGroups])
+
+  // Check if there are any totals
+  const hasExpenses = Object.keys(totalExpensesByCurrency).length > 0
+  const hasFundDeposits = Object.keys(totalFundDepositsByCurrency).length > 0
 
   const handleEditExpense = (expense: ExpenseListRow) => {
     setEditingExpense(expense)
@@ -272,6 +340,19 @@ export default function OperationsPage() {
   const handleDeleteAdjustment = (adjustment: BalanceAdjustmentWithAccount) => {
     if (confirm('Удалить эту корректировку?')) {
       deleteAdjustment.mutate(adjustment.id)
+    }
+  }
+
+  const handleEditFundDeposit = (deposit: FundDeposit) => {
+    setEditingDeposit(deposit)
+    setEditDepositDialogOpen(true)
+  }
+
+  const handleEditFundDepositSuccess = (result: UpdateFundDepositResponse) => {
+    if (result.accountBalance || result.fundBalance) {
+      setUpdateResult(result)
+      setUpdatedFundName(result.deposit.fund_name || editingDeposit?.fund_name || '')
+      setUpdateResultDialogOpen(true)
     }
   }
 
@@ -344,7 +425,7 @@ export default function OperationsPage() {
           />
 
           {/* Account Filter */}
-          <Select value={selectedAccountId} onValueChange={setSelectedAccountId}>
+          <Select value={selectedAccountId} onValueChange={handleAccountChange}>
             <SelectTrigger className="w-[180px] border-border/50 bg-background/50">
               <SelectValue placeholder="Все счета" />
             </SelectTrigger>
@@ -388,7 +469,7 @@ export default function OperationsPage() {
               size="sm"
               className="text-xs"
               onClick={() => {
-                setSelectedAccountId('all')
+                handleAccountChange('all')
                 setSelectedOperationType('all')
               }}
             >
@@ -398,23 +479,29 @@ export default function OperationsPage() {
         </div>
 
         {/* Summary Stats - Editorial Typography */}
-        <div className="flex items-center gap-6 px-1">
-          {totalExpenses > 0 && (
+        <div className="flex items-center gap-6 px-1 flex-wrap">
+          {hasExpenses && (
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Расходы</span>
-              <span className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">{formatMoney(totalExpenses)} ₽</span>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(totalExpensesByCurrency).map(([currency, amount]) => (
+                  <span key={currency} className="text-lg font-semibold tabular-nums text-red-600 dark:text-red-400">
+                    {formatMoney(amount)} {getCurrencySymbol(currency)}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
-          {totalFundDeposits > 0 && (
+          {hasFundDeposits && (
             <div className="flex flex-col gap-1">
               <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">В фонды</span>
-              <span className="text-lg font-semibold tabular-nums text-purple-600 dark:text-purple-400">{formatMoney(totalFundDeposits)} ₽</span>
-            </div>
-          )}
-          {(totalExpenses > 0 || totalFundDeposits > 0) && (
-            <div className="flex flex-col gap-1 pl-4 border-l border-border/50">
-              <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Итого</span>
-              <span className="text-lg font-semibold tabular-nums">{formatMoney(totalExpenses + totalFundDeposits)} ₽</span>
+              <div className="flex flex-wrap gap-2">
+                {Object.entries(totalFundDepositsByCurrency).map(([currency, amount]) => (
+                  <span key={currency} className="text-lg font-semibold tabular-nums text-purple-600 dark:text-purple-400">
+                    {formatMoney(amount)} {getCurrencySymbol(currency)}
+                  </span>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -453,20 +540,30 @@ export default function OperationsPage() {
                     <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">
                       {formatDateHeader(group.date)}
                     </h2>
-                    <div className="flex items-center gap-3 text-xs">
-                      {group.totalExpenses > 0 && (
+                    <div className="flex items-center gap-3 text-xs flex-wrap justify-end">
+                      {Object.keys(group.totalExpensesByCurrency).length > 0 && (
                         <div className="flex items-center gap-1">
                           <span className="text-muted-foreground">Расходы:</span>
                           <span className="text-rose-500 font-medium tabular-nums">
-                            {formatMoney(group.totalExpenses)} ₽
+                            {Object.entries(group.totalExpensesByCurrency).map(([currency, amount], index) => (
+                              <span key={currency}>
+                                {index > 0 && ', '}
+                                {formatMoney(amount)} {getCurrencySymbol(currency)}
+                              </span>
+                            ))}
                           </span>
                         </div>
                       )}
-                      {group.totalTransfers > 0 && (
+                      {Object.keys(group.totalTransfersByCurrency).length > 0 && (
                         <div className="flex items-center gap-1">
                           <span className="text-muted-foreground">Переводы:</span>
                           <span className="text-blue-500 font-medium tabular-nums">
-                            {formatMoney(group.totalTransfers)} ₽
+                            {Object.entries(group.totalTransfersByCurrency).map(([currency, amount], index) => (
+                              <span key={currency}>
+                                {index > 0 && ', '}
+                                {formatMoney(amount)} {getCurrencySymbol(currency)}
+                              </span>
+                            ))}
                           </span>
                         </div>
                       )}
@@ -483,11 +580,16 @@ export default function OperationsPage() {
                           </span>
                         </div>
                       )}
-                      {group.totalFundDeposits > 0 && (
+                      {Object.keys(group.totalFundDepositsByCurrency).length > 0 && (
                         <div className="flex items-center gap-1">
                           <span className="text-muted-foreground">В фонды:</span>
                           <span className="text-purple-500 font-medium tabular-nums">
-                            {formatMoney(group.totalFundDeposits)} ₽
+                            {Object.entries(group.totalFundDepositsByCurrency).map(([currency, amount], index) => (
+                              <span key={currency}>
+                                {index > 0 && ', '}
+                                {formatMoney(amount)} {getCurrencySymbol(currency)}
+                              </span>
+                            ))}
                           </span>
                         </div>
                       )}
@@ -534,6 +636,7 @@ export default function OperationsPage() {
                           <FundDepositRow
                             key={op.id}
                             deposit={deposit}
+                            onEdit={() => handleEditFundDeposit(deposit)}
                             onDelete={() => handleDeleteFundDeposit(deposit)}
                           />
                         )
@@ -571,12 +674,31 @@ export default function OperationsPage() {
         onOpenChange={setEditDialogOpen}
       />
 
+      {/* Edit Fund Deposit Dialog */}
+      <EditFundDepositDialog
+        deposit={editingDeposit}
+        open={editDepositDialogOpen}
+        onOpenChange={setEditDepositDialogOpen}
+        onSuccess={handleEditFundDepositSuccess}
+      />
+
       {/* Delete Fund Deposit Result Dialog */}
       <DeleteTransactionResultDialog
         result={deleteResult}
         fundName={deletedFundName}
         open={deleteResultDialogOpen}
         onOpenChange={setDeleteResultDialogOpen}
+      />
+
+      {/* Update Fund Deposit Result Dialog */}
+      <BalanceChangeResultDialog
+        title="Перевод обновлён"
+        message={updateResult?.message}
+        fundName={updatedFundName}
+        accountBalance={updateResult?.accountBalance}
+        fundBalance={updateResult?.fundBalance}
+        open={updateResultDialogOpen}
+        onOpenChange={setUpdateResultDialogOpen}
       />
     </div>
   )

@@ -125,9 +125,17 @@ export function useUpdateDistribution() {
       fundId: string
       data: UpdateDistributionRequest
     }) => incomesApi.updateDistribution(incomeId, fundId, data),
-    onSuccess: (_, { incomeId }) => {
+    onSuccess: (_, { incomeId, fundId, data }) => {
       queryClient.invalidateQueries({ queryKey: incomeKeys.detail(incomeId) })
       queryClient.invalidateQueries({ queryKey: incomeKeys.lists() })
+      // If allocations were provided, this was a confirmed distribution update
+      // which affects fund balances and account balances
+      if (data.allocations) {
+        queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+        queryClient.invalidateQueries({ queryKey: fundKeys.detail(fundId) })
+        queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+        queryClient.invalidateQueries({ queryKey: fundDepositKeys.lists() })
+      }
       toast.success('Распределение обновлено')
     },
     onError: (error) => {

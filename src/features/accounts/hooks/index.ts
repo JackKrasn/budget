@@ -42,5 +42,6 @@ export {
   // Fund Deposits
   useFundDeposits,
   useFundDeposit,
+  useUpdateFundDeposit,
   useDeleteFundDeposit,
 } from './use-fund-deposits'
