@@ -147,11 +147,11 @@ export function FundTransactionsHistory({ fundId, assetId, assetName, onClearAss
 
   // Only fetch transactions if contribution is not the only selected type
   const shouldFetchTransactions = selectedTypes.some(t => t !== 'contribution')
+  // Note: assetId filtering is done client-side as backend doesn't support it
   const { data: transactionsData, isLoading: isLoadingTransactions } = useFundTransactions(fundId, {
     type: selectedTypes.length === 1 && selectedTypes[0] !== 'contribution' ? selectedTypes[0] : undefined,
     from: dateFrom || undefined,
     to: dateTo || undefined,
-    assetId: assetId || undefined,
   })
 
   // Fetch contributions
@@ -173,12 +173,17 @@ export function FundTransactionsHistory({ fundId, assetId, assetName, onClearAss
     // Add transactions
     if (shouldFetchTransactions) {
       transactions.forEach(tx => {
+        // Filter by assetId if set
+        if (assetId && tx.asset_id !== assetId) return
+
         items.push({ ...tx, itemType: 'transaction' })
       })
     }
 
     // Add contributions (converted to HistoryItem format)
-    if (shouldFetchContributions) {
+    // Note: Contributions don't have asset_id - they are fund-level operations
+    // When filtering by asset, we hide contributions as they don't belong to specific assets
+    if (shouldFetchContributions && !assetId) {
       contributions.forEach(c => {
         // Filter by date if filters are set
         if (dateFrom && c.date < dateFrom) return
@@ -196,7 +201,7 @@ export function FundTransactionsHistory({ fundId, assetId, assetName, onClearAss
     items.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
 
     return items
-  }, [transactions, contributions, shouldFetchTransactions, shouldFetchContributions, dateFrom, dateTo])
+  }, [transactions, contributions, shouldFetchTransactions, shouldFetchContributions, dateFrom, dateTo, assetId])
 
   // Filter by selected types (client-side when multiple types selected)
   const filteredTransactions =
