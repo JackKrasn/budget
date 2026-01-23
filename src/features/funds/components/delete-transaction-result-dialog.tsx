@@ -25,6 +25,18 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function getCurrencySymbol(currency?: string): string {
+  if (!currency) return '₽'
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+    GEL: '₾',
+    TRY: '₺',
+  }
+  return symbols[currency] || currency
+}
+
 export function DeleteTransactionResultDialog({
   result,
   fundName,
@@ -66,7 +78,7 @@ export function DeleteTransactionResultDialog({
                   <div>
                     <p className="text-xs text-muted-foreground mb-0.5">До удаления</p>
                     <p className="text-lg font-semibold tabular-nums">
-                      {formatMoney(fundBalance.before)} ₽
+                      {formatMoney(fundBalance.before)} {getCurrencySymbol(fundBalance.currency)}
                     </p>
                   </div>
                   <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -77,7 +89,7 @@ export function DeleteTransactionResultDialog({
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : 'text-rose-600 dark:text-rose-400'
                     }`}>
-                      {formatMoney(fundBalance.after)} ₽
+                      {formatMoney(fundBalance.after)} {getCurrencySymbol(fundBalance.currency)}
                     </p>
                   </div>
                 </div>
@@ -89,7 +101,7 @@ export function DeleteTransactionResultDialog({
                         ? 'text-emerald-600 dark:text-emerald-400'
                         : 'text-rose-600 dark:text-rose-400'
                     }`}>
-                      {fundBalance.change > 0 ? '+' : ''}{formatMoney(fundBalance.change)} ₽
+                      {fundBalance.change > 0 ? '+' : ''}{formatMoney(fundBalance.change)} {getCurrencySymbol(fundBalance.currency)}
                     </span>
                   </p>
                 </div>
@@ -110,7 +122,7 @@ export function DeleteTransactionResultDialog({
                     <div>
                       <p className="text-xs text-muted-foreground mb-0.5">До удаления</p>
                       <p className="text-lg font-semibold tabular-nums">
-                        {formatMoney(accountBalance.before)} ₽
+                        {formatMoney(accountBalance.before)} {getCurrencySymbol(accountBalance.currency)}
                       </p>
                     </div>
                     <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -121,7 +133,7 @@ export function DeleteTransactionResultDialog({
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-rose-600 dark:text-rose-400'
                       }`}>
-                        {formatMoney(accountBalance.after)} ₽
+                        {formatMoney(accountBalance.after)} {getCurrencySymbol(accountBalance.currency)}
                       </p>
                     </div>
                   </div>
@@ -133,7 +145,7 @@ export function DeleteTransactionResultDialog({
                           ? 'text-emerald-600 dark:text-emerald-400'
                           : 'text-rose-600 dark:text-rose-400'
                       }`}>
-                        {accountBalance.change > 0 ? '+' : ''}{formatMoney(accountBalance.change)} ₽
+                        {accountBalance.change > 0 ? '+' : ''}{formatMoney(accountBalance.change)} {getCurrencySymbol(accountBalance.currency)}
                       </span>
                     </p>
                   </div>

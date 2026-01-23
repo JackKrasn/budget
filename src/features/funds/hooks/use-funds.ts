@@ -13,6 +13,7 @@ import type {
   DepositToFundRequest,
   TransferAssetRequest,
   FundTransactionsListParams,
+  UpdateFundTransactionRequest,
 } from '@/lib/api'
 import { toast } from 'sonner'
 import { accountKeys } from '@/features/accounts'
@@ -452,6 +453,42 @@ export function useFundTransactions(
     queryKey: fundKeys.transactions(fundId, params),
     queryFn: () => fundsApi.listTransactions(fundId, params),
     enabled: !!fundId,
+  })
+}
+
+/**
+ * Обновить транзакцию фонда
+ */
+export function useUpdateFundTransaction() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      fundId,
+      transactionId,
+      data,
+    }: {
+      fundId: string
+      transactionId: string
+      data: UpdateFundTransactionRequest
+    }) => fundsApi.updateTransaction(fundId, transactionId, data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
+      queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.transactions(variables.fundId),
+      })
+      queryClient.invalidateQueries({
+        queryKey: fundKeys.currencyAssets(variables.fundId),
+      })
+      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      // Invalidate accounts in case deposit/withdrawal affected account balance
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      toast.success('Транзакция обновлена')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
   })
 }
 

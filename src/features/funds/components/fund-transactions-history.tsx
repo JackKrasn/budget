@@ -14,6 +14,7 @@ import {
   ExternalLink,
   Trash2,
   Wallet,
+  Pencil,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -28,6 +29,7 @@ import { useFundTransactions, useFundContributions, useDeleteContribution, useDe
 import { DeleteContributionResultDialog } from './delete-contribution-result-dialog'
 import { DeleteTransactionResultDialog } from './delete-transaction-result-dialog'
 import { ConfirmDeleteTransactionDialog } from './confirm-delete-transaction-dialog'
+import { EditFundTransactionDialog } from './edit-fund-transaction-dialog'
 import type { FundTransaction, FundTransactionType, FundContribution, NullFloat64, DeleteContributionResponse, DeleteTransactionResponse } from '@/lib/api/types'
 import { TRANSACTION_TYPES } from '../constants'
 
@@ -135,6 +137,8 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
   const [deleteTransactionResultDialogOpen, setDeleteTransactionResultDialogOpen] = useState(false)
   const [confirmDeleteDialogOpen, setConfirmDeleteDialogOpen] = useState(false)
   const [transactionToDelete, setTransactionToDelete] = useState<FundTransaction | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [transactionToEdit, setTransactionToEdit] = useState<FundTransaction | null>(null)
 
   const { data: fundData } = useFund(fundId)
 
@@ -538,6 +542,21 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
                     )}
                   </div>
                 </div>
+                {/* Edit button - only for non-contribution transactions */}
+                {!isContribution && !isWithdrawal && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setTransactionToEdit(item as FundTransaction)
+                      setEditDialogOpen(true)
+                    }}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </Button>
+                )}
                 {canDelete && (
                   <Button
                     variant="ghost"
@@ -596,6 +615,17 @@ export function FundTransactionsHistory({ fundId }: FundTransactionsHistoryProps
         onOpenChange={setConfirmDeleteDialogOpen}
         onConfirm={handleConfirmDelete}
         isDeleting={deleteContribution.isPending || deleteTransaction.isPending}
+      />
+
+      {/* Edit Fund Transaction Dialog */}
+      <EditFundTransactionDialog
+        transaction={transactionToEdit}
+        fundId={fundId}
+        open={editDialogOpen}
+        onOpenChange={(open) => {
+          setEditDialogOpen(open)
+          if (!open) setTransactionToEdit(null)
+        }}
       />
     </div>
   )

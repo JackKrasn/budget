@@ -25,6 +25,18 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+function getCurrencySymbol(currency?: string): string {
+  if (!currency) return '₽'
+  const symbols: Record<string, string> = {
+    RUB: '₽',
+    USD: '$',
+    EUR: '€',
+    GEL: '₾',
+    TRY: '₺',
+  }
+  return symbols[currency] || currency
+}
+
 export function DeleteContributionResultDialog({
   result,
   fundName,
@@ -69,7 +81,7 @@ export function DeleteContributionResultDialog({
                       <div>
                         <p className="text-xs text-muted-foreground mb-0.5">До удаления</p>
                         <p className="text-lg font-semibold tabular-nums">
-                          {formatMoney(balance.before)} ₽
+                          {formatMoney(balance.before)} {getCurrencySymbol(balance.currency)}
                         </p>
                       </div>
                       <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -80,7 +92,7 @@ export function DeleteContributionResultDialog({
                             ? 'text-emerald-600 dark:text-emerald-400'
                             : 'text-rose-600 dark:text-rose-400'
                         }`}>
-                          {formatMoney(balance.after)} ₽
+                          {formatMoney(balance.after)} {getCurrencySymbol(balance.currency)}
                         </p>
                       </div>
                     </div>
@@ -92,7 +104,7 @@ export function DeleteContributionResultDialog({
                             ? 'text-emerald-600 dark:text-emerald-400'
                             : 'text-rose-600 dark:text-rose-400'
                         }`}>
-                          {balance.change > 0 ? '+' : ''}{formatMoney(balance.change)} ₽
+                          {balance.change > 0 ? '+' : ''}{formatMoney(balance.change)} {getCurrencySymbol(balance.currency)}
                         </span>
                       </p>
                     </div>
@@ -118,7 +130,7 @@ export function DeleteContributionResultDialog({
                         <div>
                           <p className="text-xs text-muted-foreground mb-0.5">До удаления</p>
                           <p className="text-lg font-semibold tabular-nums">
-                            {formatMoney(balance.before)} ₽
+                            {formatMoney(balance.before)} {getCurrencySymbol(balance.currency)}
                           </p>
                         </div>
                         <ArrowRight className="h-5 w-5 text-muted-foreground" />
@@ -129,7 +141,7 @@ export function DeleteContributionResultDialog({
                               ? 'text-emerald-600 dark:text-emerald-400'
                               : 'text-rose-600 dark:text-rose-400'
                           }`}>
-                            {formatMoney(balance.after)} ₽
+                            {formatMoney(balance.after)} {getCurrencySymbol(balance.currency)}
                           </p>
                         </div>
                       </div>
@@ -141,7 +153,7 @@ export function DeleteContributionResultDialog({
                               ? 'text-emerald-600 dark:text-emerald-400'
                               : 'text-rose-600 dark:text-rose-400'
                           }`}>
-                            {balance.change > 0 ? '+' : ''}{formatMoney(balance.change)} ₽
+                            {balance.change > 0 ? '+' : ''}{formatMoney(balance.change)} {getCurrencySymbol(balance.currency)}
                           </span>
                         </p>
                       </div>
