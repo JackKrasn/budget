@@ -24,6 +24,12 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -50,7 +56,9 @@ import {
   ArrowRightLeft,
   Banknote,
   Landmark,
-  ChevronRight,
+  MoreVertical,
+  ExternalLink,
+  Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -68,7 +76,7 @@ import {
   FundTransactionsHistory,
   SetInitialBalanceDialog,
 } from '@/features/funds'
-import { CreateDepositDialog } from '@/features/deposits'
+import { CreateDepositDialog, useDeposits } from '@/features/deposits'
 import type { FundStatus, RuleType, FundBalance, FundAssetBalance } from '@/lib/api/types'
 
 const FUND_ICONS = [
@@ -178,10 +186,11 @@ const assetCardVariants = {
 interface AssetGroupProps {
   typeCode: string
   assets: FundAssetBalance[]
-  onAssetClick: (asset: FundAssetBalance) => void
+  onShowHistory: (asset: FundAssetBalance) => void
+  onViewDetails: (asset: FundAssetBalance) => void
 }
 
-function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
+function AssetGroup({ typeCode, assets, onShowHistory, onViewDetails }: AssetGroupProps) {
   const config = ASSET_TYPE_CONFIG[typeCode] || ASSET_TYPE_CONFIG.other
   const Icon = config.icon
   const totalValue = assets.reduce((sum, a) => sum + a.valueBase, 0)
@@ -219,8 +228,7 @@ function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
             key={asset.asset.id}
             variants={assetCardVariants}
             custom={index}
-            className="group flex items-center justify-between rounded-xl bg-muted/40 p-3 cursor-pointer transition-all hover:bg-muted/60 hover:shadow-sm"
-            onClick={() => onAssetClick(asset)}
+            className="group flex items-center justify-between rounded-xl bg-muted/40 p-3 transition-all hover:bg-muted/60 hover:shadow-sm"
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -252,7 +260,38 @@ function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
                   </p>
                 )}
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+
+              {/* Actions Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onShowHistory(asset)}>
+                    <History className="mr-2 h-4 w-4" />
+                    История операций
+                  </DropdownMenuItem>
+                  {typeCode === 'deposit' && (
+                    <DropdownMenuItem onClick={() => onViewDetails(asset)}>
+                      <Info className="mr-2 h-4 w-4" />
+                      Подробнее
+                    </DropdownMenuItem>
+                  )}
+                  {typeCode !== 'deposit' && typeCode !== 'currency' && (
+                    <DropdownMenuItem onClick={() => onViewDetails(asset)}>
+                      <Info className="mr-2 h-4 w-4" />
+                      Информация об активе
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </motion.div>
         ))}
@@ -283,8 +322,21 @@ export default function FundDetailsPage() {
   const createRule = useCreateDistributionRule()
   const updateRule = useUpdateDistributionRule()
   const deleteRule = useDeleteDistributionRule()
+  // Fetch all deposits to create asset ID -> deposit ID mapping
+  const { data: depositsData } = useDeposits()
 
   const activeRule = rulesData?.data?.find((r) => r.is_active)
+
+  // Create mapping from asset ID to deposit ID
+  const assetIdToDepositId = useMemo(() => {
+    const map = new Map<string, string>()
+    if (depositsData?.data) {
+      depositsData.data.forEach((deposit) => {
+        map.set(deposit.assetId, deposit.id)
+      })
+    }
+    return map
+  }, [depositsData])
 
   const fundData = fund?.fund
   const totalBase = fund?.totalBase ?? 0
@@ -423,10 +475,26 @@ export default function FundDetailsPage() {
     }
   }
 
-  const handleAssetClick = (asset: FundAssetBalance) => {
+  const handleShowHistory = (asset: FundAssetBalance) => {
     setSelectedAssetId(asset.asset.id)
     setSelectedAssetName(asset.asset.name)
     setActiveTab('history')
+  }
+
+  const handleViewDetails = (asset: FundAssetBalance) => {
+    // For deposits, navigate to the deposit details page
+    if (asset.asset.typeCode === 'deposit') {
+      const depositId = assetIdToDepositId.get(asset.asset.id)
+      if (depositId) {
+        navigate(`/deposits/${depositId}`)
+      } else {
+        // Fallback: show history if deposit not found
+        handleShowHistory(asset)
+      }
+    } else {
+      // For other assets, show history for now
+      handleShowHistory(asset)
+    }
   }
 
   if (!id) {
@@ -747,7 +815,8 @@ export default function FundDetailsPage() {
                           key={typeCode}
                           typeCode={typeCode}
                           assets={typeAssets}
-                          onAssetClick={handleAssetClick}
+                          onShowHistory={handleShowHistory}
+                          onViewDetails={handleViewDetails}
                         />
                       ))}
                     </motion.div>

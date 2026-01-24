@@ -8,6 +8,7 @@ import type {
   DepositAccrualsResponse,
   DepositsSummary,
   MaturingDepositsParams,
+  MigrateDepositRequest,
 } from './types'
 
 const ENDPOINT = '/deposits'
@@ -67,4 +68,10 @@ export const depositsApi = {
    * Начислить проценты (административная функция)
    */
   processAccruals: () => apiClient.post<void>(`${ENDPOINT}/process-accruals`),
+
+  /**
+   * Мигрировать существующий депозит (без проверки баланса)
+   */
+  migrate: (data: MigrateDepositRequest) =>
+    apiClient.post<Deposit>(`${ENDPOINT}/migrate`, data),
 }

@@ -1115,7 +1115,7 @@ export interface DeleteContributionResponse {
 // === Deposits (Банковские вклады) ===
 
 export type AccrualPeriod = 'monthly' | 'quarterly' | 'annually' | 'at_maturity'
-export type DepositStatus = 'active' | 'matured' | 'closed_early'
+export type DepositStatus = 'active' | 'closed_early' | 'matured'
 
 // Go time format can be string or { Time: string; Valid: boolean }
 export type NullableDate = ISODate | { Time: string; Valid: boolean } | null
@@ -1127,7 +1127,7 @@ export interface Deposit {
   currency: string
   principalAmount: number
   currentAmount: number
-  interestRate: number
+  interestRate: number // в decimal (0.08 = 8%)
   termMonths: number
   accrualPeriod: AccrualPeriod
   hasCapitalization: boolean
@@ -1149,11 +1149,11 @@ export interface CreateDepositRequest {
   fundId: string
   currency: string
   principalAmount: number
-  interestRate: number
+  interestRate: number // в процентах (8.5)
   termMonths: number
   accrualPeriod: AccrualPeriod
   hasCapitalization: boolean
-  startDate: string
+  startDate: string // YYYY-MM-DD
   notes?: string
 }
 
@@ -1174,6 +1174,31 @@ export interface DepositAccrual {
   isCapitalized: boolean
   notes?: string
   createdAt: NullableDate
+}
+
+// Валютный актив в фонде
+export interface FundCurrencyAsset {
+  assetId: string
+  assetName: string
+  currency: string
+  amount: number
+  fundId: string
+  fundName: string
+}
+
+// Запрос на миграцию депозита (без проверки баланса)
+export interface MigrateDepositRequest {
+  name: string
+  fundId: string
+  currency: string
+  currentAmount: number // Текущая сумма (вместо principalAmount)
+  interestRate: number // В процентах
+  termMonths: number
+  accrualPeriod: AccrualPeriod
+  hasCapitalization: boolean
+  startDate: string // YYYY-MM-DD
+  maturityDate?: string // YYYY-MM-DD (опционально)
+  notes?: string
 }
 
 export interface DepositsSummary {
@@ -1338,6 +1363,7 @@ export interface BuyAssetResponse {
 
 export interface DepositToFundRequest {
   accountId: string
+  assetId: string
   amount: number
   date?: string
   note?: string
@@ -1347,7 +1373,7 @@ export interface DepositToFundResponse {
   success: boolean
   accountId: string
   accountName: string
-  currency: string
+  assetId: string
   amount: number
 }
 
@@ -1429,6 +1455,8 @@ export interface FundDeposit {
   fund_color: string | null
   from_account_id: UUID
   account_name: string
+  asset_id: UUID
+  asset_name: string
   amount: number
   currency: string
   contribution_id: string | null

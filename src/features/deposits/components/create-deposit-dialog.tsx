@@ -61,8 +61,11 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { useCreateDeposit } from '../hooks'
-import { useFunds } from '@/features/funds/hooks'
+import { useCreateDeposit, useMigrateDeposit } from '../hooks'
+import { useFunds, useFundCurrencyAssets } from '@/features/funds/hooks'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, CheckCircle2, Upload } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const CURRENCIES = [
   { value: 'RUB', label: 'Рубль', symbol: '₽' },
@@ -112,6 +115,7 @@ const formSchema = z.object({
   accrualPeriod: z.enum(['monthly', 'quarterly', 'annually', 'at_maturity']),
   hasCapitalization: z.boolean(),
   startDate: z.date({ message: 'Выберите дату открытия' }),
+  maturityDate: z.date().optional(),
   notes: z.string().optional(),
 })
 
@@ -152,7 +156,9 @@ export function CreateDepositDialog({
 }: CreateDepositDialogProps) {
   const [internalOpen, setInternalOpen] = useState(false)
   const [step, setStep] = useState(1)
+  const [isMigrationMode, setIsMigrationMode] = useState(false)
   const createDeposit = useCreateDeposit()
+  const migrateDeposit = useMigrateDeposit()
 
   // Support both controlled and uncontrolled modes
   const isControlled = controlledOpen !== undefined
@@ -176,11 +182,30 @@ export function CreateDepositDialog({
       accrualPeriod: 'monthly',
       hasCapitalization: true,
       startDate: new Date(),
+      maturityDate: undefined,
       notes: '',
     },
   })
 
+  const watchedFundId = form.watch('fundId')
+  const watchedCurrency = form.watch('currency')
+
+  // Fetch currency assets for the selected fund
+  const { data: currencyAssetsData } = useFundCurrencyAssets(
+    watchedFundId || preselectedFundId || ''
+  )
+
   const watchedValues = form.watch()
+
+  // Get available balance for the selected currency in the fund
+  const currencyAsset = currencyAssetsData?.data?.find(
+    (asset) => asset?.asset?.currency === watchedCurrency
+  )
+  const availableBalance = currencyAsset?.amount || 0
+
+  // Check if there's insufficient funds (only in create mode, not migration)
+  const principalAmount = parseFloat(watchedValues.principalAmount) || 0
+  const hasInsufficientFunds = !isMigrationMode && principalAmount > 0 && principalAmount > availableBalance
 
   // Calculate projected yield
   const projectedYield = useMemo(() => {
@@ -235,20 +260,39 @@ export function CreateDepositDialog({
 
   async function onSubmit(values: FormValues) {
     try {
-      await createDeposit.mutateAsync({
-        name: values.name,
-        fundId: values.fundId,
-        currency: values.currency,
-        principalAmount: parseFloat(values.principalAmount),
-        interestRate: parseFloat(values.interestRate),
-        termMonths: parseInt(values.termMonths),
-        accrualPeriod: values.accrualPeriod,
-        hasCapitalization: values.hasCapitalization,
-        startDate: format(values.startDate, 'yyyy-MM-dd'),
-        notes: values.notes || undefined,
-      })
+      if (isMigrationMode) {
+        // Режим миграции - используем currentAmount вместо principalAmount
+        await migrateDeposit.mutateAsync({
+          name: values.name,
+          fundId: values.fundId,
+          currency: values.currency,
+          currentAmount: parseFloat(values.principalAmount),
+          interestRate: parseFloat(values.interestRate),
+          termMonths: parseInt(values.termMonths),
+          accrualPeriod: values.accrualPeriod,
+          hasCapitalization: values.hasCapitalization,
+          startDate: format(values.startDate, 'yyyy-MM-dd'),
+          maturityDate: values.maturityDate ? format(values.maturityDate, 'yyyy-MM-dd') : undefined,
+          notes: values.notes || undefined,
+        })
+      } else {
+        // Обычный режим создания
+        await createDeposit.mutateAsync({
+          name: values.name,
+          fundId: values.fundId,
+          currency: values.currency,
+          principalAmount: parseFloat(values.principalAmount),
+          interestRate: parseFloat(values.interestRate),
+          termMonths: parseInt(values.termMonths),
+          accrualPeriod: values.accrualPeriod,
+          hasCapitalization: values.hasCapitalization,
+          startDate: format(values.startDate, 'yyyy-MM-dd'),
+          notes: values.notes || undefined,
+        })
+      }
       form.reset()
       setStep(1)
+      setIsMigrationMode(false)
       setOpen(false)
     } catch {
       // Error is handled in mutation
@@ -261,6 +305,7 @@ export function CreateDepositDialog({
     setOpen(isOpen)
     if (!isOpen) {
       setStep(1)
+      setIsMigrationMode(false)
       form.reset({
         name: '',
         fundId: preselectedFundId || '',
@@ -271,6 +316,7 @@ export function CreateDepositDialog({
         accrualPeriod: 'monthly',
         hasCapitalization: true,
         startDate: new Date(),
+        maturityDate: undefined,
         notes: '',
       })
     }
@@ -287,7 +333,7 @@ export function CreateDepositDialog({
           <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
           <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
 
-          <DialogHeader className="relative px-6 pt-6 pb-4">
+          <DialogHeader className="relative px-6 pt-6 pb-4 space-y-3">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <motion.div
@@ -301,10 +347,12 @@ export function CreateDepositDialog({
                 </motion.div>
                 <div className="space-y-1">
                   <DialogTitle className="text-xl font-semibold tracking-tight">
-                    Новый депозит
+                    {isMigrationMode ? 'Миграция депозита' : 'Новый депозит'}
                   </DialogTitle>
                   <DialogDescription className="text-sm">
-                    Добавьте банковский вклад с автоматическим расчётом
+                    {isMigrationMode
+                      ? 'Импорт существующего депозита без проверки баланса'
+                      : 'Добавьте банковский вклад с автоматическим расчётом'}
                   </DialogDescription>
                 </div>
               </div>
@@ -326,6 +374,35 @@ export function CreateDepositDialog({
                 ))}
               </div>
             </div>
+
+            {/* Mode Toggle */}
+            <Tabs
+              value={isMigrationMode ? 'migrate' : 'create'}
+              onValueChange={(value) => setIsMigrationMode(value === 'migrate')}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="create" className="gap-2">
+                  <Landmark className="h-4 w-4" />
+                  Создать новый
+                </TabsTrigger>
+                <TabsTrigger value="migrate" className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Мигрировать
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Migration mode warning */}
+            {isMigrationMode && (
+              <Alert className="border-amber-500/50 bg-amber-500/10">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-sm text-amber-700 dark:text-amber-400">
+                  Режим миграции не проверяет баланс фонда. Используйте для импорта существующих
+                  депозитов.
+                </AlertDescription>
+              </Alert>
+            )}
           </DialogHeader>
         </div>
 
@@ -470,6 +547,56 @@ export function CreateDepositDialog({
                       )}
                     />
 
+                    {/* Available Balance Display - только в режиме создания */}
+                    <AnimatePresence mode="wait">
+                      {!isMigrationMode && watchedCurrency && availableBalance >= 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <Alert className={cn(
+                            availableBalance === 0
+                              ? 'border-amber-500/50 bg-amber-500/10'
+                              : 'border-emerald-500/50 bg-emerald-500/10'
+                          )}>
+                            {availableBalance === 0 ? (
+                              <AlertCircle className="h-4 w-4 text-amber-500" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            )}
+                            <AlertDescription className={cn(
+                              'text-sm',
+                              availableBalance === 0
+                                ? 'text-amber-700 dark:text-amber-400'
+                                : 'text-emerald-700 dark:text-emerald-400'
+                            )}>
+                              {availableBalance === 0 ? (
+                                <>
+                                  В фонде нет валютного актива {watchedCurrency}.{' '}
+                                  <span className="font-medium">
+                                    Сначала пополните фонд через перевод со счёта.
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  Доступно в фонде:{' '}
+                                  <span className="font-semibold tabular-nums">
+                                    {availableBalance.toLocaleString('ru-RU', {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}{' '}
+                                    {watchedCurrency}
+                                  </span>
+                                </>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     {/* Amount and Rate - Premium Grid */}
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
@@ -479,7 +606,7 @@ export function CreateDepositDialog({
                           <FormItem>
                             <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                               <Banknote className="h-3.5 w-3.5" />
-                              Сумма вклада
+                              {isMigrationMode ? 'Текущая сумма депозита' : 'Сумма вклада'}
                             </FormLabel>
                             <FormControl>
                               <div className="relative">
@@ -487,7 +614,11 @@ export function CreateDepositDialog({
                                   type="number"
                                   step="0.01"
                                   placeholder="100 000"
-                                  className="h-12 bg-muted/30 border-muted-foreground/10 pr-10 text-lg font-semibold tabular-nums transition-all focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+                                  className={cn(
+                                    'h-12 bg-muted/30 border-muted-foreground/10 pr-10 text-lg font-semibold tabular-nums transition-all focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20',
+                                    hasInsufficientFunds &&
+                                      'border-destructive/50 focus:border-destructive/50 focus:ring-destructive/20'
+                                  )}
                                   {...field}
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">
@@ -495,6 +626,14 @@ export function CreateDepositDialog({
                                 </span>
                               </div>
                             </FormControl>
+                            {hasInsufficientFunds && (
+                              <p className="text-sm text-destructive">
+                                Недостаточно средств. Доступно: {availableBalance.toLocaleString('ru-RU', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })} {watchedCurrency}
+                              </p>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -667,53 +806,107 @@ export function CreateDepositDialog({
                       )}
                     />
 
-                    {/* Start Date - Premium Calendar */}
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                            <CalendarIcon className="h-3.5 w-3.5" />
-                            Дата открытия вклада
-                          </FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    'w-full h-12 justify-start text-left font-normal bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all',
-                                    !field.value && 'text-muted-foreground'
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
-                                  {field.value ? (
-                                    <span className="font-medium">
-                                      {format(field.value, 'd MMMM yyyy', { locale: ru })}
-                                    </span>
-                                  ) : (
-                                    <span>Выберите дату</span>
-                                  )}
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) =>
-                                  date > new Date() || date < new Date('2020-01-01')
-                                }
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
+                    {/* Date Fields */}
+                    <div className={cn('grid gap-4', isMigrationMode ? 'grid-cols-2' : 'grid-cols-1')}>
+                      {/* Start Date - Premium Calendar */}
+                      <FormField
+                        control={form.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                              <CalendarIcon className="h-3.5 w-3.5" />
+                              Дата открытия вклада
+                            </FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      'w-full h-12 justify-start text-left font-normal bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all',
+                                      !field.value && 'text-muted-foreground'
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
+                                    {field.value ? (
+                                      <span className="font-medium">
+                                        {format(field.value, 'd MMMM yyyy', { locale: ru })}
+                                      </span>
+                                    ) : (
+                                      <span>Выберите дату</span>
+                                    )}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date > new Date() || date < new Date('2020-01-01')
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Maturity Date - Only in migration mode */}
+                      {isMigrationMode && (
+                        <FormField
+                          control={form.control}
+                          name="maturityDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <CalendarIcon className="h-3.5 w-3.5" />
+                                Дата погашения (опц.)
+                              </FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      className={cn(
+                                        'w-full h-12 justify-start text-left font-normal bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all',
+                                        !field.value && 'text-muted-foreground'
+                                      )}
+                                    >
+                                      <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
+                                      {field.value ? (
+                                        <span className="font-medium">
+                                          {format(field.value, 'd MMMM yyyy', { locale: ru })}
+                                        </span>
+                                      ) : (
+                                        <span>Авто-расчёт</span>
+                                      )}
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    disabled={(date) => date < new Date('2020-01-01')}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <FormDescription className="text-xs">
+                                Оставьте пустым для автоматического расчёта
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       )}
-                    />
+                    </div>
 
                     {/* Yield Preview */}
                     <AnimatePresence>
@@ -796,20 +989,24 @@ export function CreateDepositDialog({
                       <Button
                         type="submit"
                         className="flex-1 h-12 gap-2 text-base font-medium group relative overflow-hidden"
-                        disabled={createDeposit.isPending}
+                        disabled={
+                          isMigrationMode
+                            ? migrateDeposit.isPending
+                            : createDeposit.isPending || hasInsufficientFunds || availableBalance === 0
+                        }
                       >
-                        {createDeposit.isPending ? (
+                        {(isMigrationMode ? migrateDeposit.isPending : createDeposit.isPending) ? (
                           <>
                             <motion.div
                               animate={{ rotate: 360 }}
                               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                               className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
                             />
-                            Создание...
+                            {isMigrationMode ? 'Миграция...' : 'Создание...'}
                           </>
                         ) : (
                           <>
-                            Создать депозит
+                            {isMigrationMode ? 'Мигрировать депозит' : 'Создать депозит'}
                             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                           </>
                         )}
