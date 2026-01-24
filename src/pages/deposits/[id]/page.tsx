@@ -17,10 +17,12 @@ import {
   Pencil,
   Trash2,
   ChevronRight,
+  Shield,
+  Zap,
+  CircleDollarSign,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table,
@@ -46,8 +48,9 @@ import {
   DeleteDepositDialog,
 } from '@/features/deposits'
 import type { DepositAccrual } from '@/lib/api'
+import { getBankByName } from '@/lib/banks'
 
-// Helper to parse dates that may come as string or { Time: string; Valid: boolean }
+// Helper to parse dates
 function parseDateSafe(dateValue: string | { Time: string; Valid: boolean } | null | undefined): Date | null {
   if (!dateValue) return null
   if (typeof dateValue === 'string') {
@@ -67,10 +70,30 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   TRY: '₺',
 }
 
-const STATUS_CONFIG: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  active: { label: 'Активен', variant: 'default' },
-  matured: { label: 'Погашен', variant: 'secondary' },
-  closed_early: { label: 'Закрыт досрочно', variant: 'outline' },
+const STATUS_CONFIG: Record<string, {
+  label: string
+  variant: 'default' | 'secondary' | 'destructive' | 'outline'
+  color: string
+  glow: string
+}> = {
+  active: {
+    label: 'Активен',
+    variant: 'default',
+    color: 'from-emerald-500 to-teal-500',
+    glow: 'shadow-emerald-500/20'
+  },
+  matured: {
+    label: 'Погашен',
+    variant: 'secondary',
+    color: 'from-blue-500 to-indigo-500',
+    glow: 'shadow-blue-500/20'
+  },
+  closed_early: {
+    label: 'Закрыт досрочно',
+    variant: 'outline',
+    color: 'from-amber-500 to-orange-500',
+    glow: 'shadow-amber-500/20'
+  },
 }
 
 const PERIOD_LABELS: Record<string, string> = {
@@ -84,6 +107,98 @@ const ACCRUAL_TYPE_LABELS: Record<string, string> = {
   regular: 'Регулярное',
   early_closure: 'Досрочное закрытие',
   maturity: 'При погашении',
+}
+
+// Animated circular progress component
+function CircularProgress({
+  value,
+  size = 120,
+  strokeWidth = 8,
+  color = 'stroke-emerald-500',
+  bgColor = 'stroke-muted/20',
+  children
+}: {
+  value: number
+  size?: number
+  strokeWidth?: number
+  color?: string
+  bgColor?: string
+  children?: React.ReactNode
+}) {
+  const radius = (size - strokeWidth) / 2
+  const circumference = radius * 2 * Math.PI
+  const offset = circumference - (value / 100) * circumference
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      <svg className="rotate-[-90deg]" width={size} height={size}>
+        <circle
+          className={bgColor}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+        />
+        <motion.circle
+          className={color}
+          strokeWidth={strokeWidth}
+          fill="transparent"
+          r={radius}
+          cx={size / 2}
+          cy={size / 2}
+          initial={{ strokeDashoffset: circumference }}
+          animate={{ strokeDashoffset: offset }}
+          transition={{ duration: 1.5, ease: [0.16, 1, 0.3, 1], delay: 0.3 }}
+          style={{
+            strokeDasharray: circumference,
+            strokeLinecap: 'round',
+          }}
+        />
+      </svg>
+      <div className="absolute inset-0 flex items-center justify-center">
+        {children}
+      </div>
+    </div>
+  )
+}
+
+// Container animation variants
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.08,
+      delayChildren: 0.1,
+    },
+  },
+}
+
+const itemVariants = {
+  hidden: { opacity: 0, y: 20 },
+  show: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 300,
+      damping: 24,
+    },
+  },
+}
+
+const scaleVariants = {
+  hidden: { opacity: 0, scale: 0.8 },
+  show: {
+    opacity: 1,
+    scale: 1,
+    transition: {
+      type: 'spring' as const,
+      stiffness: 300,
+      damping: 20,
+    },
+  },
 }
 
 export default function DepositDetailsPage() {
@@ -100,34 +215,49 @@ export default function DepositDetailsPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-48 bg-muted rounded animate-pulse" />
-        <div className="h-64 bg-muted rounded-xl animate-pulse" />
-        <div className="grid md:grid-cols-2 gap-6">
-          <div className="h-48 bg-muted rounded-xl animate-pulse" />
-          <div className="h-48 bg-muted rounded-xl animate-pulse" />
-        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="space-y-8"
+        >
+          <div className="h-8 w-48 bg-muted/50 rounded-lg animate-pulse" />
+          <div className="h-80 bg-gradient-to-br from-muted/30 to-muted/10 rounded-3xl animate-pulse" />
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-32 bg-muted/30 rounded-2xl animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
+            ))}
+          </div>
+        </motion.div>
       </div>
     )
   }
 
   if (error || !deposit) {
     return (
-      <div className="flex flex-col items-center justify-center py-16">
-        <h2 className="text-xl font-semibold mb-2">Депозит не найден</h2>
-        <p className="text-muted-foreground mb-4">
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex flex-col items-center justify-center py-24"
+      >
+        <div className="w-20 h-20 rounded-full bg-muted/50 flex items-center justify-center mb-6">
+          <Landmark className="h-10 w-10 text-muted-foreground" />
+        </div>
+        <h2 className="text-2xl font-semibold mb-2">Депозит не найден</h2>
+        <p className="text-muted-foreground mb-6 text-center max-w-md">
           Возможно, он был удалён или вы перешли по неверной ссылке
         </p>
-        <Button variant="outline" onClick={() => navigate('/deposits')}>
+        <Button variant="outline" size="lg" onClick={() => navigate('/deposits')}>
           <ArrowLeft className="mr-2 h-4 w-4" />
           Вернуться к списку
         </Button>
-      </div>
+      </motion.div>
     )
   }
 
   const currencySymbol = CURRENCY_SYMBOLS[deposit.currency] || deposit.currency
   const statusConfig = STATUS_CONFIG[deposit.status] || STATUS_CONFIG.active
   const isActive = deposit.status === 'active'
+  const bank = deposit.bank ? getBankByName(deposit.bank) : undefined
 
   const startDate = parseDateSafe(deposit.startDate)
   const maturityDate = parseDateSafe(deposit.maturityDate)
@@ -135,7 +265,7 @@ export default function DepositDetailsPage() {
   const passedDays = totalDays - (deposit.daysRemaining || 0)
   const termProgress = totalDays > 0 ? Math.min(100, Math.max(0, (passedDays / totalDays) * 100)) : 0
   const yieldProgress = deposit.projectedYield > 0
-    ? (deposit.totalInterest / deposit.projectedYield) * 100
+    ? Math.min(100, (deposit.totalInterest / deposit.projectedYield) * 100)
     : 0
 
   const formatAmount = (amount: number | undefined | null) => {
@@ -154,264 +284,322 @@ export default function DepositDetailsPage() {
   const accruals: DepositAccrual[] = accrualsData?.data || []
 
   return (
-    <div className="space-y-8">
+    <motion.div
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-8 pb-8"
+    >
       {/* Breadcrumb */}
-      <Breadcrumb>
-        <BreadcrumbList>
-          <BreadcrumbItem>
-            <BreadcrumbLink asChild>
-              <Link to="/deposits">Депозиты</Link>
-            </BreadcrumbLink>
-          </BreadcrumbItem>
-          <BreadcrumbSeparator>
-            <ChevronRight className="h-4 w-4" />
-          </BreadcrumbSeparator>
-          <BreadcrumbItem>
-            <BreadcrumbPage>{deposit.assetName}</BreadcrumbPage>
-          </BreadcrumbItem>
-        </BreadcrumbList>
-      </Breadcrumb>
+      <motion.div variants={itemVariants}>
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/deposits" className="hover:text-foreground transition-colors">Депозиты</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator>
+              <ChevronRight className="h-4 w-4" />
+            </BreadcrumbSeparator>
+            <BreadcrumbItem>
+              <BreadcrumbPage className="font-medium">{deposit.assetName}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+      </motion.div>
 
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"
-      >
-        <div className="flex items-start gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/20">
-            <Landmark className="h-7 w-7 text-primary" />
-          </div>
-          <div>
-            <div className="flex items-center gap-3 mb-1">
-              <h1 className="text-2xl font-bold tracking-tight">{deposit.assetName}</h1>
-              <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              {deposit.fundName && (
-                <>
-                  <Wallet className="h-4 w-4" />
-                  <span>{deposit.fundName}</span>
-                  <span>•</span>
-                </>
+      {/* Hero Card */}
+      <motion.div variants={scaleVariants}>
+        <Card className={`relative overflow-hidden border-0 bg-gradient-to-br from-card via-card to-card/80 shadow-2xl ${statusConfig.glow}`}>
+          {/* Status glow bar */}
+          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${statusConfig.color}`} />
+
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-primary/5 via-transparent to-transparent rounded-full blur-3xl" />
+          <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-emerald-500/5 via-transparent to-transparent rounded-full blur-2xl" />
+
+          <CardContent className="relative p-8">
+            <div className="flex flex-col lg:flex-row lg:items-start gap-8">
+              {/* Left: Bank & Info */}
+              <div className="flex-1 space-y-6">
+                {/* Header with bank logo */}
+                <div className="flex items-start gap-5">
+                  <motion.div
+                    initial={{ scale: 0, rotate: -180 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+                    className="relative"
+                  >
+                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-background to-muted/50 shadow-xl ring-1 ring-border/50 flex items-center justify-center overflow-hidden">
+                      {bank ? (
+                        <img
+                          src={bank.logo}
+                          alt={bank.name}
+                          className="w-12 h-12 object-contain"
+                        />
+                      ) : (
+                        <Landmark className="w-10 h-10 text-primary" />
+                      )}
+                    </div>
+                    {isActive && (
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.5 }}
+                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 ring-2 ring-background flex items-center justify-center"
+                      >
+                        <Zap className="w-3 h-3 text-white" />
+                      </motion.div>
+                    )}
+                  </motion.div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-3 flex-wrap mb-2">
+                      <h1 className="text-2xl lg:text-3xl font-bold tracking-tight">{deposit.assetName}</h1>
+                      <Badge
+                        variant={statusConfig.variant}
+                        className={`${isActive ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' : ''}`}
+                      >
+                        {statusConfig.label}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-sm text-muted-foreground flex-wrap">
+                      {bank && (
+                        <span className="font-medium text-foreground">{bank.name}</span>
+                      )}
+                      {bank && <span className="text-border">•</span>}
+                      {deposit.fundName && (
+                        <>
+                          <span className="flex items-center gap-1.5">
+                            <Wallet className="h-3.5 w-3.5" />
+                            {deposit.fundName}
+                          </span>
+                          <span className="text-border">•</span>
+                        </>
+                      )}
+                      <span>{deposit.currency}</span>
+                      <span className="text-border">•</span>
+                      <span>{PERIOD_LABELS[deposit.accrualPeriod]}</span>
+                      {deposit.hasCapitalization && (
+                        <>
+                          <span className="text-border">•</span>
+                          <span className="text-amber-600 dark:text-amber-400">
+                            Капитализация
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Amount display */}
+                <div className="space-y-4">
+                  <div className="p-6 rounded-2xl bg-gradient-to-br from-background/80 to-muted/20 ring-1 ring-border/50 backdrop-blur-sm">
+                    <p className="text-xs font-medium uppercase tracking-widest text-muted-foreground mb-2">
+                      Текущая сумма
+                    </p>
+                    <div className="flex items-baseline gap-2">
+                      <motion.span
+                        initial={{ opacity: 0, x: -20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: 0.3, duration: 0.5 }}
+                        className="text-4xl lg:text-5xl font-bold tabular-nums tracking-tight"
+                      >
+                        {formatAmount(deposit.currentAmount)}
+                      </motion.span>
+                      <span className="text-2xl text-muted-foreground font-medium">{currencySymbol}</span>
+                    </div>
+
+                    <div className="flex items-center gap-4 mt-4 text-sm">
+                      <span className="text-muted-foreground">
+                        Начальная: {formatAmount(deposit.principalAmount)} {currencySymbol}
+                      </span>
+                      <ArrowRight className="h-4 w-4 text-muted-foreground/50" />
+                      <span className="flex items-center gap-1.5 font-medium text-emerald-600 dark:text-emerald-400">
+                        <TrendingUp className="h-4 w-4" />
+                        +{formatAmount(deposit.totalInterest)} {currencySymbol}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action buttons */}
+                <div className="flex gap-3 flex-wrap">
+                  <Button variant="outline" onClick={() => setIsEditOpen(true)} className="gap-2">
+                    <Pencil className="h-4 w-4" />
+                    Редактировать
+                  </Button>
+                  {isActive && (
+                    <Button variant="outline" onClick={() => setIsCloseOpen(true)} className="gap-2">
+                      <XCircle className="h-4 w-4" />
+                      Закрыть досрочно
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setIsDeleteOpen(true)}
+                    className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Right: Progress Rings */}
+              {isActive && (
+                <div className="flex gap-8 items-center justify-center lg:justify-end">
+                  {/* Term Progress */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.4, type: 'spring' }}
+                    className="text-center"
+                  >
+                    <CircularProgress
+                      value={termProgress}
+                      size={140}
+                      strokeWidth={10}
+                      color="stroke-primary"
+                      bgColor="stroke-primary/10"
+                    >
+                      <div className="text-center">
+                        <Clock className="h-5 w-5 mx-auto mb-1 text-primary" />
+                        <span className="text-2xl font-bold tabular-nums">{termProgress.toFixed(0)}%</span>
+                      </div>
+                    </CircularProgress>
+                    <p className="text-xs text-muted-foreground mt-3 font-medium uppercase tracking-wider">Срок</p>
+                    <p className="text-sm text-muted-foreground">{deposit.daysRemaining} дн. осталось</p>
+                  </motion.div>
+
+                  {/* Yield Progress */}
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: 0.5, type: 'spring' }}
+                    className="text-center"
+                  >
+                    <CircularProgress
+                      value={yieldProgress}
+                      size={140}
+                      strokeWidth={10}
+                      color="stroke-emerald-500"
+                      bgColor="stroke-emerald-500/10"
+                    >
+                      <div className="text-center">
+                        <TrendingUp className="h-5 w-5 mx-auto mb-1 text-emerald-500" />
+                        <span className="text-2xl font-bold tabular-nums">{yieldProgress.toFixed(0)}%</span>
+                      </div>
+                    </CircularProgress>
+                    <p className="text-xs text-muted-foreground mt-3 font-medium uppercase tracking-wider">Доход</p>
+                    <p className="text-sm text-emerald-600 dark:text-emerald-400">
+                      +{formatAmount(deposit.projectedYield)} {currencySymbol}
+                    </p>
+                  </motion.div>
+                </div>
               )}
-              <span>{deposit.currency}</span>
-              <span>•</span>
-              <span>{PERIOD_LABELS[deposit.accrualPeriod]}</span>
-              {deposit.hasCapitalization && (
-                <>
-                  <span>•</span>
-                  <span>с капитализацией</span>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setIsEditOpen(true)}>
-            <Pencil className="mr-2 h-4 w-4" />
-            Редактировать
-          </Button>
-          {isActive && (
-            <Button variant="outline" onClick={() => setIsCloseOpen(true)}>
-              <XCircle className="mr-2 h-4 w-4" />
-              Закрыть досрочно
-            </Button>
-          )}
-          <Button variant="destructive" size="icon" onClick={() => setIsDeleteOpen(true)}>
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </motion.div>
-
-      {/* Main Amount Card */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.1 }}
-      >
-        <Card className="border-primary/20 bg-gradient-to-br from-primary/5 via-transparent to-transparent overflow-hidden">
-          <CardContent className="p-6">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div>
-                <p className="text-sm font-medium uppercase tracking-wider text-muted-foreground mb-2">
-                  Текущая сумма
-                </p>
-                <p className="text-4xl font-bold tabular-nums">
-                  {formatAmount(deposit.currentAmount)}
-                  <span className="ml-2 text-2xl text-muted-foreground">{currencySymbol}</span>
-                </p>
-                <div className="flex items-center gap-4 mt-3 text-sm">
-                  <span className="text-muted-foreground">
-                    Начальная: {formatAmount(deposit.principalAmount)} {currencySymbol}
-                  </span>
-                  <ArrowRight className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                    Прогноз: +{formatAmount(deposit.projectedYield)} {currencySymbol}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex flex-col items-end gap-2">
-                <div className="flex items-center gap-2 text-emerald-500">
-                  <TrendingUp className="h-6 w-6" />
-                  <span className="text-3xl font-bold tabular-nums">
-                    +{formatAmount(deposit.totalInterest)}
-                  </span>
-                  <span className="text-xl">{currencySymbol}</span>
-                </div>
-                <p className="text-sm text-muted-foreground">накопленные проценты</p>
-              </div>
             </div>
           </CardContent>
         </Card>
       </motion.div>
 
-      {/* Progress Cards */}
-      {isActive && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="grid md:grid-cols-2 gap-6"
-        >
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <Clock className="h-4 w-4 text-muted-foreground" />
-                Прогресс срока
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {passedDays} из {totalDays} дней
-                  </span>
-                  <span className="font-medium">{termProgress.toFixed(0)}%</span>
-                </div>
-                <Progress value={termProgress} className="h-3" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>{startDate ? format(startDate, 'd MMM yyyy', { locale: ru }) : '—'}</span>
-                  <span>{maturityDate ? format(maturityDate, 'd MMM yyyy', { locale: ru }) : '—'}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium flex items-center gap-2">
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
-                Доходность
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    {formatAmount(deposit.totalInterest)} из {formatAmount(deposit.projectedYield)} {currencySymbol}
-                  </span>
-                  <span className="font-medium">{yieldProgress.toFixed(0)}%</span>
-                </div>
-                <Progress value={yieldProgress} className="h-3 [&>div]:bg-emerald-500" />
-                <div className="flex justify-between text-xs text-muted-foreground">
-                  <span>Накоплено</span>
-                  <span>Прогноз на конец срока</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
-
-      {/* Details Grid */}
+      {/* Stats Grid */}
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3 }}
-        className="grid md:grid-cols-4 gap-4"
+        variants={containerVariants}
+        className="grid grid-cols-2 lg:grid-cols-4 gap-4"
       >
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Percent className="h-5 w-5 text-amber-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold tabular-nums">{formatRate(deposit.interestRate)}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">годовых</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Calendar className="h-5 w-5 text-blue-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold tabular-nums">{deposit.termMonths}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">месяцев</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 text-center">
-            <Clock className="h-5 w-5 text-violet-500 mx-auto mb-2" />
-            <p className="text-2xl font-bold tabular-nums">{deposit.daysRemaining}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">дней осталось</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4 text-center">
-            <History className="h-5 w-5 text-primary mx-auto mb-2" />
-            <p className="text-lg font-semibold">{PERIOD_LABELS[deposit.accrualPeriod]}</p>
-            <p className="text-xs text-muted-foreground uppercase tracking-wider">
-              {deposit.hasCapitalization ? 'с капит.' : 'без капит.'}
-            </p>
-          </CardContent>
-        </Card>
+        {[
+          {
+            icon: Percent,
+            value: formatRate(deposit.interestRate),
+            label: 'Годовых',
+            color: 'text-amber-500',
+            bg: 'from-amber-500/10 to-amber-500/5'
+          },
+          {
+            icon: Calendar,
+            value: deposit.termMonths,
+            label: 'Месяцев',
+            color: 'text-blue-500',
+            bg: 'from-blue-500/10 to-blue-500/5'
+          },
+          {
+            icon: Clock,
+            value: deposit.daysRemaining,
+            label: 'Дней осталось',
+            color: 'text-violet-500',
+            bg: 'from-violet-500/10 to-violet-500/5'
+          },
+          {
+            icon: CircleDollarSign,
+            value: PERIOD_LABELS[deposit.accrualPeriod],
+            label: deposit.hasCapitalization ? 'С капитализацией' : 'Без капитализации',
+            color: 'text-primary',
+            bg: 'from-primary/10 to-primary/5',
+            isText: true
+          },
+        ].map((stat, index) => (
+          <motion.div key={index} variants={itemVariants}>
+            <Card className="relative overflow-hidden border-border/50 hover:border-border transition-colors group">
+              <div className={`absolute inset-0 bg-gradient-to-br ${stat.bg} opacity-50 group-hover:opacity-100 transition-opacity`} />
+              <CardContent className="relative p-5">
+                <stat.icon className={`h-5 w-5 ${stat.color} mb-3`} />
+                <p className={`${stat.isText ? 'text-base' : 'text-2xl'} font-bold tabular-nums`}>
+                  {stat.value}
+                </p>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider mt-1">
+                  {stat.label}
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        ))}
       </motion.div>
 
-      {/* Dates & Notes */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="grid md:grid-cols-2 gap-6"
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-sm font-medium flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              Даты
+      {/* Dates & Details */}
+      <motion.div variants={itemVariants} className="grid md:grid-cols-2 gap-6">
+        <Card className="border-border/50">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-medium flex items-center gap-2">
+              <Calendar className="h-4 w-4 text-muted-foreground" />
+              Ключевые даты
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex justify-between py-2 border-b border-border/50">
-              <span className="text-muted-foreground">Дата открытия</span>
-              <span className="font-medium">{startDate ? format(startDate, 'd MMMM yyyy', { locale: ru }) : '—'}</span>
-            </div>
-            <div className="flex justify-between py-2 border-b border-border/50">
-              <span className="text-muted-foreground">Дата погашения</span>
-              <span className="font-medium">{maturityDate ? format(maturityDate, 'd MMMM yyyy', { locale: ru }) : '—'}</span>
-            </div>
-            {deposit.nextAccrualDate && (
-              <div className="flex justify-between py-2">
-                <span className="text-muted-foreground">Следующее начисление</span>
-                <span className="font-medium">
-                  {(() => {
-                    const nextDate = parseDateSafe(deposit.nextAccrualDate)
-                    return nextDate ? format(nextDate, 'd MMMM yyyy', { locale: ru }) : '—'
-                  })()}
-                </span>
+          <CardContent className="space-y-1">
+            {[
+              { label: 'Дата открытия', value: startDate ? format(startDate, 'd MMMM yyyy', { locale: ru }) : '—' },
+              { label: 'Дата погашения', value: maturityDate ? format(maturityDate, 'd MMMM yyyy', { locale: ru }) : '—' },
+              ...(deposit.nextAccrualDate ? [{
+                label: 'Следующее начисление',
+                value: (() => {
+                  const nextDate = parseDateSafe(deposit.nextAccrualDate)
+                  return nextDate ? format(nextDate, 'd MMMM yyyy', { locale: ru }) : '—'
+                })()
+              }] : []),
+            ].map((item, index) => (
+              <div
+                key={index}
+                className="flex justify-between items-center py-3 border-b border-border/50 last:border-0"
+              >
+                <span className="text-sm text-muted-foreground">{item.label}</span>
+                <span className="text-sm font-medium">{item.value}</span>
               </div>
-            )}
+            ))}
           </CardContent>
         </Card>
 
         {deposit.notes && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-sm font-medium">Заметки</CardTitle>
+          <Card className="border-border/50">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-medium flex items-center gap-2">
+                <Shield className="h-4 w-4 text-muted-foreground" />
+                Заметки
+              </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap leading-relaxed">
                 {deposit.notes}
               </p>
             </CardContent>
@@ -420,41 +608,46 @@ export default function DepositDetailsPage() {
       </motion.div>
 
       {/* Accruals History */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <Card>
+      <motion.div variants={itemVariants}>
+        <Card className="border-border/50">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <History className="h-5 w-5" />
+              <History className="h-5 w-5 text-muted-foreground" />
               История начислений
             </CardTitle>
           </CardHeader>
           <CardContent>
             {isLoadingAccruals ? (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {[...Array(3)].map((_, i) => (
-                  <div key={i} className="h-12 bg-muted rounded animate-pulse" />
+                  <div key={i} className="h-14 bg-muted/30 rounded-lg animate-pulse" style={{ animationDelay: `${i * 100}ms` }} />
                 ))}
               </div>
             ) : accruals.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <History className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                <p>Начисления пока отсутствуют</p>
-              </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-center py-12"
+              >
+                <div className="w-16 h-16 rounded-full bg-muted/50 flex items-center justify-center mx-auto mb-4">
+                  <History className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <p className="text-muted-foreground">Начисления пока отсутствуют</p>
+                <p className="text-sm text-muted-foreground/70 mt-1">
+                  Первое начисление произойдёт согласно периоду выплат
+                </p>
+              </motion.div>
             ) : (
-              <div className="rounded-lg border overflow-hidden">
+              <div className="rounded-xl border border-border/50 overflow-hidden">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Дата</TableHead>
-                      <TableHead>Период</TableHead>
-                      <TableHead className="text-right">Сумма до</TableHead>
-                      <TableHead className="text-right">Проценты</TableHead>
-                      <TableHead className="text-right">Сумма после</TableHead>
-                      <TableHead>Тип</TableHead>
+                    <TableRow className="bg-muted/30 hover:bg-muted/30">
+                      <TableHead className="font-medium">Дата</TableHead>
+                      <TableHead className="font-medium">Период</TableHead>
+                      <TableHead className="text-right font-medium">Сумма до</TableHead>
+                      <TableHead className="text-right font-medium">Проценты</TableHead>
+                      <TableHead className="text-right font-medium">Сумма после</TableHead>
+                      <TableHead className="font-medium">Тип</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -462,11 +655,12 @@ export default function DepositDetailsPage() {
                       {accruals.map((accrual, index) => (
                         <motion.tr
                           key={accrual.id}
-                          initial={{ opacity: 0, x: -10 }}
+                          initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ delay: index * 0.05 }}
+                          className="group"
                         >
-                          <TableCell>
+                          <TableCell className="font-medium">
                             {(() => {
                               const date = parseDateSafe(accrual.accrualDate)
                               return date ? format(date, 'd MMM yyyy', { locale: ru }) : '—'
@@ -485,14 +679,17 @@ export default function DepositDetailsPage() {
                           <TableCell className="text-right tabular-nums">
                             {formatAmount(accrual.principalAtStart)} {currencySymbol}
                           </TableCell>
-                          <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400 font-medium">
-                            +{formatAmount(accrual.interestAccrued)} {currencySymbol}
+                          <TableCell className="text-right tabular-nums">
+                            <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-medium">
+                              <TrendingUp className="h-3 w-3" />
+                              +{formatAmount(accrual.interestAccrued)} {currencySymbol}
+                            </span>
                           </TableCell>
                           <TableCell className="text-right tabular-nums font-medium">
                             {formatAmount(accrual.principalAtEnd)} {currencySymbol}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline" className="text-xs">
+                            <Badge variant="outline" className="text-xs font-normal">
                               {ACCRUAL_TYPE_LABELS[accrual.accrualType]}
                               {accrual.isCapitalized && ' (капит.)'}
                             </Badge>
@@ -526,11 +723,8 @@ export default function DepositDetailsPage() {
         open={isDeleteOpen}
         onOpenChange={(open) => {
           setIsDeleteOpen(open)
-          if (!open) {
-            // Check if we should navigate away
-          }
         }}
       />
-    </div>
+    </motion.div>
   )
 }
