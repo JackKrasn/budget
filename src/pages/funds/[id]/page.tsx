@@ -57,7 +57,6 @@ import {
   Banknote,
   Landmark,
   MoreVertical,
-  ExternalLink,
   Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -77,7 +76,8 @@ import {
   SetInitialBalanceDialog,
 } from '@/features/funds'
 import { CreateDepositDialog, useDeposits } from '@/features/deposits'
-import type { FundStatus, RuleType, FundBalance, FundAssetBalance } from '@/lib/api/types'
+import type { FundStatus, RuleType, FundBalance, FundAssetBalance, Deposit } from '@/lib/api/types'
+import { getBankByName } from '@/lib/banks'
 
 const FUND_ICONS = [
   { value: 'trending-up', icon: TrendingUp, label: 'Инвестиции' },
@@ -188,9 +188,10 @@ interface AssetGroupProps {
   assets: FundAssetBalance[]
   onShowHistory: (asset: FundAssetBalance) => void
   onViewDetails: (asset: FundAssetBalance) => void
+  depositsByAssetId?: Map<string, Deposit>
 }
 
-function AssetGroup({ typeCode, assets, onShowHistory, onViewDetails }: AssetGroupProps) {
+function AssetGroup({ typeCode, assets, onShowHistory, onViewDetails, depositsByAssetId }: AssetGroupProps) {
   const config = ASSET_TYPE_CONFIG[typeCode] || ASSET_TYPE_CONFIG.other
   const Icon = config.icon
   const totalValue = assets.reduce((sum, a) => sum + a.valueBase, 0)
@@ -238,6 +239,25 @@ function AssetGroup({ typeCode, assets, onShowHistory, onViewDetails }: AssetGro
                     {asset.asset.ticker}
                   </Badge>
                 )}
+                {/* Show bank info for deposits */}
+                {typeCode === 'deposit' && depositsByAssetId?.get(asset.asset.id)?.bank && (() => {
+                  const deposit = depositsByAssetId.get(asset.asset.id)
+                  const bank = deposit?.bank ? getBankByName(deposit.bank) : undefined
+                  return (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      {bank ? (
+                        <img
+                          src={bank.logo}
+                          alt={bank.name}
+                          className="h-4 w-4 shrink-0 object-contain"
+                        />
+                      ) : (
+                        <Landmark className="h-3 w-3" />
+                      )}
+                      <span>{deposit?.bank}</span>
+                    </div>
+                  )
+                })()}
               </div>
               <p className="text-xs text-muted-foreground">
                 {typeCode === 'currency' || typeCode === 'deposit'
@@ -333,6 +353,17 @@ export default function FundDetailsPage() {
     if (depositsData?.data) {
       depositsData.data.forEach((deposit) => {
         map.set(deposit.assetId, deposit.id)
+      })
+    }
+    return map
+  }, [depositsData])
+
+  // Create mapping from asset ID to full deposit data (for bank info display)
+  const depositsByAssetId = useMemo(() => {
+    const map = new Map<string, Deposit>()
+    if (depositsData?.data) {
+      depositsData.data.forEach((deposit) => {
+        map.set(deposit.assetId, deposit)
       })
     }
     return map
@@ -817,6 +848,7 @@ export default function FundDetailsPage() {
                           assets={typeAssets}
                           onShowHistory={handleShowHistory}
                           onViewDetails={handleViewDetails}
+                          depositsByAssetId={depositsByAssetId}
                         />
                       ))}
                     </motion.div>

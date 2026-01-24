@@ -134,9 +134,12 @@ export function useUpdateDeposit() {
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: UpdateDepositRequest }) =>
       depositsApi.update(id, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: depositKeys.lists() })
-      queryClient.invalidateQueries({ queryKey: depositKeys.detail(variables.id) })
+    onSuccess: async (_, variables) => {
+      // Refetch чтобы данные точно обновились
+      await queryClient.refetchQueries({ queryKey: depositKeys.lists() })
+      await queryClient.refetchQueries({ queryKey: depositKeys.detail(variables.id) })
+      // Также обновляем данные фондов, т.к. депозиты отображаются там
+      queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
       toast.success('Депозит обновлён')
     },
     onError: (error) => {
