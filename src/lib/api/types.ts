@@ -1140,6 +1140,7 @@ export interface Deposit {
   totalInterest: number
   projectedYield: number
   daysRemaining: number
+  bank?: string // Название банка
   notes?: string
   createdAt: NullableDate
 }
@@ -1154,10 +1155,12 @@ export interface CreateDepositRequest {
   accrualPeriod: AccrualPeriod
   hasCapitalization: boolean
   startDate: string // YYYY-MM-DD
+  bank?: string // Название банка
   notes?: string
 }
 
 export interface UpdateDepositRequest {
+  bank?: string // Обновить название банка
   notes?: string
 }
 
@@ -1198,6 +1201,7 @@ export interface MigrateDepositRequest {
   hasCapitalization: boolean
   startDate: string // YYYY-MM-DD
   maturityDate?: string // YYYY-MM-DD (опционально)
+  bank?: string // Название банка
   notes?: string
 }
 

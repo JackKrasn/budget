@@ -19,11 +19,13 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { useUpdateDeposit } from '../hooks'
 import type { Deposit } from '@/lib/api'
 
 const formSchema = z.object({
+  bank: z.string().optional(),
   notes: z.string().optional(),
 })
 
@@ -46,6 +48,7 @@ export function EditDepositDialog({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      bank: '',
       notes: '',
     },
   })
@@ -53,6 +56,7 @@ export function EditDepositDialog({
   useEffect(() => {
     if (deposit) {
       form.reset({
+        bank: deposit.bank || '',
         notes: deposit.notes || '',
       })
     }
@@ -66,6 +70,7 @@ export function EditDepositDialog({
       await updateDeposit.mutateAsync({
         id: deposit.id,
         data: {
+          bank: values.bank || undefined,
           notes: values.notes || undefined,
         },
       })
@@ -99,9 +104,26 @@ export function EditDepositDialog({
             <div className="rounded-lg bg-muted/50 p-4 text-sm">
               <p className="text-muted-foreground">
                 Основные параметры депозита (сумма, ставка, срок) не могут быть изменены после создания.
-                Вы можете обновить только заметки.
+                Вы можете обновить название банка и заметки.
               </p>
             </div>
+
+            <FormField
+              control={form.control}
+              name="bank"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Банк</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Например: Сбербанк, Тинькофф, Альфа-Банк"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <FormField
               control={form.control}
@@ -111,7 +133,7 @@ export function EditDepositDialog({
                   <FormLabel>Заметки</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Название банка, условия и т.д."
+                      placeholder="Условия и особенности"
                       className="resize-none"
                       rows={4}
                       {...field}

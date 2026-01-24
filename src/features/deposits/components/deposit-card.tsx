@@ -142,10 +142,16 @@ export function DepositCard({
                 <h3 className="font-semibold tracking-tight leading-none">
                   {deposit.assetName}
                 </h3>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant={statusConfig.variant} className="text-[10px] font-medium">
                     {statusConfig.label}
                   </Badge>
+                  {deposit.bank && (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <Landmark className="h-3 w-3" />
+                      <span>{deposit.bank}</span>
+                    </div>
+                  )}
                   {deposit.fundName && (
                     <span className="text-xs text-muted-foreground">
                       {deposit.fundName}
