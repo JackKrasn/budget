@@ -19,8 +19,8 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Textarea } from '@/components/ui/textarea'
-import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { BankCombobox } from '@/components/ui/bank-combobox'
 import { useUpdateDeposit } from '../hooks'
 import type { Deposit } from '@/lib/api'
 
@@ -115,9 +115,10 @@ export function EditDepositDialog({
                 <FormItem>
                   <FormLabel>Банк</FormLabel>
                   <FormControl>
-                    <Input
-                      placeholder="Например: Сбербанк, Тинькофф, Альфа-Банк"
-                      {...field}
+                    <BankCombobox
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      placeholder="Выберите банк..."
                     />
                   </FormControl>
                   <FormMessage />

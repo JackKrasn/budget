@@ -28,6 +28,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip'
 import type { Deposit } from '@/lib/api'
+import { getBankByName } from '@/lib/banks'
 import { format, differenceInDays, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 
@@ -146,12 +147,23 @@ export function DepositCard({
                   <Badge variant={statusConfig.variant} className="text-[10px] font-medium">
                     {statusConfig.label}
                   </Badge>
-                  {deposit.bank && (
-                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <Landmark className="h-3 w-3" />
-                      <span>{deposit.bank}</span>
-                    </div>
-                  )}
+                  {deposit.bank && (() => {
+                    const bank = getBankByName(deposit.bank)
+                    return (
+                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                        {bank ? (
+                          <img
+                            src={bank.logo}
+                            alt={bank.name}
+                            className="h-4 w-4 shrink-0 object-contain"
+                          />
+                        ) : (
+                          <Landmark className="h-3 w-3" />
+                        )}
+                        <span>{deposit.bank}</span>
+                      </div>
+                    )
+                  })()}
                   {deposit.fundName && (
                     <span className="text-xs text-muted-foreground">
                       {deposit.fundName}

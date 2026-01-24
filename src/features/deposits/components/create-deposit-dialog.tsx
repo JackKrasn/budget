@@ -61,6 +61,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
+import { BankCombobox } from '@/components/ui/bank-combobox'
 import { useCreateDeposit, useMigrateDeposit } from '../hooks'
 import { useFunds, useFundCurrencyAssets } from '@/features/funds/hooks'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -444,6 +445,34 @@ export function CreateDepositDialog({
                               <div className="absolute inset-0 rounded-md bg-gradient-to-r from-primary/5 to-amber-500/5 opacity-0 group-focus-within:opacity-100 transition-opacity -z-10" />
                             </div>
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Bank - With dropdown and icons */}
+                    <FormField
+                      control={form.control}
+                      name="bank"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                            Банк
+                            <span className="ml-2 text-muted-foreground/50 normal-case tracking-normal">
+                              (опционально)
+                            </span>
+                          </FormLabel>
+                          <FormControl>
+                            <BankCombobox
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              placeholder="Выберите банк..."
+                              className="h-12 bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all"
+                            />
+                          </FormControl>
+                          <FormDescription className="text-xs">
+                            Выберите из списка или введите свой
+                          </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -956,30 +985,6 @@ export function CreateDepositDialog({
                         </motion.div>
                       )}
                     </AnimatePresence>
-
-                    {/* Bank */}
-                    <FormField
-                      control={form.control}
-                      name="bank"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            Банк
-                            <span className="ml-2 text-muted-foreground/50 normal-case tracking-normal">
-                              (опционально)
-                            </span>
-                          </FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="Например: Сбербанк, Тинькофф, Альфа-Банк"
-                              className="h-12 bg-muted/30 border-muted-foreground/10 transition-all focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
-                              {...field}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
 
                     {/* Notes */}
                     <FormField

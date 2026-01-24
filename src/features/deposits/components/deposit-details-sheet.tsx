@@ -33,6 +33,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import type { Deposit, DepositAccrual } from '@/lib/api'
+import { getBankByName } from '@/lib/banks'
 import { useDepositAccruals } from '../hooks'
 import { format, differenceInDays, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
@@ -320,6 +321,26 @@ export function DepositDetailsSheet({
                   </div>
                 </div>
               )}
+              {deposit.bank && (() => {
+                const bank = getBankByName(deposit.bank)
+                return (
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm text-muted-foreground">Банк</span>
+                    <div className="flex items-center gap-2">
+                      {bank ? (
+                        <img
+                          src={bank.logo}
+                          alt={bank.name}
+                          className="h-5 w-5 shrink-0 object-contain"
+                        />
+                      ) : (
+                        <Landmark className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="text-sm font-medium">{deposit.bank}</span>
+                    </div>
+                  </div>
+                )
+              })()}
             </motion.div>
 
             {/* Notes */}
