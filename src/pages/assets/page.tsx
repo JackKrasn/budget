@@ -1,15 +1,30 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Coins, AlertCircle, Loader2, Landmark, AlertTriangle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+  Plus,
+  Coins,
+  AlertCircle,
+  Loader2,
+  LayoutGrid,
+  List,
+  TrendingUp,
+  Landmark,
+  Bitcoin,
+  Gem,
+  Banknote,
+  Filter,
+  X,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import {
   useAssets,
   useDeleteAsset,
@@ -18,59 +33,190 @@ import {
   EditAssetDialog,
   UpdatePriceDialog,
 } from '@/features/assets'
-import {
-  useDeposits,
-  useMaturingDeposits,
-  DepositCard,
-  CreateDepositDialog,
-  EditDepositDialog,
-  DepositDetailsSheet,
-  CloseDepositDialog,
-  DeleteDepositDialog,
-  DepositsSummaryCard,
-} from '@/features/deposits'
+import { cn } from '@/lib/utils'
 import type { AssetWithType } from '@/lib/api/types'
-import type { Deposit } from '@/lib/api'
+
+// Asset type configuration with icons and colors
+const ASSET_TYPE_CONFIG: Record<
+  string,
+  { label: string; icon: React.ElementType; color: string }
+> = {
+  all: {
+    label: 'Все',
+    icon: Coins,
+    color: '#6366f1',
+  },
+  currency: {
+    label: 'Валюты',
+    icon: Banknote,
+    color: '#10b981',
+  },
+  deposit: {
+    label: 'Депозиты',
+    icon: Landmark,
+    color: '#f59e0b',
+  },
+  stock: {
+    label: 'Акции',
+    icon: TrendingUp,
+    color: '#3b82f6',
+  },
+  etf: {
+    label: 'ETF',
+    icon: TrendingUp,
+    color: '#8b5cf6',
+  },
+  bond: {
+    label: 'Облигации',
+    icon: Landmark,
+    color: '#ec4899',
+  },
+  crypto: {
+    label: 'Крипто',
+    icon: Bitcoin,
+    color: '#f97316',
+  },
+  precious_metal: {
+    label: 'Металлы',
+    icon: Gem,
+    color: '#eab308',
+  },
+}
+
+type ViewMode = 'grid' | 'list'
+type FilterType = 'all' | 'currency' | 'deposit' | 'stock' | 'etf' | 'bond' | 'crypto' | 'precious_metal'
 
 const container = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
     transition: {
-      staggerChildren: 0.08,
+      staggerChildren: 0.05,
     },
   },
 }
 
 const item = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
+  hidden: { opacity: 0, y: 20, scale: 0.95 },
+  show: { opacity: 1, y: 0, scale: 1 },
+}
+
+// Primary filter color (same for all buttons)
+const FILTER_COLOR = '#6366f1'
+
+// Filter chip component
+function FilterChip({
+  type,
+  isActive,
+  count,
+  onClick,
+}: {
+  type: FilterType
+  isActive: boolean
+  count: number
+  onClick: () => void
+}) {
+  const config = ASSET_TYPE_CONFIG[type]
+  const Icon = config.icon
+
+  return (
+    <motion.button
+      onClick={onClick}
+      whileHover={{ scale: 1.02 }}
+      whileTap={{ scale: 0.98 }}
+      className={cn(
+        'group relative flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-all',
+        isActive
+          ? 'text-white shadow-lg'
+          : 'bg-muted/50 text-muted-foreground hover:bg-muted hover:text-foreground'
+      )}
+      style={
+        isActive
+          ? {
+              backgroundColor: FILTER_COLOR,
+              boxShadow: `0 4px 14px ${FILTER_COLOR}40`,
+            }
+          : undefined
+      }
+    >
+      <Icon className="h-4 w-4" />
+      <span>{config.label}</span>
+      {count > 0 && (
+        <span
+          className={cn(
+            'ml-1 rounded-full px-1.5 py-0.5 text-xs font-semibold tabular-nums',
+            isActive ? 'bg-white/20 text-white' : 'bg-muted-foreground/10'
+          )}
+        >
+          {count}
+        </span>
+      )}
+    </motion.button>
+  )
 }
 
 export default function AssetsPage() {
-  // Asset states
+  // State
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all')
   const [editAsset, setEditAsset] = useState<AssetWithType | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [priceAsset, setPriceAsset] = useState<AssetWithType | null>(null)
   const [priceDialogOpen, setPriceDialogOpen] = useState(false)
 
-  // Deposit states
-  const [selectedDeposit, setSelectedDeposit] = useState<Deposit | null>(null)
-  const [isDepositDetailsOpen, setIsDepositDetailsOpen] = useState(false)
-  const [isDepositEditOpen, setIsDepositEditOpen] = useState(false)
-  const [isDepositCloseOpen, setIsDepositCloseOpen] = useState(false)
-  const [isDepositDeleteOpen, setIsDepositDeleteOpen] = useState(false)
-
   // Fetch data
-  const { data, isLoading, error } = useAssets()
+  const { data: assetsData, isLoading, error } = useAssets()
   const deleteAsset = useDeleteAsset()
-  const { data: depositsData, isLoading: isLoadingDeposits } = useDeposits({ status: 'active' })
-  const { data: maturingData } = useMaturingDeposits({ days: 30 })
 
-  const assets = data?.data ?? []
-  const deposits = depositsData?.data ?? []
-  const depositsSummary = depositsData?.summary
-  const maturingDeposits = maturingData?.data ?? []
+  const assets = assetsData?.data ?? []
+
+  // Calculate counts for each type
+  const typeCounts = useMemo(() => {
+    const counts: Record<FilterType, number> = {
+      all: assets.length,
+      currency: assets.filter((a) => a.type_code === 'currency').length,
+      deposit: assets.filter((a) => a.type_code === 'deposit').length,
+      stock: assets.filter((a) => a.type_code === 'stock').length,
+      etf: assets.filter((a) => a.type_code === 'etf').length,
+      bond: assets.filter((a) => a.type_code === 'bond').length,
+      crypto: assets.filter((a) => a.type_code === 'crypto').length,
+      precious_metal: assets.filter((a) => a.type_code === 'precious_metal').length,
+    }
+    return counts
+  }, [assets])
+
+  // Filter assets based on active filter
+  const filteredAssets = useMemo(() => {
+    if (activeFilter === 'all') {
+      return assets
+    }
+    return assets.filter((a) => a.type_code === activeFilter)
+  }, [assets, activeFilter])
+
+  // Group assets by type (sorted by asset_type_id)
+  const groupedAssets = useMemo(() => {
+    const groups: Record<string, AssetWithType[]> = {}
+
+    // Sort assets by asset_type_id first
+    const sortedAssets = [...filteredAssets].sort((a, b) => {
+      const typeIdA = a.asset_type_id || ''
+      const typeIdB = b.asset_type_id || ''
+      return typeIdA.localeCompare(typeIdB)
+    })
+
+    for (const asset of sortedAssets) {
+      const typeCode = asset.type_code || 'other'
+      if (!groups[typeCode]) {
+        groups[typeCode] = []
+      }
+      groups[typeCode].push(asset)
+    }
+
+    return groups
+  }, [filteredAssets])
+
+  // Order for displaying groups
+  const typeOrder = ['currency', 'deposit', 'stock', 'etf', 'bond', 'crypto', 'precious_metal', 'other']
 
   // Asset handlers
   const handleEdit = (asset: AssetWithType) => {
@@ -89,47 +235,13 @@ export default function AssetsPage() {
     }
   }
 
-  // Deposit handlers
-  const handleDepositClick = (deposit: Deposit) => {
-    setSelectedDeposit(deposit)
-    setIsDepositDetailsOpen(true)
-  }
-
-  const handleDepositEdit = (deposit: Deposit) => {
-    setSelectedDeposit(deposit)
-    setIsDepositEditOpen(true)
-    setIsDepositDetailsOpen(false)
-  }
-
-  const handleDepositCloseEarly = (deposit: Deposit) => {
-    setSelectedDeposit(deposit)
-    setIsDepositCloseOpen(true)
-    setIsDepositDetailsOpen(false)
-  }
-
-  const handleDepositDelete = (deposit: Deposit) => {
-    setSelectedDeposit(deposit)
-    setIsDepositDeleteOpen(true)
-    setIsDepositDetailsOpen(false)
-  }
-
-  // Group assets by type
-  const assetsByType = assets.reduce(
-    (acc, asset) => {
-      const typeName = asset.type_name || 'Другое'
-      if (!acc[typeName]) {
-        acc[typeName] = []
-      }
-      acc[typeName].push(asset)
-      return acc
-    },
-    {} as Record<string, AssetWithType[]>
-  )
-
-  const isPageLoading = isLoading || isLoadingDeposits
+  // Get available filter types (only those with items)
+  const availableFilters: FilterType[] = ['all', 'currency', 'deposit', 'stock', 'etf', 'bond', 'crypto', 'precious_metal'].filter(
+    (type) => type === 'all' || typeCounts[type as FilterType] > 0
+  ) as FilterType[]
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -142,147 +254,157 @@ export default function AssetsPage() {
             Активы
           </h1>
           <p className="mt-1 text-muted-foreground">
-            Валюты, акции, депозиты и другие активы
+            Валюты, акции и другие финансовые инструменты
           </p>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Новый актив
+        <div className="flex items-center gap-3">
+          {/* View mode toggle */}
+          <TooltipProvider>
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(value) => value && setViewMode(value as ViewMode)}
+              className="rounded-lg border border-border/50 bg-muted/30 p-1"
+            >
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem
+                    value="grid"
+                    aria-label="Сетка"
+                    className="h-8 w-8 rounded-md data-[state=on]:bg-background data-[state=on]:shadow-sm"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>Сетка</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <ToggleGroupItem
+                    value="list"
+                    aria-label="Список"
+                    className="h-8 w-8 rounded-md data-[state=on]:bg-background data-[state=on]:shadow-sm"
+                  >
+                    <List className="h-4 w-4" />
+                  </ToggleGroupItem>
+                </TooltipTrigger>
+                <TooltipContent>Список</TooltipContent>
+              </Tooltip>
+            </ToggleGroup>
+          </TooltipProvider>
+
+          <CreateAssetDialog>
+            <Button className="gap-2">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Новый актив</span>
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <CreateAssetDialog>
-              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                <Coins className="mr-2 h-4 w-4" />
-                Валюта / Ценная бумага
-              </DropdownMenuItem>
-            </CreateAssetDialog>
-            <CreateDepositDialog>
-              <DropdownMenuItem onSelect={(e) => e.preventDefault()}>
-                <Landmark className="mr-2 h-4 w-4" />
-                Банковский депозит
-              </DropdownMenuItem>
-            </CreateDepositDialog>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </CreateAssetDialog>
+        </div>
       </motion.div>
 
-      {/* Maturing Deposits Alert */}
-      <AnimatePresence>
-        {maturingDeposits.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="rounded-xl bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent p-4 ring-1 ring-amber-500/20"
-          >
-            <div className="flex items-center gap-3">
-              <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
-              <div className="flex-1">
-                <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-                  {maturingDeposits.length === 1
-                    ? 'Депозит погашается в ближайшие 30 дней'
-                    : `${maturingDeposits.length} депозитов погашаются в ближайшие 30 дней`}
-                </p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {maturingDeposits.slice(0, 3).map((deposit) => (
-                    <Badge
-                      key={deposit.id}
-                      variant="outline"
-                      className="cursor-pointer hover:bg-amber-500/10"
-                      onClick={() => handleDepositClick(deposit)}
-                    >
-                      {deposit.assetName} ({deposit.daysRemaining} дн.)
-                    </Badge>
-                  ))}
-                  {maturingDeposits.length > 3 && (
-                    <Badge variant="outline">+{maturingDeposits.length - 3} ещё</Badge>
-                  )}
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Stats */}
+      {/* Stats Cards */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
       >
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+        <Card className="border-border/40 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                <Coins className="h-5 w-5 text-primary" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-500/10">
+                <Coins className="h-5 w-5 text-indigo-500" />
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">Всего активов</p>
-                <p className="text-xl font-bold tabular-nums">
-                  {assets.length}
-                </p>
+                <p className="text-2xl font-bold tabular-nums">{assets.length}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+
+        <Card className="border-border/40 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
-                <Coins className="h-5 w-5 text-emerald-500" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10">
+                <Banknote className="h-5 w-5 text-emerald-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Типов активов</p>
-                <p className="text-xl font-bold tabular-nums">
-                  {Object.keys(assetsByType).length}
-                </p>
+                <p className="text-sm text-muted-foreground">Валют</p>
+                <p className="text-2xl font-bold tabular-nums">{typeCounts.currency}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+
+        <Card className="border-border/40 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
           <CardContent className="p-5">
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-500/10">
-                <Landmark className="h-5 w-5 text-blue-500" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10">
+                <TrendingUp className="h-5 w-5 text-blue-500" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Активных депозитов</p>
-                <p className="text-xl font-bold tabular-nums">
-                  {deposits.length}
+                <p className="text-sm text-muted-foreground">Акций и ETF</p>
+                <p className="text-2xl font-bold tabular-nums">
+                  {typeCounts.stock + typeCounts.etf}
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
-        {depositsSummary && (
-          <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-            <CardContent className="p-5">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-500/10">
-                  <Landmark className="h-5 w-5 text-amber-500" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Сумма депозитов</p>
-                  <p className="text-xl font-bold tabular-nums">
-                    {depositsSummary.totalCurrentValue?.toLocaleString('ru-RU', {
-                      minimumFractionDigits: 2,
-                      maximumFractionDigits: 2,
-                    }) || '0'} ₽
-                  </p>
-                </div>
+
+        <Card className="border-border/40 bg-gradient-to-br from-card to-card/80 backdrop-blur-sm">
+          <CardContent className="p-5">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-500/10">
+                <Bitcoin className="h-5 w-5 text-orange-500" />
               </div>
-            </CardContent>
-          </Card>
-        )}
+              <div>
+                <p className="text-sm text-muted-foreground">Крипто</p>
+                <p className="text-2xl font-bold tabular-nums">{typeCounts.crypto}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </motion.div>
 
+      {/* Filters */}
+      {availableFilters.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+          className="flex flex-wrap items-center gap-2"
+        >
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <Filter className="h-4 w-4" />
+            <span className="text-sm font-medium">Фильтр:</span>
+          </div>
+          {availableFilters.map((type) => (
+            <FilterChip
+              key={type}
+              type={type}
+              isActive={activeFilter === type}
+              count={typeCounts[type]}
+              onClick={() => setActiveFilter(type)}
+            />
+          ))}
+          {activeFilter !== 'all' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1 text-muted-foreground hover:text-foreground"
+              onClick={() => setActiveFilter('all')}
+            >
+              <X className="h-3.5 w-3.5" />
+              Сбросить
+            </Button>
+          )}
+        </motion.div>
+      )}
+
       {/* Loading State */}
-      {isPageLoading && (
+      {isLoading && (
         <div className="flex h-[300px] items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
@@ -295,132 +417,105 @@ export default function AssetsPage() {
           <p className="text-sm text-muted-foreground">
             Ошибка загрузки: {error.message}
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => window.location.reload()}
-          >
+          <Button variant="outline" size="sm" onClick={() => window.location.reload()}>
             Попробовать снова
           </Button>
         </div>
       )}
 
       {/* Content */}
-      {!isPageLoading && !error && (
-        <>
-          {/* Deposits Section */}
-          {deposits.length > 0 && (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-primary/15 to-primary/5 ring-1 ring-primary/20">
-                    <Landmark className="h-5 w-5 text-primary" />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-semibold">Депозиты</h2>
-                    <p className="text-sm text-muted-foreground">
-                      Банковские вклады с начислением процентов
-                    </p>
-                  </div>
-                </div>
-                <CreateDepositDialog>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Новый депозит
-                  </Button>
-                </CreateDepositDialog>
-              </div>
-
-              {/* Deposits Summary */}
-              {depositsSummary && <DepositsSummaryCard summary={depositsSummary} />}
-
-              {/* Deposits Grid */}
-              <motion.div
-                variants={container}
-                initial="hidden"
-                animate="show"
-                className="grid gap-6 md:grid-cols-2 lg:grid-cols-3"
-              >
-                {deposits.map((deposit) => (
-                  <motion.div key={deposit.id} variants={item}>
-                    <DepositCard
-                      deposit={deposit}
-                      onClick={() => handleDepositClick(deposit)}
-                      onEdit={() => handleDepositEdit(deposit)}
-                      onDelete={() => handleDepositDelete(deposit)}
-                      onCloseEarly={
-                        deposit.status === 'active'
-                          ? () => handleDepositCloseEarly(deposit)
-                          : undefined
-                      }
-                    />
-                  </motion.div>
-                ))}
-              </motion.div>
-            </div>
-          )}
-
-          {/* Assets by Type */}
-          {assets.length > 0 ? (
-            <div className="space-y-8">
-              {Object.entries(assetsByType).map(([typeName, typeAssets]) => (
-                <div key={typeName} className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <h2 className="text-lg font-medium">{typeName}</h2>
-                    <span className="text-sm text-muted-foreground">
-                      {typeAssets.length} {typeAssets.length === 1 ? 'актив' : typeAssets.length < 5 ? 'актива' : 'активов'}
-                    </span>
-                  </div>
-                  <motion.div
-                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-                    variants={container}
-                    initial="hidden"
-                    animate="show"
-                  >
-                    {typeAssets.map((asset) => (
-                      <motion.div key={asset.id} variants={item}>
-                        <AssetCard
-                          asset={asset}
-                          onEdit={() => handleEdit(asset)}
-                          onDelete={() => handleDelete(asset.id)}
-                          onUpdatePrice={() => handleUpdatePrice(asset)}
-                        />
-                      </motion.div>
-                    ))}
-                  </motion.div>
-                </div>
-              ))}
-            </div>
-          ) : deposits.length === 0 ? (
+      {!isLoading && !error && (
+        <AnimatePresence mode="wait">
+          {filteredAssets.length === 0 ? (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
               className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30"
             >
               <Coins className="h-12 w-12 text-muted-foreground/50" />
               <div className="text-center">
-                <p className="font-medium">Нет активов</p>
+                <p className="font-medium">
+                  {activeFilter === 'all'
+                    ? 'Нет активов'
+                    : `Нет активов типа "${ASSET_TYPE_CONFIG[activeFilter].label}"`}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Добавьте первый актив для начала работы
+                  {activeFilter === 'all'
+                    ? 'Добавьте первый актив для начала работы'
+                    : 'Попробуйте другой фильтр'}
                 </p>
               </div>
-              <div className="flex gap-3">
+              {activeFilter === 'all' && (
                 <CreateAssetDialog>
                   <Button variant="outline">
                     <Plus className="mr-2 h-4 w-4" />
                     Добавить актив
                   </Button>
                 </CreateAssetDialog>
-                <CreateDepositDialog>
-                  <Button>
-                    <Landmark className="mr-2 h-4 w-4" />
-                    Открыть депозит
-                  </Button>
-                </CreateDepositDialog>
-              </div>
+              )}
             </motion.div>
-          ) : null}
-        </>
+          ) : (
+            <div className="space-y-8">
+              {typeOrder
+                .filter((typeCode) => groupedAssets[typeCode]?.length > 0)
+                .map((typeCode) => {
+                  const typeConfig = ASSET_TYPE_CONFIG[typeCode as FilterType]
+                  const typeAssets = groupedAssets[typeCode]
+                  const Icon = typeConfig?.icon || Coins
+
+                  return (
+                    <motion.section
+                      key={typeCode}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                    >
+                      {/* Show section header only when viewing all */}
+                      {activeFilter === 'all' && (
+                        <div className="mb-4 flex items-center gap-3">
+                          <div
+                            className="flex h-8 w-8 items-center justify-center rounded-lg"
+                            style={{ backgroundColor: `${typeConfig?.color || '#6366f1'}15` }}
+                          >
+                            <Icon
+                              className="h-4 w-4"
+                              style={{ color: typeConfig?.color || '#6366f1' }}
+                            />
+                          </div>
+                          <h2 className="text-lg font-semibold">
+                            {typeConfig?.label || 'Другое'}
+                          </h2>
+                          <Badge variant="secondary">{typeAssets.length}</Badge>
+                        </div>
+                      )}
+
+                      <motion.div
+                        className={
+                          viewMode === 'grid'
+                            ? 'grid gap-4 sm:grid-cols-2 lg:grid-cols-3'
+                            : 'space-y-2'
+                        }
+                        variants={container}
+                        initial="hidden"
+                        animate="show"
+                      >
+                        {typeAssets.map((asset) => (
+                          <motion.div key={asset.id} variants={item}>
+                            <AssetCard
+                              asset={asset}
+                              onEdit={() => handleEdit(asset)}
+                              onDelete={() => handleDelete(asset.id)}
+                              onUpdatePrice={() => handleUpdatePrice(asset)}
+                            />
+                          </motion.div>
+                        ))}
+                      </motion.div>
+                    </motion.section>
+                  )
+                })}
+            </div>
+          )}
+        </AnimatePresence>
       )}
 
       {/* Asset Dialogs */}
@@ -434,38 +529,6 @@ export default function AssetsPage() {
         asset={priceAsset}
         open={priceDialogOpen}
         onOpenChange={setPriceDialogOpen}
-      />
-
-      {/* Deposit Dialogs */}
-      <DepositDetailsSheet
-        deposit={selectedDeposit}
-        open={isDepositDetailsOpen}
-        onOpenChange={setIsDepositDetailsOpen}
-        onEdit={() => selectedDeposit && handleDepositEdit(selectedDeposit)}
-        onDelete={() => selectedDeposit && handleDepositDelete(selectedDeposit)}
-        onCloseEarly={
-          selectedDeposit?.status === 'active'
-            ? () => handleDepositCloseEarly(selectedDeposit)
-            : undefined
-        }
-      />
-
-      <EditDepositDialog
-        deposit={selectedDeposit}
-        open={isDepositEditOpen}
-        onOpenChange={setIsDepositEditOpen}
-      />
-
-      <CloseDepositDialog
-        deposit={selectedDeposit}
-        open={isDepositCloseOpen}
-        onOpenChange={setIsDepositCloseOpen}
-      />
-
-      <DeleteDepositDialog
-        deposit={selectedDeposit}
-        open={isDepositDeleteOpen}
-        onOpenChange={setIsDepositDeleteOpen}
       />
     </div>
   )

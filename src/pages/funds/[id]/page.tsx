@@ -24,6 +24,12 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
@@ -49,10 +55,9 @@ import {
   Plus,
   ArrowRightLeft,
   Banknote,
-  LineChart,
   Landmark,
-  ChevronRight,
-  Sparkles,
+  MoreVertical,
+  Info,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -70,7 +75,9 @@ import {
   FundTransactionsHistory,
   SetInitialBalanceDialog,
 } from '@/features/funds'
-import type { FundStatus, RuleType, FundBalance, FundAssetBalance } from '@/lib/api/types'
+import { CreateDepositDialog, useDeposits } from '@/features/deposits'
+import type { FundStatus, RuleType, FundBalance, FundAssetBalance, Deposit } from '@/lib/api/types'
+import { getBankByName } from '@/lib/banks'
 
 const FUND_ICONS = [
   { value: 'trending-up', icon: TrendingUp, label: 'Инвестиции' },
@@ -103,10 +110,11 @@ const FUND_COLORS = [
 // Asset type configuration for grouping
 const ASSET_TYPE_CONFIG: Record<string, { label: string; icon: typeof Banknote; color: string }> = {
   currency: { label: 'Валюта', icon: Banknote, color: '#10b981' },
-  etf: { label: 'ETF', icon: LineChart, color: '#8b5cf6' },
+  deposit: { label: 'Депозиты', icon: Landmark, color: '#f59e0b' },
+  etf: { label: 'ETF', icon: TrendingUp, color: '#8b5cf6' },
   stock: { label: 'Акции', icon: TrendingUp, color: '#3b82f6' },
-  bond: { label: 'Облигации', icon: Landmark, color: '#f59e0b' },
-  crypto: { label: 'Криптовалюта', icon: Sparkles, color: '#ec4899' },
+  bond: { label: 'Облигации', icon: Landmark, color: '#06b6d4' },
+  crypto: { label: 'Криптовалюта', icon: Wallet, color: '#ec4899' },
   other: { label: 'Другое', icon: Wallet, color: '#6b7280' },
 }
 
@@ -178,10 +186,12 @@ const assetCardVariants = {
 interface AssetGroupProps {
   typeCode: string
   assets: FundAssetBalance[]
-  onAssetClick: (asset: FundAssetBalance) => void
+  onShowHistory: (asset: FundAssetBalance) => void
+  onViewDetails: (asset: FundAssetBalance) => void
+  depositsByAssetId?: Map<string, Deposit>
 }
 
-function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
+function AssetGroup({ typeCode, assets, onShowHistory, onViewDetails, depositsByAssetId }: AssetGroupProps) {
   const config = ASSET_TYPE_CONFIG[typeCode] || ASSET_TYPE_CONFIG.other
   const Icon = config.icon
   const totalValue = assets.reduce((sum, a) => sum + a.valueBase, 0)
@@ -219,8 +229,7 @@ function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
             key={asset.asset.id}
             variants={assetCardVariants}
             custom={index}
-            className="group flex items-center justify-between rounded-xl bg-muted/40 p-3 cursor-pointer transition-all hover:bg-muted/60 hover:shadow-sm"
-            onClick={() => onAssetClick(asset)}
+            className="group flex items-center justify-between rounded-xl bg-muted/40 p-3 transition-all hover:bg-muted/60 hover:shadow-sm"
           >
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
@@ -230,9 +239,28 @@ function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
                     {asset.asset.ticker}
                   </Badge>
                 )}
+                {/* Show bank info for deposits */}
+                {typeCode === 'deposit' && depositsByAssetId?.get(asset.asset.id)?.bank && (() => {
+                  const deposit = depositsByAssetId.get(asset.asset.id)
+                  const bank = deposit?.bank ? getBankByName(deposit.bank) : undefined
+                  return (
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      {bank ? (
+                        <img
+                          src={bank.logo}
+                          alt={bank.name}
+                          className="h-4 w-4 shrink-0 object-contain"
+                        />
+                      ) : (
+                        <Landmark className="h-3 w-3" />
+                      )}
+                      <span>{deposit?.bank}</span>
+                    </div>
+                  )
+                })()}
               </div>
               <p className="text-xs text-muted-foreground">
-                {typeCode === 'currency'
+                {typeCode === 'currency' || typeCode === 'deposit'
                   ? `${formatMoney(asset.amount)} ${getCurrencySymbol(asset.asset.currency)}`
                   : `${asset.amount} шт. × ${formatPrice(asset.amount > 0 ? asset.valueBase / asset.amount : 0)} ₽`
                 }
@@ -241,18 +269,49 @@ function AssetGroup({ typeCode, assets, onAssetClick }: AssetGroupProps) {
             <div className="flex items-center gap-2">
               <div className="text-right">
                 <p className="font-semibold tabular-nums">
-                  {typeCode === 'currency'
+                  {typeCode === 'currency' || typeCode === 'deposit'
                     ? `${formatMoney(asset.amount)} ${getCurrencySymbol(asset.asset.currency)}`
                     : `${formatMoney(asset.valueBase)} ₽`
                   }
                 </p>
-                {typeCode === 'currency' && asset.asset.currency !== 'RUB' && (
+                {(typeCode === 'currency' || typeCode === 'deposit') && asset.asset.currency !== 'RUB' && (
                   <p className="text-xs text-muted-foreground">
                     ≈ {formatMoney(asset.valueBase)} ₽
                   </p>
                 )}
               </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+
+              {/* Actions Menu */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <MoreVertical className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => onShowHistory(asset)}>
+                    <History className="mr-2 h-4 w-4" />
+                    История операций
+                  </DropdownMenuItem>
+                  {typeCode === 'deposit' && (
+                    <DropdownMenuItem onClick={() => onViewDetails(asset)}>
+                      <Info className="mr-2 h-4 w-4" />
+                      Подробнее
+                    </DropdownMenuItem>
+                  )}
+                  {typeCode !== 'deposit' && typeCode !== 'currency' && (
+                    <DropdownMenuItem onClick={() => onViewDetails(asset)}>
+                      <Info className="mr-2 h-4 w-4" />
+                      Информация об активе
+                    </DropdownMenuItem>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </motion.div>
         ))}
@@ -272,6 +331,7 @@ export default function FundDetailsPage() {
   const [depositFromAccountOpen, setDepositFromAccountOpen] = useState(false)
   const [transferAssetOpen, setTransferAssetOpen] = useState(false)
   const [setInitialBalanceOpen, setSetInitialBalanceOpen] = useState(false)
+  const [createDepositOpen, setCreateDepositOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('overview')
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null)
   const [selectedAssetName, setSelectedAssetName] = useState<string | null>(null)
@@ -282,8 +342,32 @@ export default function FundDetailsPage() {
   const createRule = useCreateDistributionRule()
   const updateRule = useUpdateDistributionRule()
   const deleteRule = useDeleteDistributionRule()
+  // Fetch all deposits to create asset ID -> deposit ID mapping
+  const { data: depositsData } = useDeposits()
 
   const activeRule = rulesData?.data?.find((r) => r.is_active)
+
+  // Create mapping from asset ID to deposit ID
+  const assetIdToDepositId = useMemo(() => {
+    const map = new Map<string, string>()
+    if (depositsData?.data) {
+      depositsData.data.forEach((deposit) => {
+        map.set(deposit.assetId, deposit.id)
+      })
+    }
+    return map
+  }, [depositsData])
+
+  // Create mapping from asset ID to full deposit data (for bank info display)
+  const depositsByAssetId = useMemo(() => {
+    const map = new Map<string, Deposit>()
+    if (depositsData?.data) {
+      depositsData.data.forEach((deposit) => {
+        map.set(deposit.assetId, deposit)
+      })
+    }
+    return map
+  }, [depositsData])
 
   const fundData = fund?.fund
   const totalBase = fund?.totalBase ?? 0
@@ -303,7 +387,7 @@ export default function FundDetailsPage() {
     })
 
     // Sort groups by predefined order
-    const order = ['currency', 'etf', 'stock', 'bond', 'crypto', 'other']
+    const order = ['currency', 'deposit', 'etf', 'stock', 'bond', 'crypto', 'other']
     const sortedEntries = Object.entries(groups).sort(([a], [b]) => {
       const indexA = order.indexOf(a) === -1 ? 999 : order.indexOf(a)
       const indexB = order.indexOf(b) === -1 ? 999 : order.indexOf(b)
@@ -422,10 +506,26 @@ export default function FundDetailsPage() {
     }
   }
 
-  const handleAssetClick = (asset: FundAssetBalance) => {
+  const handleShowHistory = (asset: FundAssetBalance) => {
     setSelectedAssetId(asset.asset.id)
     setSelectedAssetName(asset.asset.name)
     setActiveTab('history')
+  }
+
+  const handleViewDetails = (asset: FundAssetBalance) => {
+    // For deposits, navigate to the deposit details page
+    if (asset.asset.typeCode === 'deposit') {
+      const depositId = assetIdToDepositId.get(asset.asset.id)
+      if (depositId) {
+        navigate(`/deposits/${depositId}`)
+      } else {
+        // Fallback: show history if deposit not found
+        handleShowHistory(asset)
+      }
+    } else {
+      // For other assets, show history for now
+      handleShowHistory(asset)
+    }
   }
 
   if (!id) {
@@ -651,6 +751,15 @@ export default function FundDetailsPage() {
                   size="sm"
                   variant="outline"
                   className="gap-1.5 bg-background/50 backdrop-blur-sm"
+                  onClick={() => setCreateDepositOpen(true)}
+                >
+                  <Landmark className="h-4 w-4" />
+                  Открыть депозит
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-1.5 bg-background/50 backdrop-blur-sm"
                   onClick={() => setDepositFromAccountOpen(true)}
                 >
                   <Plus className="h-4 w-4" />
@@ -737,7 +846,9 @@ export default function FundDetailsPage() {
                           key={typeCode}
                           typeCode={typeCode}
                           assets={typeAssets}
-                          onAssetClick={handleAssetClick}
+                          onShowHistory={handleShowHistory}
+                          onViewDetails={handleViewDetails}
+                          depositsByAssetId={depositsByAssetId}
                         />
                       ))}
                     </motion.div>
@@ -1249,6 +1360,12 @@ export default function FundDetailsPage() {
         fund={fundBalance}
         open={setInitialBalanceOpen}
         onOpenChange={setSetInitialBalanceOpen}
+      />
+      <CreateDepositDialog
+        fundId={fundData.id}
+        fundName={fundData.name}
+        open={createDepositOpen}
+        onOpenChange={setCreateDepositOpen}
       />
     </div>
   )

@@ -61,8 +61,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
-import { useCreateDeposit } from '../hooks'
-import { useFunds } from '@/features/funds/hooks'
+import { BankCombobox } from '@/components/ui/bank-combobox'
+import { useCreateDeposit, useMigrateDeposit } from '../hooks'
+import { useFunds, useFundCurrencyAssets } from '@/features/funds/hooks'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, CheckCircle2, Upload } from 'lucide-react'
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 const CURRENCIES = [
   { value: 'RUB', label: 'Рубль', symbol: '₽' },
@@ -112,13 +116,19 @@ const formSchema = z.object({
   accrualPeriod: z.enum(['monthly', 'quarterly', 'annually', 'at_maturity']),
   hasCapitalization: z.boolean(),
   startDate: z.date({ message: 'Выберите дату открытия' }),
+  maturityDate: z.date().optional(),
+  bank: z.string().optional(),
   notes: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
 
 interface CreateDepositDialogProps {
-  children: React.ReactNode
+  children?: React.ReactNode
+  fundId?: string
+  fundName?: string
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 // Animated number display component
@@ -139,17 +149,34 @@ function AnimatedValue({ value, suffix = '' }: { value: number; suffix?: string 
   )
 }
 
-export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
-  const [open, setOpen] = useState(false)
+export function CreateDepositDialog({
+  children,
+  fundId: preselectedFundId,
+  fundName: preselectedFundName,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+}: CreateDepositDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
   const [step, setStep] = useState(1)
+  const [isMigrationMode, setIsMigrationMode] = useState(false)
   const createDeposit = useCreateDeposit()
-  const { data: fundsData, isLoading: isLoadingFunds } = useFunds({ status: 'active' })
+  const migrateDeposit = useMigrateDeposit()
+
+  // Support both controlled and uncontrolled modes
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = isControlled ? (controlledOnOpenChange ?? (() => {})) : setInternalOpen
+
+  // Only fetch funds if no preselected fund
+  const { data: fundsData, isLoading: isLoadingFunds } = useFunds(
+    preselectedFundId ? undefined : { status: 'active' }
+  )
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: '',
-      fundId: '',
+      fundId: preselectedFundId || '',
       currency: 'RUB',
       principalAmount: '',
       interestRate: '',
@@ -157,11 +184,31 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
       accrualPeriod: 'monthly',
       hasCapitalization: true,
       startDate: new Date(),
+      maturityDate: undefined,
+      bank: '',
       notes: '',
     },
   })
 
+  const watchedFundId = form.watch('fundId')
+  const watchedCurrency = form.watch('currency')
+
+  // Fetch currency assets for the selected fund
+  const { data: currencyAssetsData } = useFundCurrencyAssets(
+    watchedFundId || preselectedFundId || ''
+  )
+
   const watchedValues = form.watch()
+
+  // Get available balance for the selected currency in the fund
+  const currencyAsset = currencyAssetsData?.data?.find(
+    (asset) => asset?.asset?.currency === watchedCurrency
+  )
+  const availableBalance = currencyAsset?.amount || 0
+
+  // Check if there's insufficient funds (only in create mode, not migration)
+  const principalAmount = parseFloat(watchedValues.principalAmount) || 0
+  const hasInsufficientFunds = !isMigrationMode && principalAmount > 0 && principalAmount > availableBalance
 
   // Calculate projected yield
   const projectedYield = useMemo(() => {
@@ -216,20 +263,41 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
 
   async function onSubmit(values: FormValues) {
     try {
-      await createDeposit.mutateAsync({
-        name: values.name,
-        fundId: values.fundId,
-        currency: values.currency,
-        principalAmount: parseFloat(values.principalAmount),
-        interestRate: parseFloat(values.interestRate),
-        termMonths: parseInt(values.termMonths),
-        accrualPeriod: values.accrualPeriod,
-        hasCapitalization: values.hasCapitalization,
-        startDate: format(values.startDate, 'yyyy-MM-dd'),
-        notes: values.notes || undefined,
-      })
+      if (isMigrationMode) {
+        // Режим миграции - используем currentAmount вместо principalAmount
+        await migrateDeposit.mutateAsync({
+          name: values.name,
+          fundId: values.fundId,
+          currency: values.currency,
+          currentAmount: parseFloat(values.principalAmount),
+          interestRate: parseFloat(values.interestRate),
+          termMonths: parseInt(values.termMonths),
+          accrualPeriod: values.accrualPeriod,
+          hasCapitalization: values.hasCapitalization,
+          startDate: format(values.startDate, 'yyyy-MM-dd'),
+          maturityDate: values.maturityDate ? format(values.maturityDate, 'yyyy-MM-dd') : undefined,
+          bank: values.bank || undefined,
+          notes: values.notes || undefined,
+        })
+      } else {
+        // Обычный режим создания
+        await createDeposit.mutateAsync({
+          name: values.name,
+          fundId: values.fundId,
+          currency: values.currency,
+          principalAmount: parseFloat(values.principalAmount),
+          interestRate: parseFloat(values.interestRate),
+          termMonths: parseInt(values.termMonths),
+          accrualPeriod: values.accrualPeriod,
+          hasCapitalization: values.hasCapitalization,
+          startDate: format(values.startDate, 'yyyy-MM-dd'),
+          bank: values.bank || undefined,
+          notes: values.notes || undefined,
+        })
+      }
       form.reset()
       setStep(1)
+      setIsMigrationMode(false)
       setOpen(false)
     } catch {
       // Error is handled in mutation
@@ -242,13 +310,27 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
     setOpen(isOpen)
     if (!isOpen) {
       setStep(1)
-      form.reset()
+      setIsMigrationMode(false)
+      form.reset({
+        name: '',
+        fundId: preselectedFundId || '',
+        currency: 'RUB',
+        principalAmount: '',
+        interestRate: '',
+        termMonths: '12',
+        accrualPeriod: 'monthly',
+        hasCapitalization: true,
+        startDate: new Date(),
+        maturityDate: undefined,
+        bank: '',
+        notes: '',
+      })
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {children && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="max-h-[92vh] overflow-hidden p-0 sm:max-w-[680px] gap-0 border-border/50 shadow-2xl">
         {/* Premium Header with gradient */}
         <div className="relative overflow-hidden">
@@ -257,7 +339,7 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
           <div className="absolute -top-24 -right-24 h-48 w-48 rounded-full bg-primary/10 blur-3xl" />
           <div className="absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-amber-500/10 blur-2xl" />
 
-          <DialogHeader className="relative px-6 pt-6 pb-4">
+          <DialogHeader className="relative px-6 pt-6 pb-4 space-y-3">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <motion.div
@@ -271,10 +353,12 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                 </motion.div>
                 <div className="space-y-1">
                   <DialogTitle className="text-xl font-semibold tracking-tight">
-                    Новый депозит
+                    {isMigrationMode ? 'Миграция депозита' : 'Новый депозит'}
                   </DialogTitle>
                   <DialogDescription className="text-sm">
-                    Добавьте банковский вклад с автоматическим расчётом
+                    {isMigrationMode
+                      ? 'Импорт существующего депозита без проверки баланса'
+                      : 'Добавьте банковский вклад с автоматическим расчётом'}
                   </DialogDescription>
                 </div>
               </div>
@@ -296,6 +380,35 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                 ))}
               </div>
             </div>
+
+            {/* Mode Toggle */}
+            <Tabs
+              value={isMigrationMode ? 'migrate' : 'create'}
+              onValueChange={(value) => setIsMigrationMode(value === 'migrate')}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="create" className="gap-2">
+                  <Landmark className="h-4 w-4" />
+                  Создать новый
+                </TabsTrigger>
+                <TabsTrigger value="migrate" className="gap-2">
+                  <Upload className="h-4 w-4" />
+                  Мигрировать
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Migration mode warning */}
+            {isMigrationMode && (
+              <Alert className="border-amber-500/50 bg-amber-500/10">
+                <AlertCircle className="h-4 w-4 text-amber-500" />
+                <AlertDescription className="text-sm text-amber-700 dark:text-amber-400">
+                  Режим миграции не проверяет баланс фонда. Используйте для импорта существующих
+                  депозитов.
+                </AlertDescription>
+              </Alert>
+            )}
           </DialogHeader>
         </div>
 
@@ -337,52 +450,94 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                       )}
                     />
 
-                    {/* Fund Selection - Card Style */}
+                    {/* Bank - With dropdown and icons */}
                     <FormField
                       control={form.control}
-                      name="fundId"
+                      name="bank"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                            Привязка к фонду
+                            Банк
+                            <span className="ml-2 text-muted-foreground/50 normal-case tracking-normal">
+                              (опционально)
+                            </span>
                           </FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                            disabled={isLoadingFunds}
-                          >
-                            <FormControl>
-                              <SelectTrigger className="h-12 bg-muted/30 border-muted-foreground/10 transition-all hover:bg-muted/50 focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
-                                <SelectValue placeholder="Выберите фонд" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {fundsData?.data.map((fundBalance) => {
-                                const FundIcon = FUND_ICONS[fundBalance.fund.icon] || Wallet
-                                return (
-                                  <SelectItem
-                                    key={fundBalance.fund.id}
-                                    value={fundBalance.fund.id}
-                                    className="py-3"
-                                  >
-                                    <div className="flex items-center gap-3">
-                                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
-                                        <FundIcon className="h-4 w-4 text-primary" />
-                                      </div>
-                                      <span className="font-medium">{fundBalance.fund.name}</span>
-                                    </div>
-                                  </SelectItem>
-                                )
-                              })}
-                            </SelectContent>
-                          </Select>
+                          <FormControl>
+                            <BankCombobox
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              placeholder="Выберите банк..."
+                              className="h-12 bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all"
+                            />
+                          </FormControl>
                           <FormDescription className="text-xs">
-                            Депозит отобразится как актив выбранного фонда
+                            Выберите из списка или введите свой
                           </FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
+
+                    {/* Fund Selection - Card Style (hidden if preselected) */}
+                    {preselectedFundId ? (
+                      <div className="space-y-2">
+                        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                          Фонд
+                        </p>
+                        <div className="flex items-center gap-3 h-12 px-4 rounded-md bg-muted/30 border border-muted-foreground/10">
+                          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                            <Wallet className="h-4 w-4 text-primary" />
+                          </div>
+                          <span className="font-medium">{preselectedFundName}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <FormField
+                        control={form.control}
+                        name="fundId"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                              Привязка к фонду
+                            </FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              disabled={isLoadingFunds}
+                            >
+                              <FormControl>
+                                <SelectTrigger className="h-12 bg-muted/30 border-muted-foreground/10 transition-all hover:bg-muted/50 focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20">
+                                  <SelectValue placeholder="Выберите фонд" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {fundsData?.data.map((fundBalance) => {
+                                  const FundIcon = FUND_ICONS[fundBalance.fund.icon] || Wallet
+                                  return (
+                                    <SelectItem
+                                      key={fundBalance.fund.id}
+                                      value={fundBalance.fund.id}
+                                      className="py-3"
+                                    >
+                                      <div className="flex items-center gap-3">
+                                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                                          <FundIcon className="h-4 w-4 text-primary" />
+                                        </div>
+                                        <span className="font-medium">{fundBalance.fund.name}</span>
+                                      </div>
+                                    </SelectItem>
+                                  )
+                                })}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription className="text-xs">
+                              Депозит отобразится как актив выбранного фонда
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
 
                     {/* Currency Selection - Visual Cards */}
                     <FormField
@@ -426,6 +581,56 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                       )}
                     />
 
+                    {/* Available Balance Display - только в режиме создания */}
+                    <AnimatePresence mode="wait">
+                      {!isMigrationMode && watchedCurrency && availableBalance >= 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <Alert className={cn(
+                            availableBalance === 0
+                              ? 'border-amber-500/50 bg-amber-500/10'
+                              : 'border-emerald-500/50 bg-emerald-500/10'
+                          )}>
+                            {availableBalance === 0 ? (
+                              <AlertCircle className="h-4 w-4 text-amber-500" />
+                            ) : (
+                              <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                            )}
+                            <AlertDescription className={cn(
+                              'text-sm',
+                              availableBalance === 0
+                                ? 'text-amber-700 dark:text-amber-400'
+                                : 'text-emerald-700 dark:text-emerald-400'
+                            )}>
+                              {availableBalance === 0 ? (
+                                <>
+                                  В фонде нет валютного актива {watchedCurrency}.{' '}
+                                  <span className="font-medium">
+                                    Сначала пополните фонд через перевод со счёта.
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  Доступно в фонде:{' '}
+                                  <span className="font-semibold tabular-nums">
+                                    {availableBalance.toLocaleString('ru-RU', {
+                                      minimumFractionDigits: 2,
+                                      maximumFractionDigits: 2,
+                                    })}{' '}
+                                    {watchedCurrency}
+                                  </span>
+                                </>
+                              )}
+                            </AlertDescription>
+                          </Alert>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
                     {/* Amount and Rate - Premium Grid */}
                     <div className="grid grid-cols-2 gap-4">
                       <FormField
@@ -435,7 +640,7 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                           <FormItem>
                             <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                               <Banknote className="h-3.5 w-3.5" />
-                              Сумма вклада
+                              {isMigrationMode ? 'Текущая сумма депозита' : 'Сумма вклада'}
                             </FormLabel>
                             <FormControl>
                               <div className="relative">
@@ -443,7 +648,11 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                                   type="number"
                                   step="0.01"
                                   placeholder="100 000"
-                                  className="h-12 bg-muted/30 border-muted-foreground/10 pr-10 text-lg font-semibold tabular-nums transition-all focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
+                                  className={cn(
+                                    'h-12 bg-muted/30 border-muted-foreground/10 pr-10 text-lg font-semibold tabular-nums transition-all focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20',
+                                    hasInsufficientFunds &&
+                                      'border-destructive/50 focus:border-destructive/50 focus:ring-destructive/20'
+                                  )}
                                   {...field}
                                 />
                                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-lg font-bold text-muted-foreground">
@@ -451,6 +660,14 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                                 </span>
                               </div>
                             </FormControl>
+                            {hasInsufficientFunds && (
+                              <p className="text-sm text-destructive">
+                                Недостаточно средств. Доступно: {availableBalance.toLocaleString('ru-RU', {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2,
+                                })} {watchedCurrency}
+                              </p>
+                            )}
                             <FormMessage />
                           </FormItem>
                         )}
@@ -623,53 +840,107 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                       )}
                     />
 
-                    {/* Start Date - Premium Calendar */}
-                    <FormField
-                      control={form.control}
-                      name="startDate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                            <CalendarIcon className="h-3.5 w-3.5" />
-                            Дата открытия вклада
-                          </FormLabel>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button
-                                  variant="outline"
-                                  className={cn(
-                                    'w-full h-12 justify-start text-left font-normal bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all',
-                                    !field.value && 'text-muted-foreground'
-                                  )}
-                                >
-                                  <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
-                                  {field.value ? (
-                                    <span className="font-medium">
-                                      {format(field.value, 'd MMMM yyyy', { locale: ru })}
-                                    </span>
-                                  ) : (
-                                    <span>Выберите дату</span>
-                                  )}
-                                </Button>
-                              </FormControl>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value}
-                                onSelect={field.onChange}
-                                disabled={(date) =>
-                                  date > new Date() || date < new Date('2020-01-01')
-                                }
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                          <FormMessage />
-                        </FormItem>
+                    {/* Date Fields */}
+                    <div className={cn('grid gap-4', isMigrationMode ? 'grid-cols-2' : 'grid-cols-1')}>
+                      {/* Start Date - Premium Calendar */}
+                      <FormField
+                        control={form.control}
+                        name="startDate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                              <CalendarIcon className="h-3.5 w-3.5" />
+                              Дата открытия вклада
+                            </FormLabel>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <FormControl>
+                                  <Button
+                                    variant="outline"
+                                    className={cn(
+                                      'w-full h-12 justify-start text-left font-normal bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all',
+                                      !field.value && 'text-muted-foreground'
+                                    )}
+                                  >
+                                    <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
+                                    {field.value ? (
+                                      <span className="font-medium">
+                                        {format(field.value, 'd MMMM yyyy', { locale: ru })}
+                                      </span>
+                                    ) : (
+                                      <span>Выберите дату</span>
+                                    )}
+                                  </Button>
+                                </FormControl>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={field.value}
+                                  onSelect={field.onChange}
+                                  disabled={(date) =>
+                                    date > new Date() || date < new Date('2020-01-01')
+                                  }
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Maturity Date - Only in migration mode */}
+                      {isMigrationMode && (
+                        <FormField
+                          control={form.control}
+                          name="maturityDate"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+                                <CalendarIcon className="h-3.5 w-3.5" />
+                                Дата погашения (опц.)
+                              </FormLabel>
+                              <Popover>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button
+                                      variant="outline"
+                                      className={cn(
+                                        'w-full h-12 justify-start text-left font-normal bg-muted/30 border-muted-foreground/10 hover:bg-muted/50 transition-all',
+                                        !field.value && 'text-muted-foreground'
+                                      )}
+                                    >
+                                      <CalendarIcon className="mr-3 h-4 w-4 text-muted-foreground" />
+                                      {field.value ? (
+                                        <span className="font-medium">
+                                          {format(field.value, 'd MMMM yyyy', { locale: ru })}
+                                        </span>
+                                      ) : (
+                                        <span>Авто-расчёт</span>
+                                      )}
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-0" align="start">
+                                  <Calendar
+                                    mode="single"
+                                    selected={field.value}
+                                    onSelect={field.onChange}
+                                    disabled={(date) => date < new Date('2020-01-01')}
+                                    initialFocus
+                                  />
+                                </PopoverContent>
+                              </Popover>
+                              <FormDescription className="text-xs">
+                                Оставьте пустым для автоматического расчёта
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       )}
-                    />
+                    </div>
 
                     {/* Yield Preview */}
                     <AnimatePresence>
@@ -729,7 +1000,7 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                           </FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Банк, условия, особенности..."
+                              placeholder="Условия, особенности..."
                               className="resize-none bg-muted/30 border-muted-foreground/10 min-h-[80px] transition-all focus:bg-background focus:border-primary/50 focus:ring-2 focus:ring-primary/20"
                               {...field}
                             />
@@ -752,20 +1023,24 @@ export function CreateDepositDialog({ children }: CreateDepositDialogProps) {
                       <Button
                         type="submit"
                         className="flex-1 h-12 gap-2 text-base font-medium group relative overflow-hidden"
-                        disabled={createDeposit.isPending}
+                        disabled={
+                          isMigrationMode
+                            ? migrateDeposit.isPending
+                            : createDeposit.isPending || hasInsufficientFunds || availableBalance === 0
+                        }
                       >
-                        {createDeposit.isPending ? (
+                        {(isMigrationMode ? migrateDeposit.isPending : createDeposit.isPending) ? (
                           <>
                             <motion.div
                               animate={{ rotate: 360 }}
                               transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                               className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
                             />
-                            Создание...
+                            {isMigrationMode ? 'Миграция...' : 'Создание...'}
                           </>
                         ) : (
                           <>
-                            Создать депозит
+                            {isMigrationMode ? 'Мигрировать депозит' : 'Создать депозит'}
                             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                           </>
                         )}

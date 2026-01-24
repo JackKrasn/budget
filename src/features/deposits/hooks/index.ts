@@ -2,6 +2,7 @@ export {
   depositKeys,
   useDeposits,
   useDeposit,
+  useDepositByAssetId,
   useDepositAccruals,
   useDepositsSummary,
   useMaturingDeposits,
@@ -10,4 +11,5 @@ export {
   useDeleteDeposit,
   useCloseDepositEarly,
   useProcessAccruals,
+  useMigrateDeposit,
 } from './use-deposits'

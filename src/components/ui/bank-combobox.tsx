@@ -9,7 +9,6 @@ import {
   CommandGroup,
   CommandInput,
   CommandItem,
-  CommandList,
 } from '@/components/ui/command'
 import {
   Popover,
@@ -94,19 +93,22 @@ export function BankCombobox({
             onValueChange={handleInputChange}
             onKeyDown={handleKeyDown}
           />
-          <CommandList>
-            <CommandEmpty>
-              {inputValue ? (
-                <div className="py-2 px-3 text-sm">
-                  <p className="text-muted-foreground">Банк не найден.</p>
-                  <p className="text-muted-foreground">
-                    Нажмите <kbd className="rounded bg-muted px-1">Enter</kbd> чтобы использовать "{inputValue}"
-                  </p>
-                </div>
-              ) : (
-                <p className="py-2 text-sm text-muted-foreground">Начните вводить название</p>
-              )}
-            </CommandEmpty>
+          <CommandEmpty>
+            {inputValue ? (
+              <div className="py-2 px-3 text-sm">
+                <p className="text-muted-foreground">Банк не найден.</p>
+                <p className="text-muted-foreground">
+                  Нажмите <kbd className="rounded bg-muted px-1">Enter</kbd> чтобы использовать "{inputValue}"
+                </p>
+              </div>
+            ) : (
+              <p className="py-2 text-sm text-muted-foreground">Начните вводить название</p>
+            )}
+          </CommandEmpty>
+          <div
+            className="max-h-[300px] overflow-y-auto overscroll-contain"
+            onWheelCapture={(e) => e.stopPropagation()}
+          >
             <CommandGroup>
               {BANKS.filter((bank) => {
                 if (!inputValue) return true
@@ -138,7 +140,7 @@ export function BankCombobox({
                 </CommandItem>
               ))}
             </CommandGroup>
-          </CommandList>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>
