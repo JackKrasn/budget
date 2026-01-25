@@ -7,6 +7,8 @@ import type {
   CreateAssetRequest,
   UpdateAssetRequest,
   UpdateAssetPriceRequest,
+  AssetByFundParams,
+  AssetByFundResponse,
 } from './types'
 
 const ENDPOINT = '/assets'
@@ -44,4 +46,12 @@ export const assetsApi = {
    */
   updatePrice: (id: string, data: UpdateAssetPriceRequest) =>
     apiClient.post<Asset>(`${ENDPOINT}/${id}/price`, data),
+
+  /**
+   * Получить активы с информацией о фондах
+   * GET /assets/by-fund - все активы
+   * GET /assets/by-fund?asset_id=<uuid> - конкретный актив
+   */
+  byFund: (params?: AssetByFundParams) =>
+    apiClient.get<AssetByFundResponse>(`${ENDPOINT}/by-fund`, params),
 }

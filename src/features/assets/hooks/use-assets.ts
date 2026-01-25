@@ -5,6 +5,7 @@ import type {
   CreateAssetRequest,
   UpdateAssetRequest,
   UpdateAssetPriceRequest,
+  AssetByFundParams,
 } from '@/lib/api'
 import { toast } from 'sonner'
 
@@ -17,6 +18,7 @@ export const assetKeys = {
     params ? [...assetKeys.lists(), params] : assetKeys.lists(),
   details: () => [...assetKeys.all, 'detail'] as const,
   detail: (id: string) => [...assetKeys.details(), id] as const,
+  byFund: (assetId?: string) => [...assetKeys.all, 'by-fund', assetId] as const,
 }
 
 // === Hooks ===
@@ -117,5 +119,16 @@ export function useUpdateAssetPrice() {
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)
     },
+  })
+}
+
+/**
+ * Получить актив с информацией о фондах
+ */
+export function useAssetByFund(assetId?: string) {
+  return useQuery({
+    queryKey: assetKeys.byFund(assetId),
+    queryFn: () => assetsApi.byFund(assetId ? { asset_id: assetId } : undefined),
+    enabled: !!assetId,
   })
 }

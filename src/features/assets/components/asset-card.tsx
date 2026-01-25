@@ -42,6 +42,7 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 
 interface AssetCardProps {
   asset: AssetWithType
+  onClick?: () => void
   onEdit?: () => void
   onDelete?: () => void
   onUpdatePrice?: () => void
@@ -49,6 +50,7 @@ interface AssetCardProps {
 
 export function AssetCard({
   asset,
+  onClick,
   onEdit,
   onDelete,
   onUpdatePrice,
@@ -88,7 +90,10 @@ export function AssetCard({
       whileHover={{ y: -2 }}
       transition={{ duration: 0.2 }}
     >
-      <Card className="group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5">
+      <Card
+        className="group relative cursor-pointer overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5"
+        onClick={onClick}
+      >
         <CardContent className="relative p-5">
           {/* Header */}
           <div className="mb-4 flex items-start justify-between">
@@ -117,6 +122,7 @@ export function AssetCard({
                   variant="ghost"
                   size="icon"
                   className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                  onClick={(e) => e.stopPropagation()}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>

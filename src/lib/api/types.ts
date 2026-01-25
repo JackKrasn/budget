@@ -1495,3 +1495,45 @@ export interface UpdateFundDepositResponse {
   accountBalance?: BalanceChange
   fundBalance?: BalanceChange
 }
+
+// === Fund Deposits Grouped by Asset ===
+
+/** Информация о фонде с количеством актива */
+export interface FundAmount {
+  fundId: string
+  fundName: string
+  fundIcon: string | null
+  fundColor: string | null
+  amount: number
+  value: number
+}
+
+/** Актив, сгруппированный по фондам */
+export interface AssetGrouped {
+  assetId: string
+  assetName: string
+  assetTicker: string | null
+  assetCurrency: string
+  assetTypeName: string
+  currentPrice: number
+  totalAmount: number
+  totalValue: number
+  funds: FundAmount[]
+}
+
+/** Ответ API для группировки активов по фондам */
+export interface GroupedByAssetResponse {
+  data: AssetGrouped[]
+  total: number
+}
+
+/** Параметры запроса для /assets/by-fund */
+export interface AssetByFundParams {
+  asset_id?: string
+}
+
+/** Ответ API для /assets/by-fund */
+export interface AssetByFundResponse {
+  data: AssetGrouped[]
+  total: number
+}

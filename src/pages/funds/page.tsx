@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, Wallet, AlertCircle, Loader2 } from 'lucide-react'
+import { Plus, Wallet, AlertCircle, Loader2, Package } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import {
@@ -10,7 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { useFunds, useDeleteFund, FundCard, CreateFundDialog } from '@/features/funds'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useFunds, useDeleteFund, FundCard, CreateFundDialog, AssetsByFundList } from '@/features/funds'
 import type { FundBalance } from '@/lib/api/types'
 
 const CURRENCY_OPTIONS = [
@@ -175,102 +176,123 @@ export default function FundsPage() {
         </div>
       )}
 
-      {/* Funds Content */}
-      {!isLoading && !error && (
-        <>
-          {/* Active Funds */}
-          {activeFunds.length > 0 ? (
-            <motion.div
-              className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-              variants={container}
-              initial="hidden"
-              animate="show"
-            >
-              {activeFunds.map((fund) => (
-                <motion.div key={fund.fund.id} variants={item}>
-                  <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
+      {/* Tabs for Funds and Assets */}
+      <Tabs defaultValue="funds" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="funds" className="gap-2">
+            <Wallet className="h-4 w-4" />
+            Фонды
+          </TabsTrigger>
+          <TabsTrigger value="assets" className="gap-2">
+            <Package className="h-4 w-4" />
+            Активы
+          </TabsTrigger>
+        </TabsList>
+
+        {/* Funds Tab */}
+        <TabsContent value="funds">
+          {!isLoading && !error && (
+            <>
+              {/* Active Funds */}
+              {activeFunds.length > 0 ? (
+                <motion.div
+                  className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                  variants={container}
+                  initial="hidden"
+                  animate="show"
+                >
+                  {activeFunds.map((fund) => (
+                    <motion.div key={fund.fund.id} variants={item}>
+                      <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
+                    </motion.div>
+                  ))}
+
+                  {/* Add New Fund Card */}
+                  <motion.div variants={item}>
+                    <CreateFundDialog>
+                      <Card className="flex h-full min-h-[200px] cursor-pointer items-center justify-center border-dashed border-border/50 bg-card/30 transition-all hover:border-border hover:bg-card/50">
+                        <CardContent className="flex flex-col items-center gap-2 p-6 text-center">
+                          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
+                            <Plus className="h-6 w-6 text-muted-foreground" />
+                          </div>
+                          <p className="font-medium text-muted-foreground">Добавить фонд</p>
+                        </CardContent>
+                      </Card>
+                    </CreateFundDialog>
+                  </motion.div>
                 </motion.div>
-              ))}
+              ) : (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30"
+                >
+                  <Wallet className="h-12 w-12 text-muted-foreground/50" />
+                  <div className="text-center">
+                    <p className="font-medium">Нет фондов</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Создайте первый фонд для накопления
+                    </p>
+                  </div>
+                  <CreateFundDialog>
+                    <Button>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Создать фонд
+                    </Button>
+                  </CreateFundDialog>
+                </motion.div>
+              )}
 
-              {/* Add New Fund Card */}
-              <motion.div variants={item}>
-                <CreateFundDialog>
-                  <Card className="flex h-full min-h-[200px] cursor-pointer items-center justify-center border-dashed border-border/50 bg-card/30 transition-all hover:border-border hover:bg-card/50">
-                    <CardContent className="flex flex-col items-center gap-2 p-6 text-center">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-muted">
-                        <Plus className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                      <p className="font-medium text-muted-foreground">Добавить фонд</p>
-                    </CardContent>
-                  </Card>
-                </CreateFundDialog>
-              </motion.div>
-            </motion.div>
-          ) : (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30"
-            >
-              <Wallet className="h-12 w-12 text-muted-foreground/50" />
-              <div className="text-center">
-                <p className="font-medium">Нет фондов</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Создайте первый фонд для накопления
-                </p>
-              </div>
-              <CreateFundDialog>
-                <Button>
-                  <Plus className="mr-2 h-4 w-4" />
-                  Создать фонд
-                </Button>
-              </CreateFundDialog>
-            </motion.div>
-          )}
-
-          {/* Paused Funds */}
-          {pausedFunds.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium text-muted-foreground">
-                Приостановлены ({pausedFunds.length})
-              </h2>
-              <motion.div
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-                variants={container}
-                initial="hidden"
-                animate="show"
-              >
-                {pausedFunds.map((fund) => (
-                  <motion.div key={fund.fund.id} variants={item}>
-                    <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
+              {/* Paused Funds */}
+              {pausedFunds.length > 0 && (
+                <div className="mt-8 space-y-4">
+                  <h2 className="text-lg font-medium text-muted-foreground">
+                    Приостановлены ({pausedFunds.length})
+                  </h2>
+                  <motion.div
+                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                    variants={container}
+                    initial="hidden"
+                    animate="show"
+                  >
+                    {pausedFunds.map((fund) => (
+                      <motion.div key={fund.fund.id} variants={item}>
+                        <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
+                      </motion.div>
+                    ))}
                   </motion.div>
-                ))}
-              </motion.div>
-            </div>
-          )}
+                </div>
+              )}
 
-          {/* Completed Funds */}
-          {completedFunds.length > 0 && (
-            <div className="space-y-4">
-              <h2 className="text-lg font-medium text-muted-foreground">
-                Завершены ({completedFunds.length})
-              </h2>
-              <motion.div
-                className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
-                variants={container}
-                initial="hidden"
-                animate="show"
-              >
-                {completedFunds.map((fund) => (
-                  <motion.div key={fund.fund.id} variants={item}>
-                    <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
+              {/* Completed Funds */}
+              {completedFunds.length > 0 && (
+                <div className="mt-8 space-y-4">
+                  <h2 className="text-lg font-medium text-muted-foreground">
+                    Завершены ({completedFunds.length})
+                  </h2>
+                  <motion.div
+                    className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+                    variants={container}
+                    initial="hidden"
+                    animate="show"
+                  >
+                    {completedFunds.map((fund) => (
+                      <motion.div key={fund.fund.id} variants={item}>
+                        <FundCard fund={fund} onDelete={() => handleDelete(fund)} />
+                      </motion.div>
+                    ))}
                   </motion.div>
-                ))}
-              </motion.div>
-            </div>
+                </div>
+              )}
+            </>
           )}
-        </>
-      )}
+        </TabsContent>
+
+        {/* Assets Tab */}
+        <TabsContent value="assets">
+          <AssetsByFundList />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
