@@ -15,6 +15,7 @@ export const fundDepositKeys = {
     params ? [...fundDepositKeys.lists(), params] : fundDepositKeys.lists(),
   details: () => [...fundDepositKeys.all, 'detail'] as const,
   detail: (id: string) => [...fundDepositKeys.details(), id] as const,
+  groupedByAsset: () => [...fundDepositKeys.all, 'by-asset'] as const,
 }
 
 // === Hooks ===
@@ -26,6 +27,16 @@ export function useFundDeposits(params?: ListFundDepositsParams) {
   return useQuery({
     queryKey: fundDepositKeys.list(params),
     queryFn: () => fundDepositsApi.list(params),
+  })
+}
+
+/**
+ * Получить активы, сгруппированные по фондам
+ */
+export function useAssetsGroupedByFund() {
+  return useQuery({
+    queryKey: fundDepositKeys.groupedByAsset(),
+    queryFn: () => fundDepositsApi.groupedByAsset(),
   })
 }
 
