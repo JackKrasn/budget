@@ -72,14 +72,15 @@ export function DepositToFundDialog({
   // Мемоизируем валютные активы чтобы избежать бесконечного цикла в useEffect
   const currencyAssets = useMemo(() => {
     // Используем валютные активы из API фонда, либо из активов фонда, либо все доступные валютные активы
+    // ВАЖНО: фильтруем только по typeCode === 'currency', чтобы исключить депозитные активы
     const apiFundCurrencyAssets = (currencyAssetsData?.data ?? []).filter(
-      (a) => a?.asset?.id != null
+      (a) => a?.asset?.id != null && a.asset.typeCode === 'currency'
     )
     const fundCurrencyAssets = (fund?.assets ?? []).filter(
       (a) => a?.asset?.id != null && a.asset.typeCode === 'currency'
     )
     const allCurrencyAssets = (allAssetsData?.data ?? []).filter(
-      (a) => a?.id != null
+      (a) => a?.id != null && a.typeCode === 'currency'
     )
 
     // Если в фонде есть активы - используем их, иначе показываем все доступные валютные активы
