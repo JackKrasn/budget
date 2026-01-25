@@ -216,10 +216,15 @@ export function useMigrateDeposit() {
 
   return useMutation({
     mutationFn: (data: MigrateDepositRequest) => depositsApi.migrate(data),
-    onSuccess: async () => {
-      await queryClient.refetchQueries({ queryKey: depositKeys.lists() })
+    onSuccess: async (_, variables) => {
+      // Refetch данные депозитов и фонда чтобы UI обновился сразу
+      await Promise.all([
+        queryClient.refetchQueries({ queryKey: depositKeys.lists() }),
+        queryClient.refetchQueries({ queryKey: fundKeys.detail(variables.fundId) }),
+      ])
       queryClient.invalidateQueries({ queryKey: depositKeys.summary() })
       queryClient.invalidateQueries({ queryKey: fundKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
       toast.success('Депозит успешно мигрирован')
     },
     onError: (error) => {
