@@ -32,6 +32,7 @@ import {
   CreateAssetDialog,
   EditAssetDialog,
   UpdatePriceDialog,
+  AssetDetailDialog,
 } from '@/features/assets'
 import { cn } from '@/lib/utils'
 import type { AssetWithType } from '@/lib/api/types'
@@ -163,6 +164,8 @@ export default function AssetsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [priceAsset, setPriceAsset] = useState<AssetWithType | null>(null)
   const [priceDialogOpen, setPriceDialogOpen] = useState(false)
+  const [detailAsset, setDetailAsset] = useState<AssetWithType | null>(null)
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false)
 
   // Fetch data
   const { data: assetsData, isLoading, error } = useAssets()
@@ -233,6 +236,11 @@ export default function AssetsPage() {
     if (confirm('Вы уверены, что хотите удалить этот актив?')) {
       deleteAsset.mutate(id)
     }
+  }
+
+  const handleViewDetail = (asset: AssetWithType) => {
+    setDetailAsset(asset)
+    setDetailDialogOpen(true)
   }
 
   // Get available filter types (only those with items)
@@ -503,6 +511,7 @@ export default function AssetsPage() {
                           <motion.div key={asset.id} variants={item}>
                             <AssetCard
                               asset={asset}
+                              onClick={() => handleViewDetail(asset)}
                               onEdit={() => handleEdit(asset)}
                               onDelete={() => handleDelete(asset.id)}
                               onUpdatePrice={() => handleUpdatePrice(asset)}
@@ -529,6 +538,12 @@ export default function AssetsPage() {
         asset={priceAsset}
         open={priceDialogOpen}
         onOpenChange={setPriceDialogOpen}
+      />
+
+      <AssetDetailDialog
+        asset={detailAsset}
+        open={detailDialogOpen}
+        onOpenChange={setDetailDialogOpen}
       />
     </div>
   )

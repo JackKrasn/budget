@@ -13,3 +13,4 @@ export { DeleteTransactionResultDialog } from './delete-transaction-result-dialo
 export { DeleteContributionResultDialog } from './delete-contribution-result-dialog'
 export { ConfirmDeleteTransactionDialog } from './confirm-delete-transaction-dialog'
 export { EditFundTransactionDialog } from './edit-fund-transaction-dialog'
+export { AssetsByFundList } from './assets-by-fund-list'

@@ -6,6 +6,7 @@ import type {
   DeleteTransactionResponse,
   UpdateFundDepositRequest,
   UpdateFundDepositResponse,
+  GroupedByAssetResponse,
 } from './types'
 
 const ENDPOINT = '/fund-deposits'
@@ -32,4 +33,9 @@ export const fundDepositsApi = {
    * Удалить перевод в фонд (возвращает информацию об изменении балансов)
    */
   delete: (id: string) => apiClient.delete<DeleteTransactionResponse | null>(`${ENDPOINT}/${id}`),
+
+  /**
+   * Получить активы, сгруппированные по фондам
+   */
+  groupedByAsset: () => apiClient.get<GroupedByAssetResponse>(`${ENDPOINT}/by-asset`),
 }

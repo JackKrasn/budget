@@ -44,4 +44,5 @@ export {
   useFundDeposit,
   useUpdateFundDeposit,
   useDeleteFundDeposit,
+  useAssetsGroupedByFund,
 } from './use-fund-deposits'
