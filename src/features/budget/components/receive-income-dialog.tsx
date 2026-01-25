@@ -75,13 +75,14 @@ export function ReceiveIncomeDialog({
     },
   })
 
-  // При открытии заполняем ожидаемой суммой
+  // При открытии заполняем ожидаемой суммой и счётом по умолчанию из планового дохода
   useEffect(() => {
     if (income) {
       form.reset({
         actualAmount: String(income.expected_amount),
         actualDate: new Date(),
-        accountId: accounts[0]?.id ?? '',
+        // Используем счёт из планового дохода, если указан, иначе первый доступный
+        accountId: income.account_id ?? accounts[0]?.id ?? '',
       })
     }
   }, [income, form, accounts])

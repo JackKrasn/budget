@@ -183,6 +183,12 @@ export function AccountCard({
                 </div>
               </div>
             )}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Номер счёта</span>
+              <span className="font-mono text-xs text-muted-foreground">
+                {account.id.slice(0, 8)}...
+              </span>
+            </div>
           </div>
         </CardContent>
       </Card>

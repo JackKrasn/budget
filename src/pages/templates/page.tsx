@@ -18,6 +18,7 @@ import {
 } from '@/features/budget'
 import { useExpenseCategories } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
+import { useAccounts } from '@/features/accounts'
 import type { RecurringExpenseWithCategory, RecurringIncome, Fund } from '@/lib/api/types'
 
 export default function TemplatesPage() {
@@ -34,6 +35,7 @@ export default function TemplatesPage() {
   const { data: recurringIncomesData } = useRecurringIncomes()
   const { data: categoriesData } = useExpenseCategories()
   const { data: fundsData } = useFunds()
+  const { data: accountsData } = useAccounts()
 
   // Мутации для расходов
   const createRecurringExpense = useCreateRecurringExpense()
@@ -50,6 +52,7 @@ export default function TemplatesPage() {
   const categories = categoriesData?.data ?? []
   const fundsRaw = fundsData?.data ?? []
   const funds: Fund[] = fundsRaw.map((f) => f.fund)
+  const accounts = accountsData?.data ?? []
 
   // === Обработчики для расходов ===
   const handleAddExpense = () => {
@@ -83,6 +86,7 @@ export default function TemplatesPage() {
 
   const handleSubmitExpense = async (data: {
     categoryId: string
+    accountId?: string
     fundId?: string
     name: string
     amount: number
@@ -96,6 +100,7 @@ export default function TemplatesPage() {
           id: editingExpense.id,
           data: {
             categoryId: data.categoryId,
+            accountId: data.accountId,
             fundId: data.fundId,
             name: data.name,
             amount: data.amount,
@@ -213,6 +218,7 @@ export default function TemplatesPage() {
         onOpenChange={setExpenseDialogOpen}
         expense={editingExpense}
         categories={categories}
+        accounts={accounts}
         funds={funds}
         onSubmit={handleSubmitExpense}
         isPending={createRecurringExpense.isPending || updateRecurringExpense.isPending}

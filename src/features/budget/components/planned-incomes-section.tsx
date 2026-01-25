@@ -12,6 +12,7 @@ import {
   TrendingUp,
   ArrowUp,
   ArrowDown,
+  Wallet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -313,6 +314,12 @@ export function PlannedIncomesSection({
                       </div>
                       <div>
                         <p className="font-medium">{income.source}</p>
+                        {income.account_name && (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <Wallet className="h-3 w-3" />
+                            {income.account_name}
+                          </p>
+                        )}
                         {income.notes && (
                           <p className="text-xs text-muted-foreground">
                             {income.notes}

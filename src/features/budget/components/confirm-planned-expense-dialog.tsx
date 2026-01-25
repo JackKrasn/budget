@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -87,6 +88,18 @@ export function ConfirmPlannedExpenseDialog({
       notes: '',
     },
   })
+
+  // При открытии диалога подставляем счёт по умолчанию из планового расхода
+  useEffect(() => {
+    if (expense && open) {
+      form.reset({
+        actualAmount: '',
+        accountId: expense.account_id ?? '',
+        date: today,
+        notes: '',
+      })
+    }
+  }, [expense, open, form, today])
 
   const handleSubmit = async (data: FormData) => {
     const actualAmount = data.actualAmount ? parseFloat(data.actualAmount) : undefined

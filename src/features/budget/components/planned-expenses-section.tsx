@@ -11,6 +11,7 @@ import {
   Calendar,
   PiggyBank,
   Trash2,
+  Wallet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -276,6 +277,12 @@ export function PlannedExpensesSection({
                         <p className="text-xs text-muted-foreground">
                           {expense.category_name}
                         </p>
+                        {expense.account_name && (
+                          <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                            <Wallet className="h-3 w-3" />
+                            {expense.account_name}
+                          </p>
+                        )}
                         {getActualAmount(expense.funded_amount) && expense.fund_name ? (
                           <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                             <PiggyBank className="h-3 w-3" />

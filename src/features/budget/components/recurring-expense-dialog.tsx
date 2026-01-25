@@ -30,15 +30,18 @@ import {
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { CategoryIcon, FundIcon, DayPicker } from '@/components/common'
+import { AccountIcon } from '@/components/ui/account-icon'
 import type {
   RecurringExpenseWithCategory,
   ExpenseCategoryWithTags,
   Fund,
+  AccountWithType,
 } from '@/lib/api/types'
 
 const formSchema = z.object({
   name: z.string().min(1, 'Введите название'),
   categoryId: z.string().min(1, 'Выберите категорию'),
+  accountId: z.string().optional(),
   fundId: z.string().optional(),
   amount: z.string().min(1, 'Введите сумму'),
   dayOfMonth: z.string().min(1, 'Выберите день'),
@@ -52,9 +55,11 @@ interface RecurringExpenseDialogProps {
   onOpenChange: (open: boolean) => void
   expense?: RecurringExpenseWithCategory | null
   categories: ExpenseCategoryWithTags[]
+  accounts: AccountWithType[]
   funds: Fund[]
   onSubmit: (data: {
     categoryId: string
+    accountId?: string
     fundId?: string
     name: string
     amount: number
@@ -70,6 +75,7 @@ export function RecurringExpenseDialog({
   onOpenChange,
   expense,
   categories,
+  accounts,
   funds,
   onSubmit,
   isPending,
@@ -81,6 +87,7 @@ export function RecurringExpenseDialog({
     defaultValues: {
       name: '',
       categoryId: '',
+      accountId: '',
       fundId: '',
       amount: '',
       dayOfMonth: '1',
@@ -94,6 +101,7 @@ export function RecurringExpenseDialog({
       form.reset({
         name: expense.name,
         categoryId: expense.category_id,
+        accountId: expense.account_id ?? '',
         fundId: expense.fund_id ?? '',
         amount: String(expense.amount),
         dayOfMonth: String(expense.day_of_month),
@@ -103,6 +111,7 @@ export function RecurringExpenseDialog({
       form.reset({
         name: '',
         categoryId: '',
+        accountId: '',
         fundId: '',
         amount: '',
         dayOfMonth: '1',
@@ -114,6 +123,7 @@ export function RecurringExpenseDialog({
   const handleSubmit = async (data: FormData) => {
     await onSubmit({
       categoryId: data.categoryId,
+      accountId: data.accountId || undefined,
       fundId: data.fundId || undefined,
       name: data.name,
       amount: parseFloat(data.amount),
@@ -182,6 +192,45 @@ export function RecurringExpenseDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="accountId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Счёт списания (опционально)</FormLabel>
+                  <Select
+                    onValueChange={(value) => field.onChange(value === 'none' ? '' : value)}
+                    value={field.value || 'none'}
+                  >
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Не выбран" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="none">Не выбран</SelectItem>
+                      {accounts.map((account) => (
+                        <SelectItem key={account.id} value={account.id}>
+                          <div className="flex items-center gap-2">
+                            <AccountIcon
+                              bankName={account.bank_name}
+                              typeCode={account.type_code}
+                              size="sm"
+                            />
+                            <span>{account.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Счёт по умолчанию для оплаты расхода
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

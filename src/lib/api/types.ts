@@ -924,6 +924,8 @@ export interface PlannedIncome {
   id: UUID
   budget_id: UUID
   recurring_income_id?: UUID
+  account_id?: UUID
+  account_name?: string
   source: string
   expected_amount: number
   currency: string
@@ -939,6 +941,7 @@ export interface PlannedIncome {
 
 export interface CreatePlannedIncomeRequest {
   budgetId: string
+  accountId?: string
   source: string
   expectedAmount: number
   currency: string
@@ -947,6 +950,7 @@ export interface CreatePlannedIncomeRequest {
 }
 
 export interface UpdatePlannedIncomeRequest {
+  accountId?: string
   source?: string
   expectedAmount?: number
   currency?: string
