@@ -18,7 +18,6 @@ import {
   Trash2,
   ChevronRight,
   Shield,
-  Zap,
   CircleDollarSign,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -312,9 +311,6 @@ export default function DepositDetailsPage() {
       {/* Hero Card */}
       <motion.div variants={scaleVariants}>
         <Card className={`relative overflow-hidden border-0 bg-gradient-to-br from-card via-card to-card/80 shadow-2xl ${statusConfig.glow}`}>
-          {/* Status glow bar */}
-          <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${statusConfig.color}`} />
-
           {/* Decorative elements */}
           <div className="absolute top-0 right-0 w-96 h-96 bg-gradient-to-bl from-primary/5 via-transparent to-transparent rounded-full blur-3xl" />
           <div className="absolute bottom-0 left-0 w-64 h-64 bg-gradient-to-tr from-emerald-500/5 via-transparent to-transparent rounded-full blur-2xl" />
@@ -329,7 +325,6 @@ export default function DepositDetailsPage() {
                     initial={{ scale: 0, rotate: -180 }}
                     animate={{ scale: 1, rotate: 0 }}
                     transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
-                    className="relative"
                   >
                     <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-background to-muted/50 shadow-xl ring-1 ring-border/50 flex items-center justify-center overflow-hidden">
                       {bank ? (
@@ -342,16 +337,6 @@ export default function DepositDetailsPage() {
                         <Landmark className="w-10 h-10 text-primary" />
                       )}
                     </div>
-                    {isActive && (
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ delay: 0.5 }}
-                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 ring-2 ring-background flex items-center justify-center"
-                      >
-                        <Zap className="w-3 h-3 text-white" />
-                      </motion.div>
-                    )}
                   </motion.div>
 
                   <div className="flex-1 min-w-0">

@@ -392,8 +392,10 @@ export function useDepositToFund() {
       fundId: string
       data: DepositToFundRequest
     }) => fundsApi.depositFromAccount(fundId, data),
-    onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: fundKeys.detail(variables.fundId) })
+    onSuccess: async (_, variables) => {
+      // Refetch основные данные фонда чтобы UI обновился сразу
+      await queryClient.refetchQueries({ queryKey: fundKeys.detail(variables.fundId) })
+      // Инвалидируем остальные связанные кеши
       queryClient.invalidateQueries({ queryKey: fundKeys.assets(variables.fundId) })
       queryClient.invalidateQueries({
         queryKey: fundKeys.currencyAssets(variables.fundId),

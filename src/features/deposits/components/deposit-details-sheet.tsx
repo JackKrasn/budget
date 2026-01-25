@@ -10,10 +10,11 @@ import {
   XCircle,
   Pencil,
   Trash2,
-  Sparkles,
+  BadgeCheck,
   CheckCircle2,
   AlertTriangle,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react'
 import {
   Sheet,
@@ -79,7 +80,7 @@ const STATUS_CONFIG: Record<string, {
     variant: 'secondary',
     color: 'text-blue-600 dark:text-blue-400',
     bgColor: 'bg-blue-500/10',
-    icon: Sparkles
+    icon: BadgeCheck
   },
   closed_early: {
     label: 'Закрыт досрочно',
@@ -434,7 +435,7 @@ export function DepositDetailsSheet({
                   <div className="flex items-center justify-between px-4 py-3 hover:bg-muted/30 transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-muted">
-                        <Sparkles className="h-4 w-4 text-muted-foreground" />
+                        <RefreshCw className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <span className="text-sm">Капитализация</span>
                     </div>
