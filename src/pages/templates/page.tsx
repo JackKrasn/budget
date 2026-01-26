@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Repeat } from 'lucide-react'
+import { Repeat, List, CalendarDays } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import {
   useRecurringExpenses,
   useCreateRecurringExpense,
@@ -15,6 +17,7 @@ import {
   RecurringExpenseDialog,
   RecurringIncomesSection,
   RecurringIncomeDialog,
+  RecurringCalendar,
 } from '@/features/budget'
 import { useExpenseCategories } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -29,6 +32,9 @@ export default function TemplatesPage() {
   // Состояние для доходов
   const [incomeDialogOpen, setIncomeDialogOpen] = useState(false)
   const [editingIncome, setEditingIncome] = useState<RecurringIncome | null>(null)
+
+  // Состояние для переключения вида
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
 
   // Данные
   const { data: recurringExpensesData } = useRecurringExpenses()
@@ -180,37 +186,79 @@ export default function TemplatesPage() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
-          <Repeat className="h-6 w-6 text-primary" />
-          Шаблоны
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Управление шаблонами регулярных доходов и повторяющихся расходов
-        </p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+            <Repeat className="h-6 w-6 text-primary" />
+            Шаблоны
+          </h1>
+          <p className="mt-1 text-muted-foreground">
+            Управление шаблонами регулярных доходов и повторяющихся расходов
+          </p>
+        </div>
+
+        {/* Переключатель вида */}
+        <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1 bg-muted/30">
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'h-8 px-3 gap-1.5',
+              viewMode === 'list' && 'bg-background shadow-sm'
+            )}
+            onClick={() => setViewMode('list')}
+          >
+            <List className="h-4 w-4" />
+            <span className="text-sm">Список</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className={cn(
+              'h-8 px-3 gap-1.5',
+              viewMode === 'calendar' && 'bg-background shadow-sm'
+            )}
+            onClick={() => setViewMode('calendar')}
+          >
+            <CalendarDays className="h-4 w-4" />
+            <span className="text-sm">Календарь</span>
+          </Button>
+        </div>
       </div>
 
-      {/* Секция: Шаблоны регулярных доходов */}
-      <RecurringIncomesSection
-        incomes={recurringIncomes}
-        onAdd={handleAddIncome}
-        onEdit={handleEditIncome}
-        onDelete={handleDeleteIncome}
-        onToggleActive={handleToggleIncomeActive}
-        isDeleting={deleteRecurringIncome.isPending}
-        isToggling={updateRecurringIncome.isPending}
-      />
+      {viewMode === 'list' ? (
+        <>
+          {/* Секция: Шаблоны регулярных доходов */}
+          <RecurringIncomesSection
+            incomes={recurringIncomes}
+            onAdd={handleAddIncome}
+            onEdit={handleEditIncome}
+            onDelete={handleDeleteIncome}
+            onToggleActive={handleToggleIncomeActive}
+            isDeleting={deleteRecurringIncome.isPending}
+            isToggling={updateRecurringIncome.isPending}
+          />
 
-      {/* Секция: Шаблоны повторяющихся расходов */}
-      <RecurringExpensesSection
-        expenses={recurringExpenses}
-        onAdd={handleAddExpense}
-        onEdit={handleEditExpense}
-        onDelete={handleDeleteExpense}
-        onToggleActive={handleToggleExpenseActive}
-        isDeleting={deleteRecurringExpense.isPending}
-        isToggling={updateRecurringExpense.isPending}
-      />
+          {/* Секция: Шаблоны повторяющихся расходов */}
+          <RecurringExpensesSection
+            expenses={recurringExpenses}
+            onAdd={handleAddExpense}
+            onEdit={handleEditExpense}
+            onDelete={handleDeleteExpense}
+            onToggleActive={handleToggleExpenseActive}
+            isDeleting={deleteRecurringExpense.isPending}
+            isToggling={updateRecurringExpense.isPending}
+          />
+        </>
+      ) : (
+        /* Календарный вид */
+        <RecurringCalendar
+          expenses={recurringExpenses}
+          incomes={recurringIncomes}
+          onExpenseClick={handleEditExpense}
+          onIncomeClick={handleEditIncome}
+        />
+      )}
 
       {/* Диалог создания/редактирования расхода */}
       <RecurringExpenseDialog

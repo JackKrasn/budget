@@ -20,3 +20,6 @@ export {
 } from './fund-financing-section'
 export { DistributionSummarySection } from './distribution-summary-section'
 export { FloatingBudgetBalance } from './floating-budget-balance'
+export { PaymentCalendar } from './payment-calendar'
+export { PlannedPaymentsView } from './planned-payments-view'
+export { RecurringCalendar } from './recurring-calendar'

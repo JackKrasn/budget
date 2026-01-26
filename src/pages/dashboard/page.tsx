@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { format, startOfMonth, endOfMonth, isWithinInterval, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
@@ -17,6 +17,8 @@ import {
   ChevronRight,
   Calendar,
   CircleDollarSign,
+  Receipt,
+  AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,6 +34,7 @@ import { useExpenses } from '@/features/expenses/hooks/use-expenses'
 import { useCredits } from '@/features/credits/hooks/use-credits'
 import { useCurrentBudget } from '@/features/budget/hooks/use-budgets'
 import { useUpcomingPlannedExpenses } from '@/features/budget/hooks/use-planned-expenses'
+import { useUpcomingPlannedIncomes } from '@/features/budget/hooks/use-planned-incomes'
 
 // Утилиты форматирования
 function formatMoney(amount: number, compact = false): string {
@@ -262,47 +265,151 @@ function FundCard({
   )
 }
 
-// Предстоящий платёж
+// Предстоящий платёж (с поддержкой выделения для сегодня)
 function UpcomingPayment({
+  type,
   name,
   amount,
   date,
+  categoryName,
+  isToday,
   index,
 }: {
+  type: 'income' | 'expense'
   name: string
   amount: number
   date: string
+  categoryName?: string
+  isToday?: boolean
   index: number
 }) {
+  const isIncome = type === 'income'
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
-      className="flex items-center justify-between gap-3 py-3 border-b border-border/30 last:border-0"
+      className={`flex items-center gap-3 py-2.5 -mx-2 px-2 rounded-lg transition-colors ${
+        isToday
+          ? 'bg-emerald-500/10 hover:bg-emerald-500/15'
+          : 'hover:bg-muted/50'
+      }`}
     >
-      <div className="flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-500/10 text-blue-500">
-          <Calendar className="h-4 w-4" />
+      <div
+        className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 ${
+          isToday
+            ? 'bg-emerald-500/20 text-emerald-500'
+            : isIncome
+              ? 'bg-emerald-500/10 text-emerald-500'
+              : 'bg-orange-500/10 text-orange-500'
+        }`}
+      >
+        {isIncome ? <Banknote className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <p className="text-sm font-medium truncate">{name}</p>
+          {isToday && (
+            <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/20 px-1.5 py-0.5 rounded">
+              сегодня
+            </span>
+          )}
         </div>
-        <div>
-          <p className="text-sm font-medium">{name}</p>
-          <p className="text-xs text-muted-foreground">{date}</p>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          {!isToday && <span>{date}</span>}
+          {categoryName && !isToday && <span>•</span>}
+          {categoryName && <span className="truncate">{categoryName}</span>}
         </div>
       </div>
-      <p className="text-sm font-semibold tabular-nums text-destructive">
-        −{formatMoney(amount)} ₽
+      <p
+        className={`text-sm font-semibold tabular-nums shrink-0 ${
+          isIncome ? 'text-emerald-500' : 'text-orange-500'
+        }`}
+      >
+        {isIncome ? '+' : '−'}{formatMoney(amount)} ₽
       </p>
     </motion.div>
   )
 }
 
+// Просроченный платёж
+function OverdueEvent({
+  type,
+  name,
+  amount,
+  categoryName,
+  daysOverdue,
+  index,
+  onClick,
+}: {
+  type: 'income' | 'expense'
+  name: string
+  amount: number
+  categoryName?: string
+  daysOverdue: number
+  index: number
+  onClick?: () => void
+}) {
+  const isIncome = type === 'income'
+
+  const formatDaysOverdue = (days: number) => {
+    if (days === 1) return '1 день'
+    if (days >= 2 && days <= 4) return `${days} дня`
+    return `${days} дней`
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: -10 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ delay: index * 0.08 }}
+      onClick={onClick}
+      className="flex items-center gap-3 py-2.5 hover:bg-red-500/5 transition-colors -mx-2 px-2 rounded-lg cursor-pointer"
+    >
+      <div
+        className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 ${
+          isIncome
+            ? 'bg-emerald-500/10 text-emerald-500'
+            : 'bg-red-500/10 text-red-500'
+        }`}
+      >
+        {isIncome ? <Banknote className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{name}</p>
+        <div className="flex items-center gap-2 text-xs">
+          {categoryName && (
+            <span className="text-muted-foreground truncate">{categoryName}</span>
+          )}
+          {categoryName && <span className="text-muted-foreground">•</span>}
+          <span className="text-red-500 font-medium">
+            {formatDaysOverdue(daysOverdue)}
+          </span>
+        </div>
+      </div>
+
+      <div className="text-right shrink-0">
+        <p
+          className={`text-sm font-semibold tabular-nums ${
+            isIncome ? 'text-emerald-500' : 'text-red-500'
+          }`}
+        >
+          {isIncome ? '+' : '−'}{formatMoney(amount)} ₽
+        </p>
+      </div>
+    </motion.div>
+  )
+}
+
 export default function DashboardPage() {
+  const navigate = useNavigate()
+
   // Даты текущего месяца для фильтрации
   const now = new Date()
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')
-  const today = format(now, 'yyyy-MM-dd')
   const in30Days = format(addDays(now, 30), 'yyyy-MM-dd')
 
   // Данные
@@ -311,7 +418,9 @@ export default function DashboardPage() {
   const { data: incomesData, isLoading: incomesLoading } = useIncomes()
   const { data: expensesData, isLoading: expensesLoading } = useExpenses({ from: monthStart, to: monthEnd })
   const { data: creditsData } = useCredits('active')
-  const { data: upcomingPlannedExpensesData } = useUpcomingPlannedExpenses(today, in30Days)
+  // Получаем платежи с начала месяца до +30 дней (чтобы видеть просроченные)
+  const { data: upcomingPlannedExpensesData } = useUpcomingPlannedExpenses(monthStart, in30Days)
+  const { data: upcomingPlannedIncomesData } = useUpcomingPlannedIncomes(monthStart, in30Days)
   const { data: currentBudget, isLoading: budgetLoading } = useCurrentBudget()
 
   // Вычисления
@@ -397,21 +506,25 @@ export default function DashboardPage() {
     }
   }, [currentBudget])
 
-  // Ближайшие платежи (только запланированные расходы)
-  const upcomingPayments = useMemo(() => {
-    const payments: Array<{
+  // Просроченные платежи (до сегодня, но не выполненные)
+  const overdueEvents = useMemo(() => {
+    const events: Array<{
       id: string
+      type: 'income' | 'expense'
       name: string
       amount: number
-      date: string
+      categoryName?: string
       rawDate: Date
+      daysOverdue: number
     }> = []
 
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+    // Просроченные расходы
     if (upcomingPlannedExpensesData?.data) {
       upcomingPlannedExpensesData.data
         .filter((p) => p.status === 'pending' && p.planned_date)
         .forEach((p) => {
-          // planned_date может быть строкой или объектом { Time, Valid }
           const dateValue =
             typeof p.planned_date === 'string'
               ? p.planned_date
@@ -419,21 +532,144 @@ export default function DashboardPage() {
           if (!dateValue) return
           const plannedDate = new Date(dateValue)
           if (isNaN(plannedDate.getTime())) return
+
+          // Проверяем что дата до сегодня (просрочено)
+          if (plannedDate < todayStart) {
+            const daysOverdue = Math.floor((todayStart.getTime() - plannedDate.getTime()) / (1000 * 60 * 60 * 24))
+            events.push({
+              id: p.id,
+              type: 'expense',
+              name: p.name,
+              amount: p.planned_amount,
+              categoryName: p.category_name,
+              rawDate: plannedDate,
+              daysOverdue,
+            })
+          }
+        })
+    }
+
+    // Просроченные доходы
+    if (upcomingPlannedIncomesData?.data) {
+      upcomingPlannedIncomesData.data
+        .filter((p) => p.status === 'pending' && p.expected_date)
+        .forEach((p) => {
+          const dateValue =
+            typeof p.expected_date === 'string'
+              ? p.expected_date
+              : p.expected_date && typeof p.expected_date === 'object' && 'Time' in p.expected_date
+                ? p.expected_date.Time
+                : null
+          if (!dateValue) return
+          const expectedDate = new Date(dateValue)
+          if (isNaN(expectedDate.getTime())) return
+
+          // Проверяем что дата до сегодня (просрочено)
+          if (expectedDate < todayStart) {
+            const daysOverdue = Math.floor((todayStart.getTime() - expectedDate.getTime()) / (1000 * 60 * 60 * 24))
+            events.push({
+              id: p.id,
+              type: 'income',
+              name: p.source,
+              amount: p.expected_amount,
+              rawDate: expectedDate,
+              daysOverdue,
+            })
+          }
+        })
+    }
+
+    // Сортируем по дате (самые старые первые)
+    events.sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
+
+    return events
+  }, [upcomingPlannedExpensesData, upcomingPlannedIncomesData, now])
+
+  // Ближайшие платежи до конца месяца (расходы и доходы, сегодняшние помечены)
+  const upcomingPayments = useMemo(() => {
+    const payments: Array<{
+      id: string
+      type: 'income' | 'expense'
+      name: string
+      amount: number
+      date: string
+      categoryName?: string
+      isToday: boolean
+      rawDate: Date
+    }> = []
+
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const todayEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59)
+    const monthEndDate = endOfMonth(now)
+
+    // Добавляем расходы
+    if (upcomingPlannedExpensesData?.data) {
+      upcomingPlannedExpensesData.data
+        .filter((p) => p.status === 'pending' && p.planned_date)
+        .forEach((p) => {
+          const dateValue =
+            typeof p.planned_date === 'string'
+              ? p.planned_date
+              : p.planned_date?.Time
+          if (!dateValue) return
+          const plannedDate = new Date(dateValue)
+          if (isNaN(plannedDate.getTime())) return
+
+          // Только платежи от сегодня до конца месяца
+          if (plannedDate < todayStart || plannedDate > monthEndDate) return
+
+          const isToday = plannedDate >= todayStart && plannedDate <= todayEnd
+
           payments.push({
             id: p.id,
+            type: 'expense',
             name: p.name,
             amount: p.planned_amount,
             date: format(plannedDate, 'd MMM', { locale: ru }),
+            categoryName: p.category_name,
+            isToday,
             rawDate: plannedDate,
           })
         })
     }
 
-    // Сортируем по дате
+    // Добавляем доходы
+    if (upcomingPlannedIncomesData?.data) {
+      upcomingPlannedIncomesData.data
+        .filter((p) => p.status === 'pending' && p.expected_date)
+        .forEach((p) => {
+          const dateValue =
+            typeof p.expected_date === 'string'
+              ? p.expected_date
+              : p.expected_date && typeof p.expected_date === 'object' && 'Time' in p.expected_date
+                ? p.expected_date.Time
+                : null
+          if (!dateValue) return
+          const expectedDate = new Date(dateValue)
+          if (isNaN(expectedDate.getTime())) return
+
+          // Только платежи от сегодня до конца месяца
+          if (expectedDate < todayStart || expectedDate > monthEndDate) return
+
+          const isToday = expectedDate >= todayStart && expectedDate <= todayEnd
+
+          payments.push({
+            id: p.id,
+            type: 'income',
+            name: p.source,
+            amount: p.expected_amount,
+            date: format(expectedDate, 'd MMM', { locale: ru }),
+            isToday,
+            rawDate: expectedDate,
+          })
+        })
+    }
+
+    // Сортируем по дате (сегодняшние будут первыми)
     payments.sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
 
-    return payments.slice(0, 5)
-  }, [upcomingPlannedExpensesData])
+    return payments
+  }, [upcomingPlannedExpensesData, upcomingPlannedIncomesData, now])
 
   // Текущий месяц
   const currentMonth = format(new Date(), 'LLLL yyyy', { locale: ru })
@@ -507,6 +743,80 @@ export default function DashboardPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Overdue Events */}
+      {overdueEvents.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Card className="border-border/40 bg-card/60 backdrop-blur-sm overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
+              <div className="flex items-center gap-3">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10">
+                  <AlertTriangle className="h-5 w-5 text-red-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base font-medium text-red-500">
+                    Просроченные платежи
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    {overdueEvents.length} платежей требуют внимания
+                  </p>
+                </div>
+              </div>
+              <Link to="/planned-payments">
+                <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                  Все платежи
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="divide-y divide-border/30">
+                {overdueEvents.map((event, index) => (
+                  <OverdueEvent
+                    key={event.id}
+                    type={event.type}
+                    name={event.name}
+                    amount={event.amount}
+                    categoryName={event.categoryName}
+                    daysOverdue={event.daysOverdue}
+                    index={index}
+                    onClick={() => navigate('/planned-payments')}
+                  />
+                ))}
+              </div>
+
+              {/* Итого просрочено */}
+              <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Итого просрочено:</span>
+                <div className="flex items-center gap-3">
+                  {overdueEvents.some((e) => e.type === 'income') && (
+                    <span className="text-emerald-500 font-medium tabular-nums">
+                      +{formatMoney(
+                        overdueEvents
+                          .filter((e) => e.type === 'income')
+                          .reduce((sum, e) => sum + e.amount, 0)
+                      )} ₽
+                    </span>
+                  )}
+                  {overdueEvents.some((e) => e.type === 'expense') && (
+                    <span className="text-red-500 font-medium tabular-nums">
+                      −{formatMoney(
+                        overdueEvents
+                          .filter((e) => e.type === 'expense')
+                          .reduce((sum, e) => sum + e.amount, 0)
+                      )} ₽
+                    </span>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </motion.div>
+      )}
 
       {/* Stats Grid */}
       <motion.div
@@ -708,20 +1018,34 @@ export default function DashboardPage() {
                 <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-amber-500/10">
                   <Calendar className="h-5 w-5 text-amber-500" />
                 </div>
-                <CardTitle className="text-base font-medium">
-                  Ближайшие платежи
-                </CardTitle>
+                <div>
+                  <CardTitle className="text-base font-medium">
+                    Ближайшие платежи
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground">
+                    до конца месяца
+                  </p>
+                </div>
               </div>
+              <Link to="/planned-payments">
+                <Button variant="ghost" size="sm" className="gap-1 text-xs">
+                  Все платежи
+                  <ChevronRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
             </CardHeader>
             <CardContent className="pt-0">
               {upcomingPayments.length > 0 ? (
-                <div>
+                <div className="divide-y divide-border/30">
                   {upcomingPayments.map((payment, index) => (
                     <UpcomingPayment
                       key={payment.id}
+                      type={payment.type}
                       name={payment.name}
                       amount={payment.amount}
                       date={payment.date}
+                      categoryName={payment.categoryName}
+                      isToday={payment.isToday}
                       index={index}
                     />
                   ))}

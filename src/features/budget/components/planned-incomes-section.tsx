@@ -26,6 +26,11 @@ import {
   TableFooter,
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import type { PlannedIncome, PlannedIncomeStatus } from '@/lib/api/types'
 
@@ -169,28 +174,63 @@ export function PlannedIncomesSection({
     ? Math.round((totals.received / totals.expected) * 100)
     : 0
 
+  // Цвет прогресс-бара в зависимости от процента (приглушённые цвета)
+  const getProgressBarColor = (percent: number) => {
+    if (percent >= 95) {
+      // Зелёный (95-100%)
+      return 'bg-emerald-500/50'
+    } else if (percent >= 90) {
+      // Оранжевый (90-95%)
+      return 'bg-amber-500/50'
+    } else {
+      // Красный (< 90%)
+      return 'bg-red-500/50'
+    }
+  }
+
+  // Цвет текста процента
+  const getProgressTextColor = (percent: number) => {
+    if (percent >= 95) return 'text-emerald-500'
+    if (percent >= 90) return 'text-amber-500'
+    return 'text-red-500'
+  }
+
   // Контент секции
   const content = (
     <>
       {/* Сводка: прогресс и план/факт */}
       {incomes.length > 0 && (
         <div className="space-y-3 mb-4">
-          {/* Прогресс-бар с refined gradient design */}
-          <div className="space-y-1.5">
+          {/* Прогресс-бар с цветовой индикацией */}
+          <div className="space-y-1">
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">
                 Получено {formatMoney(totals.received)} ₽ из {formatMoney(totals.expected)} ₽
               </span>
-              <span className="font-semibold">
+              <span className={cn('font-medium text-xs', getProgressTextColor(progressPercent))}>
                 {progressPercent}%
               </span>
             </div>
-            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-gradient-to-r from-[oklch(0.88_0.02_145)] to-[oklch(0.90_0.015_155)] dark:from-[oklch(0.28_0.02_145)] dark:to-[oklch(0.30_0.015_155)]">
-              <div
-                className="h-full transition-all duration-500 ease-out bg-gradient-to-r from-[oklch(0.72_0.14_150)] via-[oklch(0.75_0.13_155)] to-[oklch(0.78_0.12_160)]"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="relative h-1 w-full overflow-hidden rounded-full bg-muted/30 cursor-help">
+                  <div
+                    className={cn(
+                      'h-full transition-all duration-500 ease-out',
+                      getProgressBarColor(progressPercent)
+                    )}
+                    style={{ width: `${progressPercent}%` }}
+                  />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="text-xs">
+                <div className="space-y-0.5">
+                  <p className="text-emerald-400">≥95% — зелёный (от {formatMoney(totals.expected * 0.95)} ₽)</p>
+                  <p className="text-amber-400">90-95% — оранжевый ({formatMoney(totals.expected * 0.9)}–{formatMoney(totals.expected * 0.95)} ₽)</p>
+                  <p className="text-red-400">&lt;90% — красный (до {formatMoney(totals.expected * 0.9)} ₽)</p>
+                </div>
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Карточки со сводкой */}

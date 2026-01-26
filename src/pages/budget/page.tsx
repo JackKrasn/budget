@@ -17,6 +17,8 @@ import {
   Receipt,
   LayoutList,
   RefreshCw,
+  List,
+  CalendarDays,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -53,6 +55,7 @@ import {
   DistributionSummarySection,
   FloatingBudgetBalance,
   BudgetItemDialog,
+  PaymentCalendar,
 } from '@/features/budget'
 import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -89,6 +92,7 @@ export default function BudgetPage() {
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
   const [editItemDialogOpen, setEditItemDialogOpen] = useState(false)
   const [editingItem, setEditingItem] = useState<BudgetItemWithCategory | null>(null)
+  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'calendar'>('list')
 
   // Вычисляем даты для фильтрации расходов
   const dateFrom = useMemo(() => {
@@ -952,17 +956,44 @@ export default function BudgetPage() {
           {/* Секция 1: Запланированные расходы */}
           <CollapsibleSection
             id="planned-expenses"
-            title="Запланированные расходы"
+            title="Запланированные платежи"
             icon={<Receipt className="h-4 w-4 text-orange-500" />}
             badge={
-              plannedExpenses.length > 0 && (
+              (plannedExpenses.length > 0 || plannedIncomes.length > 0) && (
                 <Badge variant="secondary" className="ml-2 text-xs">
-                  {plannedExpenses.filter((e) => e.status === 'pending').length} ожидают
+                  {plannedExpenses.filter((e) => e.status === 'pending').length + plannedIncomes.filter((i) => i.status === 'pending').length} ожидают
                 </Badge>
               )
             }
             headerAction={
               <div className="flex items-center gap-2">
+                {/* Переключатель вида */}
+                <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1 bg-muted/30">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'h-7 px-2.5 gap-1.5',
+                      plannedViewMode === 'list' && 'bg-background shadow-sm'
+                    )}
+                    onClick={() => setPlannedViewMode('list')}
+                  >
+                    <List className="h-3.5 w-3.5" />
+                    <span className="text-xs hidden sm:inline">Список</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'h-7 px-2.5 gap-1.5',
+                      plannedViewMode === 'calendar' && 'bg-background shadow-sm'
+                    )}
+                    onClick={() => setPlannedViewMode('calendar')}
+                  >
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    <span className="text-xs hidden sm:inline">Календарь</span>
+                  </Button>
+                </div>
                 <Button
                   variant="outline"
                   size="sm"
@@ -991,18 +1022,27 @@ export default function BudgetPage() {
               </div>
             }
           >
-            <PlannedExpensesSection
-              expenses={plannedExpenses}
-              accounts={accounts}
-              categories={categories}
-              onConfirm={handleConfirmPlanned}
-              onSkip={handleSkipPlanned}
-              onDelete={handleDeletePlanned}
-              onGenerate={handleGeneratePlanned}
-              isGenerating={generatePlanned.isPending || createBudget.isPending}
-              isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
-              hideWrapper
-            />
+            {plannedViewMode === 'list' ? (
+              <PlannedExpensesSection
+                expenses={plannedExpenses}
+                accounts={accounts}
+                categories={categories}
+                onConfirm={handleConfirmPlanned}
+                onSkip={handleSkipPlanned}
+                onDelete={handleDeletePlanned}
+                onGenerate={handleGeneratePlanned}
+                isGenerating={generatePlanned.isPending || createBudget.isPending}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                hideWrapper
+              />
+            ) : (
+              <PaymentCalendar
+                expenses={plannedExpenses}
+                incomes={plannedIncomes}
+                year={year}
+                month={month}
+              />
+            )}
           </CollapsibleSection>
 
           {/* Секция 2: Таблица категорий */}
