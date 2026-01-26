@@ -19,7 +19,7 @@ import {
   RecurringIncomeDialog,
   RecurringCalendar,
 } from '@/features/budget'
-import { useExpenseCategories } from '@/features/expenses'
+import { useExpenseCategories, useExchangeRates } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
 import type { RecurringExpenseWithCategory, RecurringIncome, Fund } from '@/lib/api/types'
@@ -42,6 +42,7 @@ export default function TemplatesPage() {
   const { data: categoriesData } = useExpenseCategories()
   const { data: fundsData } = useFunds()
   const { data: accountsData } = useAccounts()
+  const { data: exchangeRatesData } = useExchangeRates()
 
   // Мутации для расходов
   const createRecurringExpense = useCreateRecurringExpense()
@@ -59,6 +60,7 @@ export default function TemplatesPage() {
   const fundsRaw = fundsData?.data ?? []
   const funds: Fund[] = fundsRaw.map((f) => f.fund)
   const accounts = accountsData?.data ?? []
+  const exchangeRates = exchangeRatesData?.data ?? []
 
   // === Обработчики для расходов ===
   const handleAddExpense = () => {
@@ -110,6 +112,7 @@ export default function TemplatesPage() {
             fundId: data.fundId,
             name: data.name,
             amount: data.amount,
+            currency: data.currency,
             dayOfMonth: data.dayOfMonth,
             isActive: data.isActive,
           },
@@ -242,6 +245,7 @@ export default function TemplatesPage() {
           {/* Секция: Шаблоны повторяющихся расходов */}
           <RecurringExpensesSection
             expenses={recurringExpenses}
+            exchangeRates={exchangeRates}
             onAdd={handleAddExpense}
             onEdit={handleEditExpense}
             onDelete={handleDeleteExpense}

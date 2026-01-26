@@ -28,14 +28,17 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { PlannedExpenseWithDetails, PlannedExpenseStatus, Account, ExpenseCategoryWithTags } from '@/lib/api/types'
+import type { PlannedExpenseWithDetails, PlannedExpenseStatus, AccountWithType, ExpenseCategoryWithTags, ExchangeRate } from '@/lib/api/types'
 import { ConfirmPlannedExpenseDialog } from './confirm-planned-expense-dialog'
+import { CURRENCY_SYMBOLS } from '@/types'
 
 interface PlannedExpensesSectionProps {
   expenses: PlannedExpenseWithDetails[]
-  accounts: Account[]
+  accounts: AccountWithType[]
   /** Список категорий для обогащения данных (если бэкенд не возвращает детали) */
   categories?: ExpenseCategoryWithTags[]
+  /** Курсы валют для конвертации */
+  exchangeRates?: ExchangeRate[]
   onConfirm: (
     id: string,
     data: {
@@ -71,6 +74,7 @@ export function PlannedExpensesSection({
   expenses,
   accounts,
   categories,
+  exchangeRates = [],
   onConfirm,
   onSkip,
   onDelete,
@@ -110,6 +114,21 @@ export function PlannedExpensesSection({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
+  }
+
+  // Получить курс валюты к RUB
+  const getExchangeRate = (currency: string): number => {
+    if (currency === 'RUB') return 1
+    const rate = exchangeRates.find(
+      (r) => r.from_currency === currency && r.to_currency === 'RUB'
+    )
+    return rate?.rate ?? 1
+  }
+
+  // Форматирование суммы с символом валюты
+  const formatMoneyWithCurrency = (amount: number, currency: string) => {
+    const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+    return `${formatMoney(amount)} ${symbol}`
   }
 
   // Извлечь число из nullable типа бэкенда (может быть {Float64: number, Valid: boolean} или просто number)
@@ -191,36 +210,43 @@ export function PlannedExpensesSection({
   const pendingExpenses = enrichedExpenses.filter((e) => e.status === 'pending')
   const confirmedExpenses = enrichedExpenses.filter((e) => e.status === 'confirmed')
 
-  // Группировка по фондам
+  // Конвертация суммы в RUB
+  const toRub = (amount: number, currency: string) => {
+    const rate = getExchangeRate(currency)
+    return amount * rate
+  }
+
+  // Группировка по фондам (конвертируем в RUB)
   const fundBreakdown = enrichedExpenses.reduce<Record<string, { name: string; amount: number }>>((acc, e) => {
     const fundedAmount = getActualAmount(e.funded_amount)
     if (fundedAmount && e.fund_name && e.fund_id) {
       if (!acc[e.fund_id]) {
         acc[e.fund_id] = { name: e.fund_name, amount: 0 }
       }
-      acc[e.fund_id].amount += fundedAmount
+      acc[e.fund_id].amount += toRub(fundedAmount, e.currency || 'RUB')
     }
     return acc
   }, {})
 
   const totals = {
-    planned: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount, 0),
+    // Все суммы конвертируем в RUB для итогов
+    planned: enrichedExpenses.reduce((sum, e) => sum + toRub(e.planned_amount, e.currency || 'RUB'), 0),
     confirmed: confirmedExpenses.reduce(
-      (sum, e) => sum + (getActualAmount(e.actual_amount) ?? e.planned_amount),
+      (sum, e) => sum + toRub(getActualAmount(e.actual_amount) ?? e.planned_amount, e.currency || 'RUB'),
       0
     ),
-    pending: pendingExpenses.reduce((sum, e) => sum + e.planned_amount, 0),
+    pending: pendingExpenses.reduce((sum, e) => sum + toRub(e.planned_amount, e.currency || 'RUB'), 0),
     // Финансирование из фондов (funded_amount приходит как { Float64, Valid })
     fromFunds: enrichedExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
+      .reduce((sum, e) => sum + toRub(getActualAmount(e.funded_amount) ?? 0, e.currency || 'RUB'), 0),
     pendingFromFunds: pendingExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
-    fromBudget: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount, 0) -
+      .reduce((sum, e) => sum + toRub(getActualAmount(e.funded_amount) ?? 0, e.currency || 'RUB'), 0),
+    fromBudget: enrichedExpenses.reduce((sum, e) => sum + toRub(e.planned_amount, e.currency || 'RUB'), 0) -
       enrichedExpenses
         .filter((e) => getActualAmount(e.funded_amount))
-        .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
+        .reduce((sum, e) => sum + toRub(getActualAmount(e.funded_amount) ?? 0, e.currency || 'RUB'), 0),
     fundBreakdown: Object.values(fundBreakdown),
   }
 
@@ -292,7 +318,7 @@ export function PlannedExpensesSection({
                         {getActualAmount(expense.funded_amount) && expense.fund_name ? (
                           <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                             <PiggyBank className="h-3 w-3" />
-                            Из фонда «{expense.fund_name}»: {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} ₽
+                            Из фонда «{expense.fund_name}»: {formatMoneyWithCurrency(getActualAmount(expense.funded_amount) ?? 0, expense.currency || 'RUB')}
                           </p>
                         ) : null}
                       </div>
@@ -315,13 +341,23 @@ export function PlannedExpensesSection({
                   <TableCell className="text-right">
                     {(() => {
                       const actualAmount = getActualAmount(expense.actual_amount)
+                      const currency = expense.currency || 'RUB'
+                      const currencySymbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+                      const isNonRub = currency !== 'RUB'
+                      const rate = getExchangeRate(currency)
+
                       if (expense.status === 'confirmed' && actualAmount != null) {
                         const savings = expense.planned_amount - actualAmount
                         return (
                           <div className="flex flex-col items-end gap-0.5">
                             <span className="text-emerald-500 font-semibold text-base tabular-nums">
-                              {formatMoney(actualAmount)} ₽
+                              {formatMoney(actualAmount)} {currencySymbol}
                             </span>
+                            {isNonRub && (
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                ≈ {formatMoney(actualAmount * rate)} ₽
+                              </span>
+                            )}
                             {savings !== 0 && (
                               <span
                                 className={cn(
@@ -331,23 +367,30 @@ export function PlannedExpensesSection({
                               >
                                 {savings > 0 ? '💰 ' : ''}
                                 {savings > 0 ? '-' : '+'}
-                                {formatMoney(Math.abs(savings))} ₽
+                                {formatMoney(Math.abs(savings))} {currencySymbol}
                               </span>
                             )}
                           </div>
                         )
                       }
                       return (
-                        <span
-                          className={cn(
-                            'tabular-nums font-semibold text-base',
-                            expense.status === 'skipped'
-                              ? 'text-muted-foreground line-through'
-                              : 'text-muted-foreground'
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span
+                            className={cn(
+                              'tabular-nums font-semibold text-base',
+                              expense.status === 'skipped'
+                                ? 'text-muted-foreground line-through'
+                                : 'text-muted-foreground'
+                            )}
+                          >
+                            {formatMoney(expense.planned_amount)} {currencySymbol}
+                          </span>
+                          {isNonRub && expense.status !== 'skipped' && (
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              ≈ {formatMoney(expense.planned_amount * rate)} ₽
+                            </span>
                           )}
-                        >
-                          {formatMoney(expense.planned_amount)} ₽
-                        </span>
+                        </div>
                       )
                     })()}
                   </TableCell>

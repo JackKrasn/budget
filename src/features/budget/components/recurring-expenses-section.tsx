@@ -31,10 +31,12 @@ import {
 } from '@/components/ui/alert-dialog'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { RecurringExpenseWithCategory } from '@/lib/api/types'
+import type { RecurringExpenseWithCategory, ExchangeRate } from '@/lib/api/types'
+import { CURRENCY_SYMBOLS } from '@/types'
 
 interface RecurringExpensesSectionProps {
   expenses: RecurringExpenseWithCategory[]
+  exchangeRates?: ExchangeRate[]
   onAdd: () => void
   onEdit: (expense: RecurringExpenseWithCategory) => void
   onDelete: (id: string) => Promise<void>
@@ -45,6 +47,7 @@ interface RecurringExpensesSectionProps {
 
 export function RecurringExpensesSection({
   expenses,
+  exchangeRates = [],
   onAdd,
   onEdit,
   onDelete,
@@ -59,6 +62,26 @@ export function RecurringExpensesSection({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
+  }
+
+  // Получить курс валюты к RUB
+  const getExchangeRate = (currency: string): number => {
+    if (currency === 'RUB') return 1
+    const rate = exchangeRates.find(
+      (r) => r.from_currency === currency && r.to_currency === 'RUB'
+    )
+    return rate?.rate ?? 1
+  }
+
+  // Конвертировать в RUB
+  const toRub = (amount: number, currency: string): number => {
+    return amount * getExchangeRate(currency)
+  }
+
+  // Форматирование суммы с символом валюты
+  const formatMoneyWithCurrency = (amount: number, currency: string) => {
+    const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+    return `${formatMoney(amount)} ${symbol}`
   }
 
   const handleDelete = async () => {
@@ -76,10 +99,10 @@ export function RecurringExpensesSection({
     return a.day_of_month - b.day_of_month
   })
 
-  // Считаем общую сумму активных расходов
-  const totalActive = expenses
+  // Считаем общую сумму активных расходов (в RUB)
+  const totalActiveRub = expenses
     .filter((e) => e.is_active)
-    .reduce((sum, e) => sum + e.amount, 0)
+    .reduce((sum, e) => sum + toRub(e.amount, e.currency || 'RUB'), 0)
 
   return (
     <motion.div
@@ -97,7 +120,7 @@ export function RecurringExpensesSection({
               <span className="text-sm text-muted-foreground">
                 Всего в месяц:{' '}
                 <span className="font-semibold text-foreground">
-                  {formatMoney(totalActive)} ₽
+                  {formatMoney(totalActiveRub)} ₽
                 </span>
               </span>
               <Button variant="outline" size="sm" onClick={onAdd}>
@@ -163,8 +186,17 @@ export function RecurringExpensesSection({
                       </span>
                     </TableCell>
 
-                    <TableCell className="text-right tabular-nums font-medium">
-                      {formatMoney(expense.amount)} ₽
+                    <TableCell className="text-right">
+                      <div className="flex flex-col items-end">
+                        <span className="tabular-nums font-medium">
+                          {formatMoneyWithCurrency(expense.amount, expense.currency || 'RUB')}
+                        </span>
+                        {expense.currency && expense.currency !== 'RUB' && (
+                          <span className="text-xs text-muted-foreground tabular-nums">
+                            ≈ {formatMoney(toRub(expense.amount, expense.currency))} ₽
+                          </span>
+                        )}
+                      </div>
                     </TableCell>
 
                     <TableCell className="text-center">

@@ -58,7 +58,7 @@ import {
   BudgetItemDialog,
   PaymentCalendar,
 } from '@/features/budget'
-import { useExpenseCategories, useExpenses } from '@/features/expenses'
+import { useExpenseCategories, useExpenses, useExchangeRates } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
 import { useIncomes } from '@/features/incomes'
@@ -117,6 +117,7 @@ export default function BudgetPage() {
   const { data: categoriesData } = useExpenseCategories()
   const { data: fundsData } = useFunds()
   const { data: accountsData } = useAccounts()
+  const { data: exchangeRatesData } = useExchangeRates()
 
   // Фактические расходы за выбранный месяц
   const { data: expensesData } = useExpenses({
@@ -165,6 +166,7 @@ export default function BudgetPage() {
   const actualIncomes = useMemo(() => incomesData?.data ?? [], [incomesData?.data])
   const fundsRaw = useMemo(() => fundsData?.data ?? [], [fundsData?.data])
   const accounts = accountsData?.data ?? []
+  const exchangeRates = exchangeRatesData?.data ?? []
 
   // Считаем фактические расходы по категориям (используем amountBase для валютных расходов)
   const actualByCategory = useMemo(() => {
@@ -1038,6 +1040,7 @@ export default function BudgetPage() {
                 expenses={plannedExpenses}
                 accounts={accounts}
                 categories={categories}
+                exchangeRates={exchangeRates}
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
                 onDelete={handleDeletePlanned}

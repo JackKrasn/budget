@@ -39,8 +39,10 @@ import {
 } from '@/components/ui/popover'
 import { Calendar } from '@/components/ui/calendar'
 import { CategoryIcon } from '@/components/common'
+import { AccountIcon } from '@/components/ui/account-icon'
 import { cn } from '@/lib/utils'
-import type { PlannedExpenseWithDetails, Account } from '@/lib/api/types'
+import type { PlannedExpenseWithDetails, AccountWithType } from '@/lib/api/types'
+import { CURRENCY_SYMBOLS } from '@/types'
 
 const formSchema = z.object({
   actualAmount: z.string().optional(),
@@ -53,7 +55,7 @@ type FormData = z.infer<typeof formSchema>
 
 interface ConfirmPlannedExpenseDialogProps {
   expense: PlannedExpenseWithDetails | null
-  accounts: Account[]
+  accounts: AccountWithType[]
   open: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: (data: {
@@ -152,6 +154,11 @@ export function ConfirmPlannedExpenseDialog({
   const plannedDateFormatted = formatDateLong(plannedDate)
 
   const plannedAmount = expense.planned_amount
+  const currency = expense.currency || 'RUB'
+  const currencySymbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+
+  // Фильтруем счета по валюте расхода
+  const filteredAccounts = accounts.filter((account) => account.currency === currency)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -180,7 +187,7 @@ export function ConfirmPlannedExpenseDialog({
           <div className="flex items-baseline gap-2">
             <span className="text-sm text-muted-foreground">Запланировано:</span>
             <span className="text-lg font-semibold tabular-nums">
-              {formatMoney(plannedAmount)} ₽
+              {formatMoney(plannedAmount)} {currencySymbol}
             </span>
           </div>
           {/* Fund Financing Info */}
@@ -189,7 +196,7 @@ export function ConfirmPlannedExpenseDialog({
               <PiggyBank className="h-4 w-4" />
               <span className="text-sm">Из фонда:</span>
               <span className="text-sm font-medium tabular-nums">
-                {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} ₽
+                {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} {currencySymbol}
               </span>
             </div>
           ) : null}
@@ -231,21 +238,30 @@ export function ConfirmPlannedExpenseDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {accounts.map((account) => (
+                      {filteredAccounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
-                          <div className="flex items-center justify-between gap-2 w-full">
-                            <div className="flex items-center gap-2">
-                              <Wallet className="h-4 w-4" />
-                              <span>{account.name}</span>
-                            </div>
-                            <span className="text-xs text-muted-foreground tabular-nums ml-2">
-                              {account.current_balance.toLocaleString('ru-RU')} ₽
+                          <div className="flex items-center gap-2">
+                            <AccountIcon
+                              bankName={account.bank_name}
+                              typeCode={account.type_code}
+                              color={account.color}
+                              size="sm"
+                              showBackground={false}
+                            />
+                            <span>{account.name}</span>
+                            <span className="text-xs text-muted-foreground tabular-nums ml-auto">
+                              {formatMoney(account.current_balance)} {currencySymbol}
                             </span>
                           </div>
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
+                  {filteredAccounts.length === 0 && (
+                    <FormDescription className="text-destructive">
+                      Нет счетов в валюте {currency}
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
