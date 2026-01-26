@@ -18,7 +18,6 @@ import {
   Calendar,
   CircleDollarSign,
   Receipt,
-  AlertTriangle,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -333,76 +332,6 @@ function UpcomingPayment({
   )
 }
 
-// Просроченный платёж
-function OverdueEvent({
-  type,
-  name,
-  amount,
-  categoryName,
-  daysOverdue,
-  index,
-  onClick,
-}: {
-  type: 'income' | 'expense'
-  name: string
-  amount: number
-  categoryName?: string
-  daysOverdue: number
-  index: number
-  onClick?: () => void
-}) {
-  const isIncome = type === 'income'
-
-  const formatDaysOverdue = (days: number) => {
-    if (days === 1) return '1 день'
-    if (days >= 2 && days <= 4) return `${days} дня`
-    return `${days} дней`
-  }
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, x: -10 }}
-      animate={{ opacity: 1, x: 0 }}
-      transition={{ delay: index * 0.08 }}
-      onClick={onClick}
-      className="flex items-center gap-3 py-2.5 hover:bg-red-500/5 transition-colors -mx-2 px-2 rounded-lg cursor-pointer"
-    >
-      <div
-        className={`flex h-8 w-8 items-center justify-center rounded-lg shrink-0 ${
-          isIncome
-            ? 'bg-emerald-500/10 text-emerald-500'
-            : 'bg-red-500/10 text-red-500'
-        }`}
-      >
-        {isIncome ? <Banknote className="h-4 w-4" /> : <Receipt className="h-4 w-4" />}
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium truncate">{name}</p>
-        <div className="flex items-center gap-2 text-xs">
-          {categoryName && (
-            <span className="text-muted-foreground truncate">{categoryName}</span>
-          )}
-          {categoryName && <span className="text-muted-foreground">•</span>}
-          <span className="text-red-500 font-medium">
-            {formatDaysOverdue(daysOverdue)}
-          </span>
-        </div>
-      </div>
-
-      <div className="text-right shrink-0">
-        <p
-          className={`text-sm font-semibold tabular-nums ${
-            isIncome ? 'text-emerald-500' : 'text-red-500'
-          }`}
-        >
-          {isIncome ? '+' : '−'}{formatMoney(amount)} ₽
-        </p>
-      </div>
-    </motion.div>
-  )
-}
-
 export default function DashboardPage() {
   const navigate = useNavigate()
 
@@ -505,85 +434,6 @@ export default function DashboardPage() {
       hasBudget: !!currentBudget,
     }
   }, [currentBudget])
-
-  // Просроченные платежи (до сегодня, но не выполненные)
-  const overdueEvents = useMemo(() => {
-    const events: Array<{
-      id: string
-      type: 'income' | 'expense'
-      name: string
-      amount: number
-      categoryName?: string
-      rawDate: Date
-      daysOverdue: number
-    }> = []
-
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-
-    // Просроченные расходы
-    if (upcomingPlannedExpensesData?.data) {
-      upcomingPlannedExpensesData.data
-        .filter((p) => p.status === 'pending' && p.planned_date)
-        .forEach((p) => {
-          const dateValue =
-            typeof p.planned_date === 'string'
-              ? p.planned_date
-              : p.planned_date?.Time
-          if (!dateValue) return
-          const plannedDate = new Date(dateValue)
-          if (isNaN(plannedDate.getTime())) return
-
-          // Проверяем что дата до сегодня (просрочено)
-          if (plannedDate < todayStart) {
-            const daysOverdue = Math.floor((todayStart.getTime() - plannedDate.getTime()) / (1000 * 60 * 60 * 24))
-            events.push({
-              id: p.id,
-              type: 'expense',
-              name: p.name,
-              amount: p.planned_amount,
-              categoryName: p.category_name,
-              rawDate: plannedDate,
-              daysOverdue,
-            })
-          }
-        })
-    }
-
-    // Просроченные доходы
-    if (upcomingPlannedIncomesData?.data) {
-      upcomingPlannedIncomesData.data
-        .filter((p) => p.status === 'pending' && p.expected_date)
-        .forEach((p) => {
-          const dateValue =
-            typeof p.expected_date === 'string'
-              ? p.expected_date
-              : p.expected_date && typeof p.expected_date === 'object' && 'Time' in p.expected_date
-                ? p.expected_date.Time
-                : null
-          if (!dateValue) return
-          const expectedDate = new Date(dateValue)
-          if (isNaN(expectedDate.getTime())) return
-
-          // Проверяем что дата до сегодня (просрочено)
-          if (expectedDate < todayStart) {
-            const daysOverdue = Math.floor((todayStart.getTime() - expectedDate.getTime()) / (1000 * 60 * 60 * 24))
-            events.push({
-              id: p.id,
-              type: 'income',
-              name: p.source,
-              amount: p.expected_amount,
-              rawDate: expectedDate,
-              daysOverdue,
-            })
-          }
-        })
-    }
-
-    // Сортируем по дате (самые старые первые)
-    events.sort((a, b) => a.rawDate.getTime() - b.rawDate.getTime())
-
-    return events
-  }, [upcomingPlannedExpensesData, upcomingPlannedIncomesData, now])
 
   // Ближайшие платежи до конца месяца (расходы и доходы, сегодняшние помечены)
   const upcomingPayments = useMemo(() => {
@@ -743,80 +593,6 @@ export default function DashboardPage() {
           </div>
         </div>
       </motion.div>
-
-      {/* Overdue Events */}
-      {overdueEvents.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-        >
-          <Card className="border-border/40 bg-card/60 backdrop-blur-sm overflow-hidden">
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-red-500/10">
-                  <AlertTriangle className="h-5 w-5 text-red-500" />
-                </div>
-                <div>
-                  <CardTitle className="text-base font-medium text-red-500">
-                    Просроченные платежи
-                  </CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    {overdueEvents.length} платежей требуют внимания
-                  </p>
-                </div>
-              </div>
-              <Link to="/planned-payments">
-                <Button variant="ghost" size="sm" className="gap-1 text-xs">
-                  Все платежи
-                  <ChevronRight className="h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent className="pt-0">
-              <div className="divide-y divide-border/30">
-                {overdueEvents.map((event, index) => (
-                  <OverdueEvent
-                    key={event.id}
-                    type={event.type}
-                    name={event.name}
-                    amount={event.amount}
-                    categoryName={event.categoryName}
-                    daysOverdue={event.daysOverdue}
-                    index={index}
-                    onClick={() => navigate('/planned-payments')}
-                  />
-                ))}
-              </div>
-
-              {/* Итого просрочено */}
-              <div className="mt-3 pt-3 border-t border-border/30 flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Итого просрочено:</span>
-                <div className="flex items-center gap-3">
-                  {overdueEvents.some((e) => e.type === 'income') && (
-                    <span className="text-emerald-500 font-medium tabular-nums">
-                      +{formatMoney(
-                        overdueEvents
-                          .filter((e) => e.type === 'income')
-                          .reduce((sum, e) => sum + e.amount, 0)
-                      )} ₽
-                    </span>
-                  )}
-                  {overdueEvents.some((e) => e.type === 'expense') && (
-                    <span className="text-red-500 font-medium tabular-nums">
-                      −{formatMoney(
-                        overdueEvents
-                          .filter((e) => e.type === 'expense')
-                          .reduce((sum, e) => sum + e.amount, 0)
-                      )} ₽
-                    </span>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-      )}
 
       {/* Stats Grid */}
       <motion.div
