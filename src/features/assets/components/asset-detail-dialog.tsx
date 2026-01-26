@@ -45,7 +45,7 @@ const ASSET_ICONS: Record<string, React.ElementType> = {
   default: Coins,
 }
 
-const FUND_ICONS: Record<string, React.ElementType> = {
+const _FUND_ICONS: Record<string, React.ElementType> = {
   'trending-up': TrendingUp,
   home: Home,
   'shopping-bag': ShoppingBag,
@@ -59,6 +59,7 @@ const FUND_ICONS: Record<string, React.ElementType> = {
   'graduation-cap': GraduationCap,
   heart: Heart,
 }
+void _FUND_ICONS // Reserved for future use
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   RUB: '₽',

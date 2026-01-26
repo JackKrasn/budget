@@ -66,8 +66,8 @@ const ASSET_TYPE_ICONS: Record<string, React.ElementType> = {
   crypto: Bitcoin,
 }
 
-// Иконки для фондов
-const FUND_ICONS: Record<string, React.ElementType> = {
+// Иконки для фондов (зарезервировано для будущего использования)
+const _FUND_ICONS: Record<string, React.ElementType> = {
   'trending-up': TrendingUp,
   home: Home,
   'shopping-bag': ShoppingBag,
@@ -81,6 +81,7 @@ const FUND_ICONS: Record<string, React.ElementType> = {
   'graduation-cap': GraduationCap,
   heart: Heart,
 }
+void _FUND_ICONS
 
 /** Сгруппированный актив */
 interface GroupedAsset {
@@ -131,9 +132,7 @@ function groupAssetsByFunds(funds: FundBalance[]): GroupedAsset[] {
           assetCurrency: asset.currency,
           assetTypeCode: asset.typeCode,
           assetTypeName: typeNames[asset.typeCode] || asset.typeCode,
-          currentPrice: typeof asset.currentPrice === 'number'
-            ? asset.currentPrice
-            : asset.currentPrice?.Float64 ?? 1,
+          currentPrice: asset.currentPrice ?? 1,
           totalAmount: 0,
           totalValue: 0,
           funds: [],
@@ -315,10 +314,9 @@ interface FundRowProps {
   onHover?: (fundId: string | null) => void
 }
 
-function FundRow({ fund, currency, totalAmount, totalValue, onFundClick, index, isHovered, onHover }: FundRowProps) {
+function FundRow({ fund, currency, totalValue, onFundClick, index, isHovered, onHover }: FundRowProps) {
   const currencySymbol = CURRENCY_SYMBOLS[currency] ?? currency
   const percentage = totalValue > 0 ? (fund.value / totalValue) * 100 : 0
-  const FundIcon = FUND_ICONS[fund.fundIcon] || Wallet
 
   return (
     <motion.div

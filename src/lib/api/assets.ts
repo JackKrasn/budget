@@ -53,5 +53,5 @@ export const assetsApi = {
    * GET /assets/by-fund?asset_id=<uuid> - конкретный актив
    */
   byFund: (params?: AssetByFundParams) =>
-    apiClient.get<AssetByFundResponse>(`${ENDPOINT}/by-fund`, params),
+    apiClient.get<AssetByFundResponse>(`${ENDPOINT}/by-fund`, params as Record<string, string | undefined>),
 }

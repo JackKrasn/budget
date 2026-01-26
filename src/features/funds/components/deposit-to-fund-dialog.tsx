@@ -80,7 +80,7 @@ export function DepositToFundDialog({
       (a) => a?.asset?.id != null && a.asset.typeCode === 'currency'
     )
     const allCurrencyAssets = (allAssetsData?.data ?? []).filter(
-      (a) => a?.id != null && a.typeCode === 'currency'
+      (a) => a?.id != null && a.type_code === 'currency'
     )
 
     // Если в фонде есть активы - используем их, иначе показываем все доступные валютные активы

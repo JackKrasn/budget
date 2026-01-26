@@ -5,7 +5,6 @@ import type {
   CreateAssetRequest,
   UpdateAssetRequest,
   UpdateAssetPriceRequest,
-  AssetByFundParams,
 } from '@/lib/api'
 import { toast } from 'sonner'
 
