@@ -53,6 +53,8 @@ interface PlannedExpensesSectionProps {
   addButton?: React.ReactNode
   /** Скрыть обёртку Card (когда используется внутри CollapsibleSection) */
   hideWrapper?: boolean
+  /** Callback при клике на запланированный расход (переход на страницу детализации) */
+  onExpenseClick?: (expenseId: string) => void
 }
 
 const STATUS_CONFIG: Record<
@@ -76,6 +78,7 @@ export function PlannedExpensesSection({
   isPending,
   addButton,
   hideWrapper,
+  onExpenseClick,
 }: PlannedExpensesSectionProps) {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
@@ -261,8 +264,10 @@ export function PlannedExpensesSection({
                   key={expense.id}
                   className={cn(
                     'group',
-                    expense.status === 'skipped' && 'opacity-50'
+                    expense.status === 'skipped' && 'opacity-50',
+                    onExpenseClick && 'cursor-pointer hover:bg-muted/50'
                   )}
+                  onClick={() => onExpenseClick?.(expense.id)}
                 >
                   <TableCell>
                     <div className="flex items-center gap-3">

@@ -488,6 +488,7 @@ export default function PlannedPaymentsPage() {
                 isGenerating={generatePlanned.isPending || createBudget.isPending}
                 isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
                 hideWrapper
+                onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
             </CardContent>
           </Card>
@@ -500,6 +501,8 @@ export default function PlannedPaymentsPage() {
               incomes={plannedIncomes}
               year={year}
               month={month}
+              onExpenseClick={(expense) => navigate(`/planned-expenses/${expense.id}`)}
+              onIncomeClick={(income) => navigate(`/planned-incomes/${income.id}`)}
             />
           </CardContent>
         </Card>
