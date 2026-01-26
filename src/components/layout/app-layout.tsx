@@ -23,6 +23,7 @@ import {
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { HeaderRates } from '@/components/layout/header-rates'
+import { GlobalOverdueAlert } from '@/features/budget'
 import {
   Sidebar,
   SidebarContent,
@@ -417,6 +418,8 @@ export function AppLayout() {
           <Header />
           <MainContent />
         </SidebarInset>
+        {/* Глобальное уведомление о просроченных платежах */}
+        <GlobalOverdueAlert />
       </div>
     </SidebarProvider>
   )

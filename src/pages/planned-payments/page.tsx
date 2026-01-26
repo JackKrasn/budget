@@ -36,7 +36,6 @@ import {
   AddPlannedExpenseDialog,
   ReceiveIncomeDialog,
   PaymentCalendar,
-  OverduePaymentsAlert,
 } from '@/features/budget'
 import { useExpenseCategories } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -514,9 +513,6 @@ export default function PlannedPaymentsPage() {
         onSubmit={handleConfirmReceiveIncome}
         isPending={createIncomeAndReceive.isPending}
       />
-
-      {/* Плавающее уведомление о просроченных платежах */}
-      <OverduePaymentsAlert overdueCount={stats.overdueCount} />
     </motion.div>
   )
 }

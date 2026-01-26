@@ -12,6 +12,7 @@ import {
   PiggyBank,
   Trash2,
   Wallet,
+  AlertCircle,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -352,15 +353,37 @@ export function PlannedExpensesSection({
                   </TableCell>
 
                   <TableCell className="text-center">
-                    <div
-                      className={cn(
-                        'inline-flex items-center gap-1 text-xs',
-                        statusConfig.color
-                      )}
-                    >
-                      <StatusIcon className="h-3.5 w-3.5" />
-                      {statusConfig.label}
-                    </div>
+                    {(() => {
+                      // Проверяем просрочку для pending
+                      if (expense.status === 'pending') {
+                        const plannedDate = getDateString(expense.planned_date)
+                        if (plannedDate) {
+                          const today = new Date()
+                          today.setHours(0, 0, 0, 0)
+                          const expenseDate = new Date(plannedDate)
+                          expenseDate.setHours(0, 0, 0, 0)
+                          if (expenseDate < today) {
+                            return (
+                              <div className="inline-flex items-center gap-1 text-xs text-red-500">
+                                <AlertCircle className="h-3.5 w-3.5" />
+                                Просрочен
+                              </div>
+                            )
+                          }
+                        }
+                      }
+                      return (
+                        <div
+                          className={cn(
+                            'inline-flex items-center gap-1 text-xs',
+                            statusConfig.color
+                          )}
+                        >
+                          <StatusIcon className="h-3.5 w-3.5" />
+                          {statusConfig.label}
+                        </div>
+                      )
+                    })()}
                   </TableCell>
 
                   <TableCell>

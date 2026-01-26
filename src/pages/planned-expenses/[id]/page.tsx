@@ -11,7 +11,6 @@ import {
   SkipForward,
   Wallet,
   Check,
-  X,
   Trash2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -211,6 +210,23 @@ export default function PlannedExpenseDetailsPage() {
   // Находим счет по умолчанию
   const defaultAccount = accounts.find((a) => a.id === expense.account_id)
 
+  // Проверка просрочки
+  const getOverdueDays = (): number | null => {
+    if (expense.status !== 'pending') return null
+    const dateStr = typeof expense.planned_date === 'string'
+      ? expense.planned_date
+      : expense.planned_date?.Time
+    if (!dateStr) return null
+    const plannedDate = new Date(dateStr)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    plannedDate.setHours(0, 0, 0, 0)
+    const diffTime = today.getTime() - plannedDate.getTime()
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24))
+    return diffDays > 0 ? diffDays : null
+  }
+  const overdueDays = getOverdueDays()
+
   return (
     <div className="space-y-8">
       {/* Back Button */}
@@ -230,24 +246,15 @@ export default function PlannedExpenseDetailsPage() {
         <Card
           className={cn(
             'relative overflow-hidden border-border/50',
-            isPending
-              ? 'bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent'
-              : expense.status === 'confirmed'
-                ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent'
-                : 'bg-gradient-to-br from-muted/30 via-muted/10 to-transparent'
+            expense.status === 'confirmed'
+              ? 'bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent'
+              : 'bg-card/50 backdrop-blur-sm'
           )}
         >
           {/* Decorative elements */}
-          <div
-            className={cn(
-              'absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl',
-              isPending
-                ? 'bg-amber-500/10'
-                : expense.status === 'confirmed'
-                  ? 'bg-emerald-500/10'
-                  : 'bg-muted/10'
-            )}
-          />
+          {expense.status === 'confirmed' && (
+            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full blur-3xl bg-emerald-500/10" />
+          )}
 
           <CardContent className="relative p-6 md:p-8">
             <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
@@ -256,18 +263,14 @@ export default function PlannedExpenseDetailsPage() {
                 <div
                   className={cn(
                     'flex h-14 w-14 items-center justify-center rounded-2xl shadow-lg',
-                    isPending
-                      ? 'bg-amber-500'
-                      : expense.status === 'confirmed'
-                        ? 'bg-emerald-500'
-                        : 'bg-muted'
+                    expense.status === 'confirmed'
+                      ? 'bg-emerald-500'
+                      : 'bg-primary'
                   )}
                   style={
-                    isPending
-                      ? { boxShadow: '0 10px 30px rgba(245, 158, 11, 0.3)' }
-                      : expense.status === 'confirmed'
-                        ? { boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)' }
-                        : undefined
+                    expense.status === 'confirmed'
+                      ? { boxShadow: '0 10px 30px rgba(16, 185, 129, 0.3)' }
+                      : undefined
                   }
                 >
                   <Receipt className="h-7 w-7 text-white" />
@@ -286,6 +289,15 @@ export default function PlannedExpenseDetailsPage() {
                         <StatusIcon className="mr-1.5 h-3.5 w-3.5" />
                         {statusConfig.label}
                       </Badge>
+                      {overdueDays !== null && overdueDays > 0 && (
+                        <Badge
+                          variant="destructive"
+                          className="bg-red-500/10 text-red-500 border-red-500/30"
+                        >
+                          <AlertCircle className="mr-1.5 h-3.5 w-3.5" />
+                          Просрочен на {overdueDays} {overdueDays === 1 ? 'день' : overdueDays < 5 ? 'дня' : 'дней'}
+                        </Badge>
+                      )}
                     </div>
                     <p className="mt-1 text-muted-foreground">{expense.category_name}</p>
                   </div>
@@ -344,11 +356,21 @@ export default function PlannedExpenseDetailsPage() {
                 {isPending && (
                   <div className="flex gap-2 justify-end">
                     <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                      onClick={handleDelete}
+                      disabled={deletePlanned.isPending}
+                      title="Удалить"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                    <Button
                       variant="outline"
                       onClick={handleSkip}
                       disabled={skipPlanned.isPending}
                     >
-                      <X className="mr-2 h-4 w-4" />
+                      <SkipForward className="mr-2 h-4 w-4" />
                       Пропустить
                     </Button>
                     <Button
@@ -356,7 +378,7 @@ export default function PlannedExpenseDetailsPage() {
                       className="bg-emerald-600 hover:bg-emerald-700"
                     >
                       <Check className="mr-2 h-4 w-4" />
-                      Подтвердить оплату
+                      Подтвердить
                     </Button>
                   </div>
                 )}
@@ -422,7 +444,7 @@ export default function PlannedExpenseDetailsPage() {
       </div>
 
       {/* Fund Financing Details */}
-      {fundedAmount && expense.fund_name && (
+      {fundedAmount !== null && fundedAmount > 0 && expense.fund_name && (
         <Card className="border-violet-500/30 bg-violet-500/5">
           <CardContent className="p-5">
             <div className="flex items-start gap-3">
@@ -434,27 +456,6 @@ export default function PlannedExpenseDetailsPage() {
                 <p className="text-sm text-muted-foreground mt-1">
                   Из фонда «{expense.fund_name}» будет списано {formatMoney(fundedAmount)} ₽
                   {fromBudget > 0 && `, остальные ${formatMoney(fromBudget)} ₽ — из бюджета`}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Pending State Notice */}
-      {isPending && (
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="p-5">
-            <div className="flex items-start gap-3">
-              <Clock className="h-5 w-5 text-amber-500 mt-0.5" />
-              <div>
-                <p className="font-medium text-amber-700 dark:text-amber-400">
-                  Ожидает подтверждения оплаты
-                </p>
-                <p className="text-sm text-muted-foreground mt-1">
-                  Нажмите «Подтвердить оплату», чтобы создать фактический расход и списать средства
-                  со счёта. Вы можете указать фактическую сумму, если она отличается от
-                  запланированной.
                 </p>
               </div>
             </div>
@@ -487,21 +488,6 @@ export default function PlannedExpenseDetailsPage() {
             </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Delete Button for Pending */}
-      {isPending && (
-        <div className="flex justify-end">
-          <Button
-            variant="ghost"
-            className="text-destructive hover:text-destructive hover:bg-destructive/10"
-            onClick={handleDelete}
-            disabled={deletePlanned.isPending}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Удалить запланированный расход
-          </Button>
-        </div>
       )}
 
       {/* Confirm Dialog */}
