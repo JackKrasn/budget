@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
@@ -12,8 +12,6 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
-  AlertTriangle,
-  X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -38,6 +36,7 @@ import {
   AddPlannedExpenseDialog,
   ReceiveIncomeDialog,
   PaymentCalendar,
+  OverduePaymentsAlert,
 } from '@/features/budget'
 import { useExpenseCategories } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -52,7 +51,6 @@ export default function PlannedPaymentsPage() {
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [receiveIncomeDialogOpen, setReceiveIncomeDialogOpen] = useState(false)
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
-  const [overdueAlertDismissed, setOverdueAlertDismissed] = useState(false)
 
   // Данные бюджета
   const { data: budgetData } = useBudgetByMonth(year, month)
@@ -518,39 +516,7 @@ export default function PlannedPaymentsPage() {
       />
 
       {/* Плавающее уведомление о просроченных платежах */}
-      <AnimatePresence>
-        {stats.overdueCount > 0 && !overdueAlertDismissed && (
-          <motion.div
-            initial={{ opacity: 0, y: 50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 50, scale: 0.9 }}
-            transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-            className="fixed bottom-6 right-6 z-50 max-w-sm"
-          >
-            <div className="flex items-center gap-3 rounded-2xl border border-red-500/30 bg-card/95 backdrop-blur-xl px-4 py-3 shadow-2xl">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 shrink-0">
-                <AlertTriangle className="h-5 w-5 text-red-500" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-red-500 text-sm">
-                  Просроченные платежи: {stats.overdueCount}
-                </p>
-                <p className="text-xs text-muted-foreground truncate">
-                  Требуют внимания
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                onClick={() => setOverdueAlertDismissed(true)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      <OverduePaymentsAlert overdueCount={stats.overdueCount} />
     </motion.div>
   )
 }

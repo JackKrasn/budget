@@ -19,6 +19,7 @@ import {
   RefreshCw,
   List,
   CalendarDays,
+  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -56,6 +57,7 @@ import {
   FloatingBudgetBalance,
   BudgetItemDialog,
   PaymentCalendar,
+  OverduePaymentsAlert,
 } from '@/features/budget'
 import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -201,6 +203,26 @@ export default function BudgetPage() {
     const pendingPlanned = plannedExpenses
       .filter((e) => e.status === 'pending')
       .reduce((sum, e) => sum + e.planned_amount, 0)
+
+    // Просроченные (дата до сегодня, но не выполнены)
+    const todayStart = new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate())
+    const pendingExpensesList = plannedExpenses.filter((e) => e.status === 'pending')
+    const overdueExpenses = pendingExpensesList.filter((e) => {
+      const dateStr = typeof e.planned_date === 'string' ? e.planned_date : e.planned_date?.Time
+      if (!dateStr) return false
+      return new Date(dateStr) < todayStart
+    })
+    const pendingIncomesList = plannedIncomes.filter((i) => i.status === 'pending')
+    const overdueIncomes = pendingIncomesList.filter((i) => {
+      const dateStr = typeof i.expected_date === 'string'
+        ? i.expected_date
+        : i.expected_date && typeof i.expected_date === 'object' && 'Time' in i.expected_date
+          ? i.expected_date.Time
+          : null
+      if (!dateStr) return false
+      return new Date(dateStr) < todayStart
+    })
+    const overdueCount = overdueExpenses.length + overdueIncomes.length
     const confirmedPlanned = plannedExpenses
       .filter((e) => e.status === 'confirmed')
       .reduce((sum, e) => sum + (getActualAmount(e.actual_amount) ?? e.planned_amount), 0)
@@ -269,6 +291,7 @@ export default function BudgetPage() {
       plannedAvailable,
       availableForPlanning,
       actuallyAvailable,
+      overdueCount,
     }
   }, [items, plannedExpenses, plannedIncomes, actualIncomes, actualByCategory, budget?.distributionSummary])
 
@@ -1019,6 +1042,14 @@ export default function BudgetPage() {
                     isPending={createPlanned.isPending}
                   />
                 )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => navigate('/planned-payments')}
+                >
+                  <ExternalLink className="mr-2 h-4 w-4" />
+                  Открыть
+                </Button>
               </div>
             }
           >
@@ -1135,6 +1166,9 @@ export default function BudgetPage() {
         actuallyAvailable={stats.actuallyAvailable}
         isVisible={!isLoading && !error}
       />
+
+      {/* Плавающее уведомление о просроченных платежах */}
+      <OverduePaymentsAlert overdueCount={stats.overdueCount} />
     </div>
   )
 }
