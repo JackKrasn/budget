@@ -19,7 +19,6 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { Textarea } from '@/components/ui/textarea'
 import { Calendar } from '@/components/ui/calendar'
 import {
   Popover,
@@ -302,38 +301,33 @@ export function CreateExpenseDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[520px] p-0 gap-0 bg-background">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b border-border/40">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500/20 to-orange-500/20 ring-1 ring-rose-500/30">
-              <TrendingDown className="h-5 w-5 text-rose-500" />
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px] p-0 gap-0 bg-background">
+        <DialogHeader className="px-5 pt-4 pb-3 border-b border-border/40">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500/20 to-orange-500/20 ring-1 ring-rose-500/30">
+              <TrendingDown className="h-4 w-4 text-rose-500" />
             </div>
-            <div>
-              <DialogTitle className="text-xl font-semibold tracking-tight">
-                Новый расход
-              </DialogTitle>
-              <p className="text-sm text-muted-foreground mt-0.5">
-                Добавьте информацию о расходе
-              </p>
-            </div>
+            <DialogTitle className="text-lg font-semibold tracking-tight">
+              Новый расход
+            </DialogTitle>
           </div>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
-            <div className="px-6 py-5 space-y-5">
+            <div className="px-5 py-4 space-y-3">
               {/* Account Selection */}
               <FormField
                 control={form.control}
                 name="accountId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <FormLabel className="text-xs font-medium text-muted-foreground">
                       Счёт списания
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-12 bg-background border-border/60 hover:border-border transition-colors">
+                        <SelectTrigger className="h-10 bg-background border-border/60 hover:border-border transition-colors">
                           <SelectValue placeholder="Выберите счёт" />
                         </SelectTrigger>
                       </FormControl>
@@ -368,13 +362,13 @@ export function CreateExpenseDialog({
               />
 
               {/* Amount & Currency Row */}
-              <div className="grid grid-cols-[1fr,100px] gap-3">
+              <div className="grid grid-cols-[1fr,80px] gap-2">
                 <FormField
                   control={form.control}
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <FormLabel className="text-xs font-medium text-muted-foreground">
                         Сумма
                       </FormLabel>
                       <FormControl>
@@ -383,10 +377,10 @@ export function CreateExpenseDialog({
                             type="number"
                             step="0.01"
                             placeholder="0"
-                            className="h-12 text-lg font-semibold pl-4 pr-12 bg-background border-border/60 hover:border-border transition-colors tabular-nums"
+                            className="h-10 text-base font-semibold pl-3 pr-10 bg-background border-border/60 hover:border-border transition-colors tabular-nums"
                             {...field}
                           />
-                          <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground font-medium">
+                          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground font-medium text-sm">
                             {currencySymbol}
                           </span>
                         </div>
@@ -401,11 +395,11 @@ export function CreateExpenseDialog({
                   name="currency"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      <FormLabel className="text-xs font-medium text-muted-foreground">
                         Валюта
                       </FormLabel>
                       <FormControl>
-                        <div className="flex h-12 items-center justify-center rounded-md border border-border/60 bg-muted/30 text-sm font-medium">
+                        <div className="flex h-10 items-center justify-center rounded-md border border-border/60 bg-muted/30 text-sm font-medium">
                           {CURRENCY_CONFIG[field.value]?.name ?? field.value}
                         </div>
                       </FormControl>
@@ -421,12 +415,12 @@ export function CreateExpenseDialog({
                 name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <FormLabel className="text-xs font-medium text-muted-foreground">
                       Категория
                     </FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-12 bg-background border-border/60 hover:border-border transition-colors">
+                        <SelectTrigger className="h-10 bg-background border-border/60 hover:border-border transition-colors">
                           <SelectValue placeholder="Выберите категорию" />
                         </SelectTrigger>
                       </FormControl>
@@ -435,15 +429,15 @@ export function CreateExpenseDialog({
                           const Icon = getIconByName(cat.icon)
                           return (
                             <SelectItem key={cat.id} value={cat.id}>
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
                                 <div
-                                  className="flex h-7 w-7 items-center justify-center rounded-lg"
+                                  className="flex h-6 w-6 items-center justify-center rounded-md"
                                   style={{
                                     backgroundColor: `${cat.color}20`,
                                   }}
                                 >
                                   <Icon
-                                    className="h-4 w-4"
+                                    className="h-3.5 w-3.5"
                                     style={{ color: cat.color }}
                                   />
                                 </div>
@@ -465,7 +459,7 @@ export function CreateExpenseDialog({
                 name="date"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <FormLabel className="text-xs font-medium text-muted-foreground">
                       Дата
                     </FormLabel>
                     <Popover>
@@ -474,14 +468,14 @@ export function CreateExpenseDialog({
                           <Button
                             variant="outline"
                             className={cn(
-                              'w-full h-12 pl-4 text-left font-normal bg-background border-border/60 hover:border-border transition-colors justify-start',
+                              'w-full h-10 pl-3 text-left font-normal bg-background border-border/60 hover:border-border transition-colors justify-start',
                               !field.value && 'text-muted-foreground'
                             )}
                           >
-                            <CalendarIcon className="mr-3 h-4 w-4 opacity-60" />
+                            <CalendarIcon className="mr-2 h-4 w-4 opacity-60" />
                             {field.value ? (
                               <span className="font-medium">
-                                {format(parseDateString(field.value), 'PPP', {
+                                {format(parseDateString(field.value), 'd MMM yyyy', {
                                   locale: ru,
                                 })}
                               </span>
@@ -523,13 +517,13 @@ export function CreateExpenseDialog({
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                    <FormLabel className="text-xs font-medium text-muted-foreground">
                       Описание
                     </FormLabel>
                     <FormControl>
-                      <Textarea
+                      <Input
                         placeholder="Необязательное описание..."
-                        className="resize-none min-h-[80px] bg-background border-border/60 hover:border-border transition-colors"
+                        className="h-10 bg-background border-border/60 hover:border-border transition-colors"
                         {...field}
                       />
                     </FormControl>
@@ -559,7 +553,7 @@ export function CreateExpenseDialog({
             {/* Fund Allocation Section */}
             {hasFundsWithCurrency && (
               <div className="border-t border-border/40">
-                <div className="px-6 py-4">
+                <div className="px-5 py-3">
                   <FormField
                     control={form.control}
                     name="useFundAllocation"
@@ -575,37 +569,34 @@ export function CreateExpenseDialog({
                         <button
                           type="button"
                           onClick={() => field.onChange(!field.value)}
-                          className="w-full p-4 flex items-center justify-between"
+                          className="w-full p-3 flex items-center justify-between"
                         >
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-2.5">
                             <div
                               className={cn(
-                                'flex h-10 w-10 items-center justify-center rounded-xl transition-colors',
+                                'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
                                 field.value
                                   ? 'bg-emerald-500/20 text-emerald-600'
                                   : 'bg-muted text-muted-foreground'
                               )}
                             >
-                              <Wallet className="h-5 w-5" />
+                              <Wallet className="h-4 w-4" />
                             </div>
                             <div className="text-left">
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold">
-                                  Финансировать из фонда
+                                <span className="font-medium text-sm">
+                                  Из фонда
                                 </span>
                                 {field.value && fundAllocations.length > 0 && (
                                   <Badge
                                     variant="secondary"
-                                    className="bg-emerald-500/20 text-emerald-700 border-0"
+                                    className="bg-emerald-500/20 text-emerald-700 border-0 text-xs px-1.5 py-0"
                                   >
-                                    <Sparkles className="h-3 w-3 mr-1" />
+                                    <Sparkles className="h-3 w-3 mr-0.5" />
                                     {fundAllocations.length}
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-sm text-muted-foreground">
-                                Списать средства из накопительных фондов
-                              </p>
                             </div>
                           </div>
                           <Switch
@@ -822,21 +813,21 @@ export function CreateExpenseDialog({
             )}
 
             {/* Action Buttons */}
-            <div className="px-6 py-4 border-t border-border/40 flex gap-3">
+            <div className="px-5 py-3 border-t border-border/40 flex gap-2">
               <Button
                 type="button"
                 variant="outline"
-                className="flex-1 h-11"
+                className="flex-1 h-9"
                 onClick={() => setOpen(false)}
               >
                 Отмена
               </Button>
               <Button
                 type="submit"
-                className="flex-1 h-11 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white shadow-lg shadow-rose-500/25"
+                className="flex-1 h-9 bg-gradient-to-r from-rose-500 to-orange-500 hover:from-rose-600 hover:to-orange-600 text-white shadow-lg shadow-rose-500/25"
                 disabled={createExpense.isPending}
               >
-                {createExpense.isPending ? 'Создание...' : 'Добавить расход'}
+                {createExpense.isPending ? 'Создание...' : 'Добавить'}
               </Button>
             </div>
           </form>

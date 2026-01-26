@@ -170,7 +170,6 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
                             className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent text-left transition-colors"
                             onClick={() => {
                               handleToggleTag(tag.id)
-                              setSearchQuery('')
                             }}
                           >
                             <div
