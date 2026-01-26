@@ -2,7 +2,9 @@ import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Check, Wallet, PiggyBank } from 'lucide-react'
+import { format } from 'date-fns'
+import { ru } from 'date-fns/locale'
+import { Check, Wallet, PiggyBank, CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -30,7 +32,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover'
+import { Calendar } from '@/components/ui/calendar'
 import { CategoryIcon } from '@/components/common'
+import { cn } from '@/lib/utils'
 import type { PlannedExpenseWithDetails, Account } from '@/lib/api/types'
 
 const formSchema = z.object({
@@ -120,7 +129,27 @@ export function ConfirmPlannedExpenseDialog({
     })
   }
 
+  const getDateFromValue = (dateStr: string | { Time: string; Valid: boolean } | null | undefined): Date | null => {
+    if (!dateStr) return null
+    const dateValue = typeof dateStr === 'string' ? dateStr : dateStr.Valid ? dateStr.Time : null
+    if (!dateValue) return null
+    const date = new Date(dateValue)
+    if (isNaN(date.getTime())) return null
+    return date
+  }
+
+  const formatDateLong = (date: Date | null): string | null => {
+    if (!date) return null
+    return date.toLocaleDateString('ru-RU', {
+      day: 'numeric',
+      month: 'long',
+    })
+  }
+
   if (!expense) return null
+
+  const plannedDate = getDateFromValue(expense.planned_date)
+  const plannedDateFormatted = formatDateLong(plannedDate)
 
   const plannedAmount = expense.planned_amount
 
@@ -225,15 +254,61 @@ export function ConfirmPlannedExpenseDialog({
             <FormField
               control={form.control}
               name="date"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Дата оплаты</FormLabel>
-                  <FormControl>
-                    <Input type="date" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                const selectedDate = field.value ? new Date(field.value) : undefined
+                return (
+                  <FormItem>
+                    <FormLabel>Дата оплаты</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'w-full justify-start text-left font-normal',
+                              !selectedDate && 'text-muted-foreground'
+                            )}
+                          >
+                            <CalendarIcon className="mr-2 h-4 w-4" />
+                            {selectedDate
+                              ? format(selectedDate, 'PPP', { locale: ru })
+                              : 'Выберите дату'}
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={selectedDate}
+                          onSelect={(date) => {
+                            if (date) {
+                              field.onChange(format(date, 'yyyy-MM-dd'))
+                            }
+                          }}
+                          modifiers={plannedDate ? { planned: plannedDate } : undefined}
+                          modifiersStyles={{
+                            planned: {
+                              backgroundColor: 'oklch(0.85 0.15 85)',
+                              borderRadius: '9999px',
+                              color: 'oklch(0.35 0.1 85)',
+                              fontWeight: 600,
+                            },
+                          }}
+                          initialFocus
+                          locale={ru}
+                        />
+                        {plannedDateFormatted && (
+                          <div className="border-t px-3 py-2 text-xs text-muted-foreground flex items-center gap-1.5">
+                            <div className="h-3 w-3 rounded-full" style={{ backgroundColor: 'oklch(0.85 0.15 85)' }} />
+                            Запланировано на {plannedDateFormatted}
+                          </div>
+                        )}
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
             />
 
             <FormField

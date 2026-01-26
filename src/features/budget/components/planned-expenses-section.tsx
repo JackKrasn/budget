@@ -393,7 +393,10 @@ export function PlannedExpensesSection({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => handleOpenConfirmDialog(expense)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleOpenConfirmDialog(expense)
+                          }}
                           disabled={isPending || isProcessing}
                           title="Подтвердить оплату"
                         >
@@ -403,7 +406,10 @@ export function PlannedExpensesSection({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => handleSkip(expense.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleSkip(expense.id)
+                          }}
                           disabled={isPending || isProcessing}
                           title="Пропустить"
                         >
@@ -414,7 +420,10 @@ export function PlannedExpensesSection({
                             variant="ghost"
                             size="icon"
                             className="h-7 w-7"
-                            onClick={() => handleDelete(expense.id)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleDelete(expense.id)
+                            }}
                             disabled={isPending || isProcessing}
                             title="Удалить"
                           >

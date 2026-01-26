@@ -464,7 +464,10 @@ export function PlannedIncomesSection({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => handleReceive(income.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleReceive(income.id)
+                          }}
                           disabled={isPending || isProcessing}
                           title="Отметить полученным"
                         >
@@ -474,7 +477,10 @@ export function PlannedIncomesSection({
                           variant="ghost"
                           size="icon"
                           className="h-7 w-7"
-                          onClick={() => handleSkip(income.id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleSkip(income.id)
+                          }}
                           disabled={isPending || isProcessing}
                           title="Пропустить"
                         >
