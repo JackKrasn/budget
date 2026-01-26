@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { format, startOfMonth, endOfMonth, isWithinInterval, addDays } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
@@ -333,8 +333,6 @@ function UpcomingPayment({
 }
 
 export default function DashboardPage() {
-  const navigate = useNavigate()
-
   // Даты текущего месяца для фильтрации
   const now = new Date()
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
