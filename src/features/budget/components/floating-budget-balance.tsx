@@ -3,6 +3,14 @@ import { Calculator, Wallet, Receipt } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CURRENCY_SYMBOLS } from '@/types'
 
+interface CurrencyLimitTotals {
+  totalLimit: number
+  actualAmount: number
+  remaining: number
+  plannedAmount: number
+  bufferAmount: number
+}
+
 interface FloatingBudgetBalanceProps {
   /** Доступно для планирования = Ожидаемый доход - План по категориям - Обязательные - Распределения в фонды */
   availableForPlanning: number
@@ -10,6 +18,8 @@ interface FloatingBudgetBalanceProps {
   actuallyAvailable: number
   /** Расходы по валютам */
   expensesByCurrency?: Record<string, number>
+  /** Лимиты по валютам (для будущего использования) */
+  limitsByCurrency?: Record<string, CurrencyLimitTotals>
   /** Callback при клике на кнопку расходов */
   onExpensesClick?: () => void
   isVisible?: boolean
@@ -26,6 +36,7 @@ export function FloatingBudgetBalance({
   availableForPlanning,
   actuallyAvailable,
   expensesByCurrency,
+  limitsByCurrency: _limitsByCurrency,
   onExpensesClick,
   isVisible = true,
 }: FloatingBudgetBalanceProps) {
