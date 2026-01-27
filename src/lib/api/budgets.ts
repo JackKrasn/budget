@@ -9,6 +9,10 @@ import type {
   UpdateBudgetRequest,
   UpsertBudgetItemRequest,
   BudgetsListParams,
+  CurrencyLimitsResponse,
+  SetCurrencyBufferRequest,
+  CurrencyLimit,
+  BudgetCurrency,
 } from './types'
 
 const ENDPOINT = '/budgets'
@@ -97,4 +101,28 @@ export const budgetsApi = {
    */
   generateCreditPayments: (budgetId: string) =>
     apiClient.post<{ generated: number }>(`${ENDPOINT}/${budgetId}/generate-credit-payments`, {}),
+
+  /**
+   * Get currency limits for a budget item
+   */
+  getCurrencyLimits: (budgetId: string, itemId: string) =>
+    apiClient.get<CurrencyLimitsResponse>(`${ENDPOINT}/${budgetId}/items/${itemId}/limits`),
+
+  /**
+   * Set buffer amount for a specific currency in a budget item
+   */
+  setCurrencyBuffer: (budgetId: string, itemId: string, data: SetCurrencyBufferRequest) =>
+    apiClient.put<CurrencyLimit>(`${ENDPOINT}/${budgetId}/items/${itemId}/limits`, data),
+
+  /**
+   * Delete currency limit for a budget item
+   */
+  deleteCurrencyLimit: (budgetId: string, itemId: string, currency: BudgetCurrency) =>
+    apiClient.delete<void>(`${ENDPOINT}/${budgetId}/items/${itemId}/limits/${currency}`),
+
+  /**
+   * Recalculate currency limits from planned expenses
+   */
+  recalculateLimits: (budgetId: string, itemId: string) =>
+    apiClient.post<CurrencyLimitsResponse>(`${ENDPOINT}/${budgetId}/items/${itemId}/recalculate-limits`, {}),
 }

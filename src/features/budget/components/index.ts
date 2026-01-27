@@ -1,5 +1,7 @@
 export { BudgetCategoryCard } from './budget-category-card'
 export { BudgetItemDialog } from './budget-item-dialog'
+export { CurrencyLimitBadge, CurrencyLimitsGrid, getCurrencyConfig } from './currency-limit-badge'
+export { CurrencyLimitsEditor } from './currency-limits-editor'
 export { MonthSelector } from './month-selector'
 export { CopyBudgetDialog } from './copy-budget-dialog'
 export { AddCategoryDialog } from './add-category-dialog'

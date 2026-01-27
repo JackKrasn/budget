@@ -5,6 +5,7 @@ import type {
   CreateBudgetRequest,
   UpdateBudgetRequest,
   UpsertBudgetItemRequest,
+  SetCurrencyBufferRequest,
 } from '@/lib/api/types'
 
 export const budgetKeys = {
@@ -173,6 +174,43 @@ export function useBudgetByMonth(year: number, month: number) {
         ...budgetDetail,
         total_planned: budgetFromList.total_planned,
       }
+    },
+  })
+}
+
+export function useSetCurrencyBuffer() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      budgetId,
+      itemId,
+      data,
+    }: {
+      budgetId: string
+      itemId: string
+      data: SetCurrencyBufferRequest
+    }) => budgetsApi.setCurrencyBuffer(budgetId, itemId, data),
+    onSuccess: () => {
+      // Инвалидируем все запросы бюджетов
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all })
+    },
+  })
+}
+
+export function useRecalculateLimits() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({
+      budgetId,
+      itemId,
+    }: {
+      budgetId: string
+      itemId: string
+    }) => budgetsApi.recalculateLimits(budgetId, itemId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: budgetKeys.all })
     },
   })
 }

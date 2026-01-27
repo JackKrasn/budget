@@ -17,8 +17,8 @@ export function BudgetCategoryCard({
   onEdit,
   isFixed = false,
 }: BudgetCategoryCardProps) {
-  // plannedAmount already includes plannedExpensesSum (formula: plannedAmount = plannedExpensesSum + bufferAmount)
-  const totalPlanned = item.plannedAmount
+  // totalLimit already includes plannedExpensesSum (formula: totalLimit = plannedExpensesSum + bufferAmount)
+  const totalPlanned = item.totalLimit
 
   const progress =
     totalPlanned > 0

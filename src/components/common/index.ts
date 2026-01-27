@@ -2,3 +2,5 @@ export { CategoryIcon, getCategoryIcon, FundIcon, getFundIcon } from './category
 export { DayPicker } from './day-picker'
 export { DateRangePicker } from './date-range-picker'
 export { ViewModeTabs, type ViewMode } from './view-mode-tabs'
+export { DayHeader, formatDateHeader, groupExpensesByCurrency, getCurrencySymbol } from './day-header'
+export { FiltersPanel, type FiltersPanelProps } from './filters-panel'

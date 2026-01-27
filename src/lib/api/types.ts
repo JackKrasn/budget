@@ -608,6 +608,20 @@ export interface ExpensesListParams {
 
 export type BudgetStatus = 'draft' | 'active' | 'closed'
 
+// Supported currencies for budget limits
+export type BudgetCurrency = 'RUB' | 'USD' | 'EUR' | 'GEL' | 'TRY' | 'CNY' | 'AED' | 'USDT' | 'BTC' | 'ETH' | 'TON' | 'OTHER'
+
+// Currency limit for a specific currency within a budget item
+export interface CurrencyLimit {
+  id: UUID
+  currency: BudgetCurrency
+  plannedAmount: number    // Auto-calculated from planned_expenses
+  bufferAmount: number     // User-editable buffer for unplanned expenses
+  totalLimit: number       // plannedAmount + bufferAmount
+  actualAmount: number     // Actual expenses in this currency
+  remaining: number        // totalLimit - actualAmount
+}
+
 export interface Budget {
   id: UUID
   year: number
@@ -623,12 +637,8 @@ export interface BudgetItem {
   id: UUID
   budgetId: UUID
   categoryId: UUID
-  plannedAmount: number
-  bufferAmount?: number
-  // Multi-currency breakdown
-  plannedAmountRub?: number  // RUB expenses only (no conversion)
-  plannedAmountUsd?: number  // USD expenses (in USD)
-  plannedAmountEur?: number  // EUR expenses (in EUR)
+  // Total limit = plannedExpensesSum + sum of all buffers
+  totalLimit: number
   notes?: string | null
   createdAt: ISODate
   updatedAt: ISODate
@@ -642,11 +652,14 @@ export interface BudgetItemWithCategory extends BudgetItem {
   actualAmount: number
   fundedAmount: number
   remaining: number
+  // Sum of planned expenses for this category (auto-calculated)
   plannedExpensesSum: number
   // Fund financing fields
   fundId?: UUID
   fundName?: string
   fundAllocation: number
+  // Multi-currency limits (always present in new API)
+  currencyLimits: CurrencyLimit[]
 }
 
 export interface FundDistributionSummary {
@@ -687,11 +700,45 @@ export interface FundFinancingSummary {
   fundBreakdown: FundingSource[]
 }
 
+// Currency summary for budget
+export interface BudgetCurrencySummary {
+  currency: string
+  totalPlanned: number
+  totalBuffer: number
+  totalLimit: number
+  totalActual: number
+  totalRemaining: number
+}
+
+// Planned expenses currency summary
+export interface PlannedExpensesCurrencySummary {
+  currency: string
+  totalPlanned: number
+  totalConfirmed: number
+  totalPending: number
+  totalSkipped: number
+  pendingCount: number
+  confirmedCount: number
+  skippedCount: number
+}
+
+// Funding currency summary
+export interface FundingCurrencySummary {
+  currency: string
+  totalPlanned: number
+  totalFromFunds: number
+  totalFromIncome: number
+}
+
 export interface BudgetWithItems extends Budget {
   items: BudgetItemWithCategory[]
   distributionSummary?: DistributionSummary
   fundDistributions?: FundDistributionSummary[]
   fundFinancingSummary?: FundFinancingSummary
+  // Multi-currency summaries
+  currencySummary?: BudgetCurrencySummary[]
+  plannedExpensesCurrencySummary?: PlannedExpensesCurrencySummary[]
+  fundingCurrencySummary?: FundingCurrencySummary[]
 }
 
 export interface BudgetsListResponse {
@@ -723,6 +770,17 @@ export interface UpsertBudgetItemRequest {
   // Fund financing fields
   fundId?: string
   fundAllocation?: number
+}
+
+// Request to set buffer for a specific currency
+export interface SetCurrencyBufferRequest {
+  currency: BudgetCurrency
+  bufferAmount: number
+}
+
+// Response for currency limits
+export interface CurrencyLimitsResponse {
+  data: CurrencyLimit[]
 }
 
 export interface BudgetsListParams {

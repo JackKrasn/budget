@@ -1,7 +1,7 @@
 // === Базовые типы ===
 export type UUID = string
 export type ISODate = string
-export type Currency = 'RUB' | 'USD' | 'EUR' | 'GEL' | 'TRY'
+export type Currency = 'RUB' | 'USD' | 'EUR' | 'GEL' | 'TRY' | 'CNY' | 'AED'
 
 // === Счета ===
 export type AccountType = 'card' | 'cash' | 'deposit' | 'credit' | 'investment' | 'broker'
@@ -165,4 +165,6 @@ export const CURRENCY_SYMBOLS: Record<Currency, string> = {
   EUR: '€',
   GEL: '₾',
   TRY: '₺',
+  CNY: '¥',
+  AED: 'د.إ',
 }

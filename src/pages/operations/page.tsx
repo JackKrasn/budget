@@ -41,7 +41,7 @@ import {
 } from '@/features/accounts'
 import { AccountIcon } from '@/components/ui/account-icon'
 import { DeleteTransactionResultDialog } from '@/features/funds/components'
-import { DateRangePicker } from '@/components/common'
+import { DateRangePicker, DayHeader, getCurrencySymbol } from '@/components/common'
 import type { ExpenseListRow, TransferWithAccounts, BalanceAdjustmentWithAccount, FundDeposit, DeleteTransactionResponse, UpdateFundDepositResponse } from '@/lib/api/types'
 
 function formatMoney(amount: number): string {
@@ -49,37 +49,6 @@ function formatMoney(amount: number): string {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
-}
-
-function getCurrencySymbol(currency: string): string {
-  const symbols: Record<string, string> = {
-    RUB: '₽',
-    USD: '$',
-    EUR: '€',
-    GEL: '₾',
-    TRY: '₺',
-  }
-  return symbols[currency] || currency
-}
-
-function formatDateHeader(date: string): string {
-  const d = new Date(date)
-  const today = new Date()
-  const yesterday = new Date(today)
-  yesterday.setDate(yesterday.getDate() - 1)
-
-  if (d.toDateString() === today.toDateString()) {
-    return 'Сегодня'
-  }
-  if (d.toDateString() === yesterday.toDateString()) {
-    return 'Вчера'
-  }
-
-  return d.toLocaleDateString('ru-RU', {
-    weekday: 'long',
-    day: 'numeric',
-    month: 'long',
-  })
 }
 
 type OperationType = 'expense' | 'transfer' | 'adjustment' | 'fund_deposit'
@@ -536,65 +505,14 @@ export default function OperationsPage() {
               {dayGroups.map((group) => (
                 <motion.div key={group.date} variants={item}>
                   {/* Day Header */}
-                  <div className="flex items-center justify-between mb-3">
-                    <h2 className="text-sm font-medium text-slate-700 dark:text-slate-300 capitalize">
-                      {formatDateHeader(group.date)}
-                    </h2>
-                    <div className="flex items-center gap-3 text-xs flex-wrap justify-end">
-                      {Object.keys(group.totalExpensesByCurrency).length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-muted-foreground">Расходы:</span>
-                          <span className="text-rose-500 font-medium tabular-nums">
-                            {Object.entries(group.totalExpensesByCurrency).map(([currency, amount], index) => (
-                              <span key={currency}>
-                                {index > 0 && ', '}
-                                {formatMoney(amount)} {getCurrencySymbol(currency)}
-                              </span>
-                            ))}
-                          </span>
-                        </div>
-                      )}
-                      {Object.keys(group.totalTransfersByCurrency).length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-muted-foreground">Переводы:</span>
-                          <span className="text-blue-500 font-medium tabular-nums">
-                            {Object.entries(group.totalTransfersByCurrency).map(([currency, amount], index) => (
-                              <span key={currency}>
-                                {index > 0 && ', '}
-                                {formatMoney(amount)} {getCurrencySymbol(currency)}
-                              </span>
-                            ))}
-                          </span>
-                        </div>
-                      )}
-                      {Object.keys(group.totalAdjustmentsByCurrency).length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-muted-foreground">Корректировки:</span>
-                          <span className="text-amber-500 font-medium tabular-nums">
-                            {Object.entries(group.totalAdjustmentsByCurrency).map(([currency, amount], index) => (
-                              <span key={currency}>
-                                {index > 0 && ', '}
-                                {formatMoney(amount)} {getCurrencySymbol(currency)}
-                              </span>
-                            ))}
-                          </span>
-                        </div>
-                      )}
-                      {Object.keys(group.totalFundDepositsByCurrency).length > 0 && (
-                        <div className="flex items-center gap-1">
-                          <span className="text-muted-foreground">В фонды:</span>
-                          <span className="text-purple-500 font-medium tabular-nums">
-                            {Object.entries(group.totalFundDepositsByCurrency).map(([currency, amount], index) => (
-                              <span key={currency}>
-                                {index > 0 && ', '}
-                                {formatMoney(amount)} {getCurrencySymbol(currency)}
-                              </span>
-                            ))}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                  <DayHeader
+                    date={group.date}
+                    expensesByCurrency={Object.keys(group.totalExpensesByCurrency).length > 0 ? group.totalExpensesByCurrency : undefined}
+                    transfersByCurrency={Object.keys(group.totalTransfersByCurrency).length > 0 ? group.totalTransfersByCurrency : undefined}
+                    adjustmentsByCurrency={Object.keys(group.totalAdjustmentsByCurrency).length > 0 ? group.totalAdjustmentsByCurrency : undefined}
+                    fundDepositsByCurrency={Object.keys(group.totalFundDepositsByCurrency).length > 0 ? group.totalFundDepositsByCurrency : undefined}
+                    className="mb-3"
+                  />
 
                   {/* Operations */}
                   <div className="space-y-2">

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { EyeOff, Plus, Settings2, Check, X, PiggyBank, Pencil } from 'lucide-react'
+import { EyeOff, Plus, Settings2, Check, X, PiggyBank } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -19,13 +19,9 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
+import { getCurrencyConfig } from './currency-limit-badge'
 import type { BudgetItemWithCategory, ExpenseCategoryWithTags } from '@/lib/api/types'
 
 interface BudgetTableProps {
@@ -43,8 +39,8 @@ interface BudgetTableProps {
   actualByCategory?: Record<string, number>
   /** Callback для клика по категории (переход к расходам) */
   onCategoryClick?: (categoryId: string) => void
-  /** Callback для редактирования категории (открыть диалог настроек) */
-  onEditCategory?: (item: BudgetItemWithCategory) => void
+  /** Callback для редактирования буфера (открыть диалог мультивалютных лимитов) */
+  onEditBuffer?: (item: BudgetItemWithCategory) => void
   /** Карта фондов для отображения названий (fundId -> fundName) */
   fundNames?: Record<string, string>
 }
@@ -184,17 +180,18 @@ export function BudgetTable({
   onAddCategory,
   actualByCategory = {},
   onCategoryClick,
-  onEditCategory,
+  onEditBuffer,
   fundNames = {},
 }: BudgetTableProps) {
   // Объединить все категории с данными бюджета
   const allRows = allCategories.map((category) => {
     const existingItem = items.find((i) => i.categoryId === category.id)
     const plannedExpensesSum = existingItem?.plannedExpensesSum ?? 0
-    // Буфер = plannedAmount - plannedExpensesSum (то что пользователь может тратить свободно)
-    const bufferAmount = Math.max((existingItem?.plannedAmount ?? 0) - plannedExpensesSum, 0)
-    // Total planned = buffer + mandatory payments (credits, etc.)
-    const totalPlanned = bufferAmount + plannedExpensesSum
+    // Буфер = сумма bufferAmount по всем валютам (берём из currencyLimits)
+    const currencyLimits = existingItem?.currencyLimits ?? []
+    const bufferAmount = currencyLimits.reduce((sum, l) => sum + l.bufferAmount, 0)
+    // Total limit from new API (or calculate fallback)
+    const totalLimit = existingItem?.totalLimit ?? (plannedExpensesSum + bufferAmount)
     // Используем actualByCategory из расходов, а не из budget_items
     const actual = actualByCategory[category.id] ?? 0
     // Информация о финансировании из фонда
@@ -207,7 +204,7 @@ export function BudgetTable({
       id: '',
       budgetId: '',
       categoryId: category.id,
-      plannedAmount: 0,
+      totalLimit: 0,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       categoryName: category.name,
@@ -219,13 +216,14 @@ export function BudgetTable({
       remaining: 0,
       plannedExpensesSum: 0,
       fundAllocation: 0,
+      currencyLimits: [],
     }
 
-    // Multi-currency breakdown
-    const plannedAmountRub = existingItem?.plannedAmountRub ?? 0
-    const plannedAmountUsd = existingItem?.plannedAmountUsd ?? 0
-    const plannedAmountEur = existingItem?.plannedAmountEur ?? 0
-    const hasMultiCurrency = plannedAmountUsd > 0 || plannedAmountEur > 0
+    // Show multi-currency if:
+    // - Has currencyLimits with more than 1 currency OR has non-RUB currency
+    const hasNonRubCurrency = currencyLimits.some(l => l.currency !== 'RUB')
+    const hasMultipleCurrencies = currencyLimits.length > 1
+    const hasMultiCurrency = hasMultipleCurrencies || hasNonRubCurrency
 
     return {
       categoryId: category.id,
@@ -235,9 +233,9 @@ export function BudgetTable({
       categoryColor: category.color,
       bufferAmount,
       plannedExpensesSum,
-      totalPlanned,
+      totalLimit,
       actual,
-      variance: totalPlanned - actual,
+      variance: totalLimit - actual,
       hasItem: !!existingItem || actual > 0,
       isHidden: hiddenCategories.includes(category.id),
       // Финансирование из фонда
@@ -245,10 +243,8 @@ export function BudgetTable({
       fundAllocation,
       fundName,
       budgetItem,
-      // Multi-currency
-      plannedAmountRub,
-      plannedAmountUsd,
-      plannedAmountEur,
+      // Multi-currency limits
+      currencyLimits,
       hasMultiCurrency,
     }
   })
@@ -258,21 +254,48 @@ export function BudgetTable({
 
   // Итоги
   const totals = rows.reduce(
-    (acc, row) => ({
-      buffer: acc.buffer + row.bufferAmount,
-      planned: acc.planned + row.totalPlanned,
-      mandatory: acc.mandatory + row.plannedExpensesSum,
-      actual: acc.actual + row.actual,
-      variance: acc.variance + row.variance,
-      // Multi-currency totals
-      plannedRub: acc.plannedRub + row.plannedAmountRub,
-      plannedUsd: acc.plannedUsd + row.plannedAmountUsd,
-      plannedEur: acc.plannedEur + row.plannedAmountEur,
-    }),
-    { buffer: 0, planned: 0, mandatory: 0, actual: 0, variance: 0, plannedRub: 0, plannedUsd: 0, plannedEur: 0 }
+    (acc, row) => {
+      // Aggregate currency limits
+      const newCurrencyTotals = { ...acc.currencyTotals }
+      for (const limit of row.currencyLimits) {
+        if (!newCurrencyTotals[limit.currency]) {
+          newCurrencyTotals[limit.currency] = {
+            plannedAmount: 0,
+            bufferAmount: 0,
+            totalLimit: 0,
+            actualAmount: 0,
+            remaining: 0,
+          }
+        }
+        newCurrencyTotals[limit.currency].plannedAmount += limit.plannedAmount
+        newCurrencyTotals[limit.currency].bufferAmount += limit.bufferAmount
+        newCurrencyTotals[limit.currency].totalLimit += limit.totalLimit
+        newCurrencyTotals[limit.currency].actualAmount += limit.actualAmount
+        newCurrencyTotals[limit.currency].remaining += limit.remaining
+      }
+
+      return {
+        buffer: acc.buffer + row.bufferAmount,
+        totalLimit: acc.totalLimit + row.totalLimit,
+        mandatory: acc.mandatory + row.plannedExpensesSum,
+        actual: acc.actual + row.actual,
+        variance: acc.variance + row.variance,
+        // Currency totals
+        currencyTotals: newCurrencyTotals,
+      }
+    },
+    {
+      buffer: 0,
+      totalLimit: 0,
+      mandatory: 0,
+      actual: 0,
+      variance: 0,
+      currencyTotals: {} as Record<string, { plannedAmount: number; bufferAmount: number; totalLimit: number; actualAmount: number; remaining: number }>,
+    }
   )
 
-  const hasMultiCurrencyTotals = totals.plannedUsd > 0 || totals.plannedEur > 0
+  const currencyTotalsArray = Object.entries(totals.currencyTotals)
+  const hasMultiCurrencyTotals = currencyTotalsArray.length > 1 || currencyTotalsArray.some(([c]) => c !== 'RUB')
 
   const formatMoney = (amount: number) => {
     return amount.toLocaleString('ru-RU', {
@@ -391,32 +414,89 @@ export function BudgetTable({
                             Из фонда «{row.fundName}»: {formatMoney(row.fundAllocation)} ₽
                           </p>
                         )}
+                        {/* Multi-currency badges */}
+                        {row.hasMultiCurrency && row.currencyLimits.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {row.currencyLimits.map((limit) => {
+                              const config = getCurrencyConfig(limit.currency)
+                              const progress = limit.totalLimit > 0 ? (limit.actualAmount / limit.totalLimit) * 100 : 0
+                              const isOver = limit.remaining < 0
+                              return (
+                                <span
+                                  key={limit.id}
+                                  className={cn(
+                                    'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs tabular-nums',
+                                    config.bgColor,
+                                    isOver ? 'text-destructive' : config.color
+                                  )}
+                                  title={`${limit.currency}: ${formatMoney(limit.actualAmount)} / ${formatMoney(limit.totalLimit)} (${Math.round(progress)}%)`}
+                                >
+                                  <span className="font-semibold">{config.symbol}</span>
+                                  <span>{formatMoney(limit.actualAmount)}</span>
+                                  <span className="text-muted-foreground">/</span>
+                                  <span>{formatMoney(limit.totalLimit)}</span>
+                                </span>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     </button>
-                    {onEditCategory && (
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => onEditCategory(row.budgetItem)}
-                        title="Настройки категории"
-                      >
-                        <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                      </Button>
-                    )}
                   </div>
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <InlineAmountInput
-                    value={row.bufferAmount}
-                    onChange={(value) => onUpdateItem(row.categoryId, value + row.plannedExpensesSum)}
-                    disabled={isPending}
-                  />
+                  {onEditBuffer ? (
+                    <button
+                      onClick={() => onEditBuffer(row.budgetItem)}
+                      className={cn(
+                        'min-w-[96px] h-auto px-2 py-1 text-right tabular-nums text-sm rounded',
+                        'hover:bg-muted/50 cursor-pointer transition-colors',
+                        'inline-flex flex-col items-end gap-0.5',
+                        row.bufferAmount === 0 && !row.hasMultiCurrency && 'text-muted-foreground'
+                      )}
+                      title="Настроить буфер по валютам"
+                    >
+                      {row.hasMultiCurrency && row.currencyLimits.length > 0 ? (
+                        row.currencyLimits.map((limit) => {
+                          const config = getCurrencyConfig(limit.currency)
+                          return (
+                            <span key={limit.id} className={cn('tabular-nums', config.color)}>
+                              {config.symbol}{formatMoney(limit.bufferAmount)}
+                            </span>
+                          )
+                        })
+                      ) : (
+                        <span className="inline-flex items-center gap-1">
+                          {formatMoney(row.bufferAmount)} ₽
+                        </span>
+                      )}
+                    </button>
+                  ) : (
+                    <InlineAmountInput
+                      value={row.bufferAmount}
+                      onChange={(value) => onUpdateItem(row.categoryId, value + row.plannedExpensesSum)}
+                      disabled={isPending}
+                    />
+                  )}
                 </TableCell>
 
                 <TableCell className="text-right">
-                  {row.plannedExpensesSum > 0 ? (
+                  {row.hasMultiCurrency && row.currencyLimits.length > 0 ? (
+                    <div className="flex flex-col items-end gap-0.5">
+                      {row.currencyLimits.map((limit) => {
+                        const config = getCurrencyConfig(limit.currency)
+                        return (
+                          <span
+                            key={limit.id}
+                            className={cn('tabular-nums text-sm font-medium', config.color)}
+                          >
+                            {config.symbol}{formatMoney(limit.plannedAmount)}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  ) : row.plannedExpensesSum > 0 ? (
                     <span className="tabular-nums text-blue-500 font-medium">
                       {formatMoney(row.plannedExpensesSum)} ₽
                     </span>
@@ -426,77 +506,88 @@ export function BudgetTable({
                 </TableCell>
 
                 <TableCell className="text-right">
-                  {row.hasMultiCurrency ? (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <span className="tabular-nums font-semibold cursor-help border-b border-dashed border-muted-foreground/50">
-                          {formatMoney(row.totalPlanned)} ₽
-                        </span>
-                      </TooltipTrigger>
-                      <TooltipContent side="left" className="text-left">
-                        <div className="space-y-1">
-                          <p className="font-medium">Разбивка по валютам:</p>
-                          {row.plannedAmountRub > 0 && (
-                            <p className="tabular-nums">{formatMoney(row.plannedAmountRub)} ₽</p>
-                          )}
-                          {row.plannedAmountUsd > 0 && (() => {
-                            // Вычисляем курс: (totalPlanned - rub - eur_in_rub) / usd
-                            // Для упрощения считаем сколько рублей приходится на USD
-                            const usdInRub = row.plannedExpensesSum - row.plannedAmountRub -
-                              (row.plannedAmountEur > 0 ? (row.plannedExpensesSum - row.plannedAmountRub) * row.plannedAmountEur / (row.plannedAmountUsd + row.plannedAmountEur) : 0)
-                            const rate = row.plannedAmountUsd > 0 ? usdInRub / row.plannedAmountUsd : 0
-                            return (
-                              <p className="tabular-nums">
-                                ${formatMoney(row.plannedAmountUsd)}
-                                <span className="text-muted-foreground ml-1">
-                                  (~{formatMoney(usdInRub)} ₽, курс {rate.toFixed(2)})
-                                </span>
-                              </p>
-                            )
-                          })()}
-                          {row.plannedAmountEur > 0 && (() => {
-                            const eurInRub = row.plannedExpensesSum - row.plannedAmountRub -
-                              (row.plannedAmountUsd > 0 ? (row.plannedExpensesSum - row.plannedAmountRub) * row.plannedAmountUsd / (row.plannedAmountUsd + row.plannedAmountEur) : 0)
-                            const rate = row.plannedAmountEur > 0 ? eurInRub / row.plannedAmountEur : 0
-                            return (
-                              <p className="tabular-nums">
-                                €{formatMoney(row.plannedAmountEur)}
-                                <span className="text-muted-foreground ml-1">
-                                  (~{formatMoney(eurInRub)} ₽, курс {rate.toFixed(2)})
-                                </span>
-                              </p>
-                            )
-                          })()}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
+                  {row.hasMultiCurrency && row.currencyLimits.length > 0 ? (
+                    <div className="flex flex-col items-end gap-0.5">
+                      {row.currencyLimits.map((limit) => {
+                        const config = getCurrencyConfig(limit.currency)
+                        return (
+                          <span
+                            key={limit.id}
+                            className={cn('tabular-nums text-sm font-semibold', config.color)}
+                          >
+                            {config.symbol}{formatMoney(limit.totalLimit)}
+                          </span>
+                        )
+                      })}
+                    </div>
                   ) : (
                     <span className="tabular-nums font-semibold">
-                      {formatMoney(row.totalPlanned)} ₽
+                      {formatMoney(row.totalLimit)} ₽
                     </span>
                   )}
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <span className="tabular-nums text-muted-foreground">
-                    {formatMoney(row.actual)} ₽
-                  </span>
+                  {row.hasMultiCurrency && row.currencyLimits.length > 0 ? (
+                    <div className="flex flex-col items-end gap-0.5">
+                      {row.currencyLimits.map((limit) => {
+                        const config = getCurrencyConfig(limit.currency)
+                        return (
+                          <span
+                            key={limit.id}
+                            className={cn('tabular-nums text-sm', config.color)}
+                          >
+                            {config.symbol}{formatMoney(limit.actualAmount)}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <span className="tabular-nums text-muted-foreground">
+                      {formatMoney(row.actual)} ₽
+                    </span>
+                  )}
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <span
-                    className={cn(
-                      'tabular-nums font-medium',
-                      isOverBudget
-                        ? 'text-destructive'
-                        : row.variance > 0
-                          ? 'text-emerald-500'
-                          : 'text-muted-foreground'
-                    )}
-                  >
-                    {row.variance > 0 ? '+' : ''}
-                    {formatMoney(row.variance)} ₽
-                  </span>
+                  {row.hasMultiCurrency && row.currencyLimits.length > 0 ? (
+                    <div className="flex flex-col items-end gap-0.5">
+                      {row.currencyLimits.map((limit) => {
+                        const config = getCurrencyConfig(limit.currency)
+                        const isLimitOver = limit.remaining < 0
+                        return (
+                          <span
+                            key={limit.id}
+                            className={cn(
+                              'tabular-nums text-sm font-medium',
+                              isLimitOver
+                                ? 'text-destructive'
+                                : limit.remaining > 0
+                                  ? 'text-emerald-500'
+                                  : 'text-muted-foreground'
+                            )}
+                          >
+                            {limit.remaining > 0 ? '+' : ''}
+                            {config.symbol}{formatMoney(limit.remaining)}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <span
+                      className={cn(
+                        'tabular-nums font-medium',
+                        isOverBudget
+                          ? 'text-destructive'
+                          : row.variance > 0
+                            ? 'text-emerald-500'
+                            : 'text-muted-foreground'
+                      )}
+                    >
+                      {row.variance > 0 ? '+' : ''}
+                      {formatMoney(row.variance)} ₽
+                    </span>
+                  )}
                 </TableCell>
 
                 <TableCell>
@@ -517,81 +608,94 @@ export function BudgetTable({
           })}
         </TableBody>
         <TableFooter>
-          <TableRow className="bg-muted/50 font-semibold">
-            <TableCell>Итого</TableCell>
-            <TableCell className="text-right tabular-nums text-muted-foreground">
-              {formatMoney(totals.buffer)} ₽
-            </TableCell>
-            <TableCell className="text-right tabular-nums text-blue-500">
-              {formatMoney(totals.mandatory)} ₽
-            </TableCell>
-            <TableCell className="text-right tabular-nums">
-              {hasMultiCurrencyTotals ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span className="cursor-help border-b border-dashed border-muted-foreground/50">
-                      {formatMoney(totals.planned)} ₽
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent side="left" className="text-left">
-                    <div className="space-y-1">
-                      <p className="font-medium">Разбивка по валютам:</p>
-                      {totals.plannedRub > 0 && (
-                        <p className="tabular-nums">{formatMoney(totals.plannedRub)} ₽</p>
-                      )}
-                      {totals.plannedUsd > 0 && (() => {
-                        const usdInRub = totals.mandatory - totals.plannedRub -
-                          (totals.plannedEur > 0 ? (totals.mandatory - totals.plannedRub) * totals.plannedEur / (totals.plannedUsd + totals.plannedEur) : 0)
-                        const rate = totals.plannedUsd > 0 ? usdInRub / totals.plannedUsd : 0
-                        return (
-                          <p className="tabular-nums">
-                            ${formatMoney(totals.plannedUsd)}
-                            <span className="text-muted-foreground ml-1">
-                              (~{formatMoney(usdInRub)} ₽, курс {rate.toFixed(2)})
-                            </span>
-                          </p>
-                        )
-                      })()}
-                      {totals.plannedEur > 0 && (() => {
-                        const eurInRub = totals.mandatory - totals.plannedRub -
-                          (totals.plannedUsd > 0 ? (totals.mandatory - totals.plannedRub) * totals.plannedUsd / (totals.plannedUsd + totals.plannedEur) : 0)
-                        const rate = totals.plannedEur > 0 ? eurInRub / totals.plannedEur : 0
-                        return (
-                          <p className="tabular-nums">
-                            €{formatMoney(totals.plannedEur)}
-                            <span className="text-muted-foreground ml-1">
-                              (~{formatMoney(eurInRub)} ₽, курс {rate.toFixed(2)})
-                            </span>
-                          </p>
-                        )
-                      })()}
-                    </div>
-                  </TooltipContent>
-                </Tooltip>
-              ) : (
-                <>{formatMoney(totals.planned)} ₽</>
-              )}
-            </TableCell>
-            <TableCell className="text-right tabular-nums text-muted-foreground">
-              {formatMoney(totals.actual)} ₽
-            </TableCell>
-            <TableCell className="text-right">
-              <span
-                className={cn(
-                  'tabular-nums',
-                  totals.variance < 0
-                    ? 'text-destructive'
-                    : totals.variance > 0
-                      ? 'text-emerald-500'
-                      : ''
-                )}
-              >
-                {totals.variance > 0 ? '+' : ''}
-                {formatMoney(totals.variance)} ₽
-              </span>
-            </TableCell>
-            <TableCell></TableCell>
-          </TableRow>
+          {/* Итого по валютам - показываем каждую валюту отдельно */}
+          {hasMultiCurrencyTotals ? (
+            <>
+              {currencyTotalsArray.map(([currency, data], index) => {
+                const config = getCurrencyConfig(currency as Parameters<typeof getCurrencyConfig>[0])
+                const isOverBudget = data.remaining < 0
+                return (
+                  <TableRow
+                    key={currency}
+                    className={cn(
+                      'font-semibold',
+                      index === 0 ? 'bg-muted/50' : 'bg-muted/30'
+                    )}
+                  >
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        {index === 0 && <span>Итого</span>}
+                        <span className={cn('inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs', config.bgColor, config.color)}>
+                          <span className="font-bold">{config.symbol}</span>
+                          {currency}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell className={cn('text-right tabular-nums text-muted-foreground', config.color)}>
+                      {config.symbol}{formatMoney(data.bufferAmount)}
+                    </TableCell>
+                    <TableCell className={cn('text-right tabular-nums', config.color)}>
+                      {config.symbol}{formatMoney(data.plannedAmount)}
+                    </TableCell>
+                    <TableCell className={cn('text-right tabular-nums', config.color)}>
+                      {config.symbol}{formatMoney(data.totalLimit)}
+                    </TableCell>
+                    <TableCell className={cn('text-right tabular-nums', config.color)}>
+                      {config.symbol}{formatMoney(data.actualAmount)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <span
+                        className={cn(
+                          'tabular-nums',
+                          isOverBudget
+                            ? 'text-destructive'
+                            : data.remaining > 0
+                              ? 'text-emerald-500'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        {data.remaining > 0 ? '+' : ''}
+                        {config.symbol}{formatMoney(data.remaining)}
+                      </span>
+                    </TableCell>
+                    <TableCell></TableCell>
+                  </TableRow>
+                )
+              })}
+            </>
+          ) : (
+            <TableRow className="bg-muted/50 font-semibold">
+              <TableCell>Итого</TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {formatMoney(totals.buffer)} ₽
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-blue-500">
+                {formatMoney(totals.mandatory)} ₽
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatMoney(totals.totalLimit)} ₽
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {formatMoney(totals.actual)} ₽
+              </TableCell>
+              <TableCell className="text-right">
+                <span
+                  className={cn(
+                    'tabular-nums',
+                    totals.variance < 0
+                      ? 'text-destructive'
+                      : totals.variance > 0
+                        ? 'text-emerald-500'
+                        : ''
+                  )}
+                >
+                  {totals.variance > 0 ? '+' : ''}
+                  {formatMoney(totals.variance)} ₽
+                </span>
+              </TableCell>
+              <TableCell></TableCell>
+            </TableRow>
+          )}
         </TableFooter>
       </Table>
     </motion.div>

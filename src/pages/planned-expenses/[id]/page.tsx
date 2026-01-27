@@ -18,6 +18,8 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AccountIcon } from '@/components/ui/account-icon'
+import { CURRENCY_SYMBOLS } from '@/types'
 import {
   usePlannedExpense,
   useConfirmPlannedExpenseWithExpense,
@@ -210,6 +212,10 @@ export default function PlannedExpenseDetailsPage() {
   // Находим счет по умолчанию
   const defaultAccount = accounts.find((a) => a.id === expense.account_id)
 
+  // Валюта расхода
+  const currency = expense.currency || 'RUB'
+  const currencySymbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+
   // Проверка просрочки
   const getOverdueDays = (): number | null => {
     if (expense.status !== 'pending') return null
@@ -309,7 +315,13 @@ export default function PlannedExpenseDetailsPage() {
                     </div>
                     {defaultAccount && (
                       <div className="flex items-center gap-1.5">
-                        <Wallet className="h-4 w-4" />
+                        <AccountIcon
+                          bankName={defaultAccount.bank_name}
+                          typeCode={defaultAccount.type_code}
+                          color={defaultAccount.color}
+                          size="sm"
+                          showBackground={false}
+                        />
                         <span>{defaultAccount.name}</span>
                       </div>
                     )}
@@ -340,14 +352,28 @@ export default function PlannedExpenseDetailsPage() {
                           : expense.planned_amount
                       )}
                     </span>
-                    <span className="text-2xl font-medium text-muted-foreground">₽</span>
+                    <span className="text-2xl font-medium text-muted-foreground">{currencySymbol}</span>
                   </div>
+                  {/* Сумма в базовой валюте для иностранных валют */}
+                  {currency !== 'RUB' && expense.planned_amount_base > 0 && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      ≈ {formatMoney(expense.planned_amount_base)} ₽
+                      {(() => {
+                        const rate = getActualAmount(expense.exchange_rate as number | { Float64: number; Valid: boolean } | null)
+                        return rate ? (
+                          <span className="ml-1 text-xs">
+                            (курс {rate.toFixed(2)})
+                          </span>
+                        ) : null
+                      })()}
+                    </p>
+                  )}
                   {expense.status === 'confirmed' && actualAmount != null && actualAmount !== expense.planned_amount && (
                     <p className="text-sm text-muted-foreground mt-1">
-                      Запланировано: {formatMoney(expense.planned_amount)} ₽
+                      Запланировано: {formatMoney(expense.planned_amount)} {currencySymbol}
                       {actualAmount < expense.planned_amount && (
                         <span className="text-emerald-500 ml-2">
-                          (экономия {formatMoney(expense.planned_amount - actualAmount)} ₽)
+                          (экономия {formatMoney(expense.planned_amount - actualAmount)} {currencySymbol})
                         </span>
                       )}
                     </p>
@@ -400,7 +426,7 @@ export default function PlannedExpenseDetailsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Из бюджета</p>
                 <p className="text-xl font-bold tabular-nums">
-                  {formatMoney(fromBudget)} ₽
+                  {formatMoney(fromBudget)} {currencySymbol}
                 </p>
               </div>
             </div>
@@ -417,7 +443,7 @@ export default function PlannedExpenseDetailsPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Из фонда</p>
                 <p className="text-xl font-bold tabular-nums">
-                  {fundedAmount ? `${formatMoney(fundedAmount)} ₽` : '—'}
+                  {fundedAmount ? `${formatMoney(fundedAmount)} ${currencySymbol}` : '—'}
                 </p>
                 {expense.fund_name && (
                   <p className="text-xs text-muted-foreground">{expense.fund_name}</p>
@@ -454,8 +480,8 @@ export default function PlannedExpenseDetailsPage() {
                   Финансирование из фонда
                 </p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Из фонда «{expense.fund_name}» будет списано {formatMoney(fundedAmount)} ₽
-                  {fromBudget > 0 && `, остальные ${formatMoney(fromBudget)} ₽ — из бюджета`}
+                  Из фонда «{expense.fund_name}» будет списано {formatMoney(fundedAmount)} {currencySymbol}
+                  {fromBudget > 0 && `, остальные ${formatMoney(fromBudget)} ${currencySymbol} — из бюджета`}
                 </p>
               </div>
             </div>
