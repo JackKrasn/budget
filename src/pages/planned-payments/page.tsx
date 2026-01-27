@@ -90,7 +90,7 @@ export default function PlannedPaymentsPage() {
     const pendingExpenses = plannedExpenses.filter((e) => e.status === 'pending')
     const pendingIncomes = plannedIncomes.filter((i) => i.status === 'pending')
 
-    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.planned_amount, 0)
+    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0)
     const totalPendingIncomes = pendingIncomes.reduce((sum, i) => sum + i.expected_amount, 0)
 
     // Просроченные (дата до сегодня, но не выполнены)

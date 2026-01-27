@@ -37,10 +37,15 @@ import type {
   Fund,
   AccountWithType,
 } from '@/lib/api/types'
+import type { Currency } from '@/types'
+import { CURRENCY_SYMBOLS } from '@/types'
+
+const CURRENCIES: Currency[] = ['RUB', 'USD', 'EUR', 'GEL', 'TRY']
 
 const formSchema = z.object({
   name: z.string().min(1, 'Введите название'),
   categoryId: z.string().min(1, 'Выберите категорию'),
+  currency: z.string().min(1, 'Выберите валюту'),
   accountId: z.string().optional(),
   fundId: z.string().optional(),
   amount: z.string().min(1, 'Введите сумму'),
@@ -87,6 +92,7 @@ export function RecurringExpenseDialog({
     defaultValues: {
       name: '',
       categoryId: '',
+      currency: 'RUB',
       accountId: '',
       fundId: '',
       amount: '',
@@ -95,12 +101,20 @@ export function RecurringExpenseDialog({
     },
   })
 
+  const selectedCurrency = form.watch('currency')
+
+  // Filter accounts by selected currency
+  const filteredAccounts = accounts.filter(
+    (account) => account.currency === selectedCurrency
+  )
+
   // При открытии с данными для редактирования
   useEffect(() => {
     if (expense) {
       form.reset({
         name: expense.name,
         categoryId: expense.category_id,
+        currency: expense.currency || 'RUB',
         accountId: expense.account_id ?? '',
         fundId: expense.fund_id ?? '',
         amount: String(expense.amount),
@@ -111,6 +125,7 @@ export function RecurringExpenseDialog({
       form.reset({
         name: '',
         categoryId: '',
+        currency: 'RUB',
         accountId: '',
         fundId: '',
         amount: '',
@@ -120,6 +135,17 @@ export function RecurringExpenseDialog({
     }
   }, [expense, form])
 
+  // Reset account when currency changes (account must match currency)
+  useEffect(() => {
+    const currentAccountId = form.getValues('accountId')
+    if (currentAccountId) {
+      const account = accounts.find((a) => a.id === currentAccountId)
+      if (account && account.currency !== selectedCurrency) {
+        form.setValue('accountId', '')
+      }
+    }
+  }, [selectedCurrency, accounts, form])
+
   const handleSubmit = async (data: FormData) => {
     await onSubmit({
       categoryId: data.categoryId,
@@ -127,7 +153,7 @@ export function RecurringExpenseDialog({
       fundId: data.fundId || undefined,
       name: data.name,
       amount: parseFloat(data.amount),
-      currency: 'RUB',
+      currency: data.currency,
       dayOfMonth: parseInt(data.dayOfMonth, 10),
       isActive: data.isActive,
     })
@@ -199,6 +225,34 @@ export function RecurringExpenseDialog({
 
             <FormField
               control={form.control}
+              name="currency"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Валюта</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Выберите валюту" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {CURRENCIES.map((currency) => (
+                        <SelectItem key={currency} value={currency}>
+                          <span>{CURRENCY_SYMBOLS[currency]} {currency}</span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription>
+                    Валюта в которой запланирован расход
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
               name="accountId"
               render={({ field }) => (
                 <FormItem>
@@ -214,7 +268,7 @@ export function RecurringExpenseDialog({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="none">Не выбран</SelectItem>
-                      {accounts.map((account) => (
+                      {filteredAccounts.map((account) => (
                         <SelectItem key={account.id} value={account.id}>
                           <div className="flex items-center gap-2">
                             <AccountIcon
@@ -229,7 +283,9 @@ export function RecurringExpenseDialog({
                     </SelectContent>
                   </Select>
                   <FormDescription>
-                    Счёт по умолчанию для оплаты расхода
+                    {filteredAccounts.length === 0
+                      ? `Нет счетов в валюте ${selectedCurrency}`
+                      : 'Счёт по умолчанию для оплаты расхода'}
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

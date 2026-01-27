@@ -625,6 +625,10 @@ export interface BudgetItem {
   categoryId: UUID
   plannedAmount: number
   bufferAmount?: number
+  // Multi-currency breakdown
+  plannedAmountRub?: number  // RUB expenses only (no conversion)
+  plannedAmountUsd?: number  // USD expenses (in USD)
+  plannedAmountEur?: number  // EUR expenses (in EUR)
   notes?: string | null
   createdAt: ISODate
   updatedAt: ISODate
@@ -804,6 +808,8 @@ export interface PlannedExpense {
   name: string
   planned_amount: number
   currency: string
+  planned_amount_base: number // Сумма в базовой валюте (RUB) для расчёта бюджета
+  exchange_rate?: number | null // Курс конвертации на момент создания
   planned_date: ISODate | { Time: string; Valid: boolean }
   status: PlannedExpenseStatus
   actual_expense_id?: UUID

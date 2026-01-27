@@ -197,24 +197,40 @@ export default function BudgetPage() {
     const totalActual = Object.values(actualByCategory).reduce((sum, amount) => sum + amount, 0)
     const variance = totalPlanned - totalActual
 
-    // Обязательные расходы из planned_expenses
-    const totalPlannedExpenses = plannedExpenses.reduce((sum, e) => sum + e.planned_amount, 0)
+    // Обязательные расходы из planned_expenses (используем planned_amount_base — уже в RUB)
+    const totalPlannedExpenses = plannedExpenses.reduce(
+      (sum, e) => sum + e.planned_amount_base,
+      0
+    )
     const pendingPlanned = plannedExpenses
       .filter((e) => e.status === 'pending')
-      .reduce((sum, e) => sum + e.planned_amount, 0)
+      .reduce((sum, e) => sum + e.planned_amount_base, 0)
 
     const confirmedPlanned = plannedExpenses
       .filter((e) => e.status === 'confirmed')
-      .reduce((sum, e) => sum + (getActualAmount(e.actual_amount) ?? e.planned_amount), 0)
+      .reduce((sum, e) => {
+        // actual_amount в валюте расхода, конвертируем по курсу расхода
+        const actualAmount = getActualAmount(e.actual_amount)
+        if (actualAmount !== null && e.exchange_rate) {
+          return sum + actualAmount * e.exchange_rate
+        }
+        return sum + e.planned_amount_base
+      }, 0)
 
-    // Финансирование обязательных расходов из фондов
+    // Финансирование обязательных расходов из фондов (конвертируем в RUB по курсу расхода)
     // funded_amount приходит как { Float64: number, Valid: boolean }
     const plannedFromFunds = plannedExpenses
       .filter((e) => e.status === 'pending' && getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0)
+      .reduce((sum, e) => {
+        const fundedAmount = getActualAmount(e.funded_amount) ?? 0
+        return sum + fundedAmount * (e.exchange_rate ?? 1)
+      }, 0)
     const confirmedFromFunds = plannedExpenses
       .filter((e) => e.status === 'confirmed' && getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0)
+      .reduce((sum, e) => {
+        const fundedAmount = getActualAmount(e.funded_amount) ?? 0
+        return sum + fundedAmount * (e.exchange_rate ?? 1)
+      }, 0)
     const totalFromFunds = plannedFromFunds + confirmedFromFunds
 
     // Обязательные из бюджета (без финансирования из фондов)
@@ -285,13 +301,15 @@ export default function BudgetPage() {
     for (const expense of plannedExpenses) {
       const fundedAmount = getActualAmount(expense.funded_amount)
       if (expense.fund_id && fundedAmount && fundedAmount > 0) {
+        // Конвертируем в RUB по курсу расхода
+        const fundedAmountRub = fundedAmount * (expense.exchange_rate ?? 1)
         const current = fundPlanned.get(expense.fund_id) || 0
-        fundPlanned.set(expense.fund_id, current + fundedAmount)
+        fundPlanned.set(expense.fund_id, current + fundedAmountRub)
 
         // Если расход подтверждён, считаем как использованный
         if (expense.status === 'confirmed') {
           const currentUsed = fundUsed.get(expense.fund_id) || 0
-          fundUsed.set(expense.fund_id, currentUsed + fundedAmount)
+          fundUsed.set(expense.fund_id, currentUsed + fundedAmountRub)
         }
       }
     }

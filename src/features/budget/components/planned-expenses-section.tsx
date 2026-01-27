@@ -28,12 +28,13 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { PlannedExpenseWithDetails, PlannedExpenseStatus, Account, ExpenseCategoryWithTags } from '@/lib/api/types'
+import type { PlannedExpenseWithDetails, PlannedExpenseStatus, AccountWithType, ExpenseCategoryWithTags } from '@/lib/api/types'
 import { ConfirmPlannedExpenseDialog } from './confirm-planned-expense-dialog'
+import { CURRENCY_SYMBOLS } from '@/types'
 
 interface PlannedExpensesSectionProps {
   expenses: PlannedExpenseWithDetails[]
-  accounts: Account[]
+  accounts: AccountWithType[]
   /** Список категорий для обогащения данных (если бэкенд не возвращает детали) */
   categories?: ExpenseCategoryWithTags[]
   onConfirm: (
@@ -110,6 +111,12 @@ export function PlannedExpensesSection({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
+  }
+
+  // Форматирование суммы с символом валюты
+  const formatMoneyWithCurrency = (amount: number, currency: string) => {
+    const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+    return `${formatMoney(amount)} ${symbol}`
   }
 
   // Извлечь число из nullable типа бэкенда (может быть {Float64: number, Valid: boolean} или просто number)
@@ -191,36 +198,41 @@ export function PlannedExpensesSection({
   const pendingExpenses = enrichedExpenses.filter((e) => e.status === 'pending')
   const confirmedExpenses = enrichedExpenses.filter((e) => e.status === 'confirmed')
 
-  // Группировка по фондам
+  // Группировка по фондам (используем exchange_rate из расхода)
   const fundBreakdown = enrichedExpenses.reduce<Record<string, { name: string; amount: number }>>((acc, e) => {
     const fundedAmount = getActualAmount(e.funded_amount)
     if (fundedAmount && e.fund_name && e.fund_id) {
       if (!acc[e.fund_id]) {
         acc[e.fund_id] = { name: e.fund_name, amount: 0 }
       }
-      acc[e.fund_id].amount += fundedAmount
+      // Конвертируем по курсу расхода
+      acc[e.fund_id].amount += fundedAmount * (e.exchange_rate ?? 1)
     }
     return acc
   }, {})
 
   const totals = {
-    planned: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount, 0),
-    confirmed: confirmedExpenses.reduce(
-      (sum, e) => sum + (getActualAmount(e.actual_amount) ?? e.planned_amount),
-      0
-    ),
-    pending: pendingExpenses.reduce((sum, e) => sum + e.planned_amount, 0),
+    // Используем planned_amount_base — уже в RUB
+    planned: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0),
+    confirmed: confirmedExpenses.reduce((sum, e) => {
+      const actualAmount = getActualAmount(e.actual_amount)
+      if (actualAmount !== null && e.exchange_rate) {
+        return sum + actualAmount * e.exchange_rate
+      }
+      return sum + e.planned_amount_base
+    }, 0),
+    pending: pendingExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0),
     // Финансирование из фондов (funded_amount приходит как { Float64, Valid })
     fromFunds: enrichedExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
     pendingFromFunds: pendingExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
-    fromBudget: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount, 0) -
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
+    fromBudget: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0) -
       enrichedExpenses
         .filter((e) => getActualAmount(e.funded_amount))
-        .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0), 0),
+        .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
     fundBreakdown: Object.values(fundBreakdown),
   }
 
@@ -292,7 +304,7 @@ export function PlannedExpensesSection({
                         {getActualAmount(expense.funded_amount) && expense.fund_name ? (
                           <p className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
                             <PiggyBank className="h-3 w-3" />
-                            Из фонда «{expense.fund_name}»: {formatMoney(getActualAmount(expense.funded_amount) ?? 0)} ₽
+                            Из фонда «{expense.fund_name}»: {formatMoneyWithCurrency(getActualAmount(expense.funded_amount) ?? 0, expense.currency || 'RUB')}
                           </p>
                         ) : null}
                       </div>
@@ -315,13 +327,24 @@ export function PlannedExpensesSection({
                   <TableCell className="text-right">
                     {(() => {
                       const actualAmount = getActualAmount(expense.actual_amount)
+                      const currency = expense.currency || 'RUB'
+                      const currencySymbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+                      const isNonRub = currency !== 'RUB'
+                      // Используем exchange_rate из расхода вместо поиска по курсам
+                      const rate = expense.exchange_rate ?? 1
+
                       if (expense.status === 'confirmed' && actualAmount != null) {
                         const savings = expense.planned_amount - actualAmount
                         return (
                           <div className="flex flex-col items-end gap-0.5">
                             <span className="text-emerald-500 font-semibold text-base tabular-nums">
-                              {formatMoney(actualAmount)} ₽
+                              {formatMoney(actualAmount)} {currencySymbol}
                             </span>
+                            {isNonRub && (
+                              <span className="text-xs text-muted-foreground tabular-nums">
+                                ≈ {formatMoney(actualAmount * rate)} ₽
+                              </span>
+                            )}
                             {savings !== 0 && (
                               <span
                                 className={cn(
@@ -331,23 +354,30 @@ export function PlannedExpensesSection({
                               >
                                 {savings > 0 ? '💰 ' : ''}
                                 {savings > 0 ? '-' : '+'}
-                                {formatMoney(Math.abs(savings))} ₽
+                                {formatMoney(Math.abs(savings))} {currencySymbol}
                               </span>
                             )}
                           </div>
                         )
                       }
                       return (
-                        <span
-                          className={cn(
-                            'tabular-nums font-semibold text-base',
-                            expense.status === 'skipped'
-                              ? 'text-muted-foreground line-through'
-                              : 'text-muted-foreground'
+                        <div className="flex flex-col items-end gap-0.5">
+                          <span
+                            className={cn(
+                              'tabular-nums font-semibold text-base',
+                              expense.status === 'skipped'
+                                ? 'text-muted-foreground line-through'
+                                : 'text-muted-foreground'
+                            )}
+                          >
+                            {formatMoney(expense.planned_amount)} {currencySymbol}
+                          </span>
+                          {isNonRub && expense.status !== 'skipped' && (
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              ≈ {formatMoney(expense.planned_amount_base)} ₽
+                            </span>
                           )}
-                        >
-                          {formatMoney(expense.planned_amount)} ₽
-                        </span>
+                        </div>
                       )
                     })()}
                   </TableCell>
