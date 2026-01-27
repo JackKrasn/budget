@@ -1103,83 +1103,72 @@ export default function BudgetPage() {
               )
             }
             headerAction={
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Переключатель видов */}
-                <div className="inline-flex items-center rounded-lg border border-border/50 bg-muted/40 p-0.5">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      'h-7 px-2 gap-1 rounded-md text-xs',
-                      plannedViewMode === 'list' && 'bg-background shadow-sm text-foreground'
-                    )}
-                    onClick={() => setPlannedViewMode('list')}
-                  >
-                    <List className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Список</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      'h-7 px-2 gap-1 rounded-md text-xs',
-                      plannedViewMode === 'category' && 'bg-background shadow-sm text-foreground'
-                    )}
-                    onClick={() => setPlannedViewMode('category')}
-                  >
-                    <LayoutGrid className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Категории</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className={cn(
-                      'h-7 px-2 gap-1 rounded-md text-xs',
-                      plannedViewMode === 'calendar' && 'bg-background shadow-sm text-foreground'
-                    )}
-                    onClick={() => setPlannedViewMode('calendar')}
-                  >
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    <span className="hidden sm:inline">Календарь</span>
-                  </Button>
+              <div className="flex items-center gap-2">
+                {/* Переключатель видов - сегментированный контрол */}
+                <div className="inline-flex h-8 items-center rounded-lg bg-muted/50 p-1">
+                  {[
+                    { mode: 'list' as const, icon: List, label: 'Список' },
+                    { mode: 'category' as const, icon: LayoutGrid, label: 'Категории' },
+                    { mode: 'calendar' as const, icon: CalendarDays, label: 'Календарь' },
+                  ].map(({ mode, icon: Icon, label }) => (
+                    <button
+                      key={mode}
+                      onClick={() => setPlannedViewMode(mode)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
+                        plannedViewMode === mode
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{label}</span>
+                    </button>
+                  ))}
                 </div>
 
+                {/* Разделитель */}
+                <div className="h-4 w-px bg-border/60" />
+
                 {/* Кнопки действий */}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 gap-1 text-xs"
-                  onClick={handleGeneratePlanned}
-                  disabled={generatePlanned.isPending || createBudget.isPending}
-                >
-                  <RefreshCw
-                    className={cn(
-                      'h-3.5 w-3.5',
-                      generatePlanned.isPending && 'animate-spin'
-                    )}
-                  />
-                  <span className="hidden sm:inline">Сгенерировать</span>
-                </Button>
-                {budget?.id && (
-                  <AddPlannedExpenseDialog
-                    budgetId={budget.id}
-                    year={year}
-                    month={month}
-                    categories={categories}
-                    funds={fundsRaw}
-                    onAdd={handleAddPlannedExpense}
-                    isPending={createPlanned.isPending}
-                  />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 gap-1 text-xs"
-                  onClick={() => navigate('/planned-payments')}
-                >
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  <span className="hidden sm:inline">Открыть</span>
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={handleGeneratePlanned}
+                    disabled={generatePlanned.isPending || createBudget.isPending}
+                  >
+                    <RefreshCw
+                      className={cn(
+                        'h-3.5 w-3.5',
+                        generatePlanned.isPending && 'animate-spin'
+                      )}
+                    />
+                    <span className="hidden sm:inline ml-1.5">Сгенерировать</span>
+                  </Button>
+                  {budget?.id && (
+                    <AddPlannedExpenseDialog
+                      budgetId={budget.id}
+                      year={year}
+                      month={month}
+                      categories={categories}
+                      funds={fundsRaw}
+                      onAdd={handleAddPlannedExpense}
+                      isPending={createPlanned.isPending}
+                      triggerClassName="h-8 text-muted-foreground hover:text-foreground"
+                    />
+                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate('/planned-payments')}
+                  >
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline ml-1.5">Открыть</span>
+                  </Button>
+                </div>
               </div>
             }
           >

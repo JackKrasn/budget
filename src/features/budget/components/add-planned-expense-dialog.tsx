@@ -102,6 +102,7 @@ interface AddPlannedExpenseDialogProps {
     notes?: string
   }) => Promise<void>
   isPending?: boolean
+  triggerClassName?: string
 }
 
 export function AddPlannedExpenseDialog({
@@ -112,6 +113,7 @@ export function AddPlannedExpenseDialog({
   funds,
   onAdd,
   isPending,
+  triggerClassName,
 }: AddPlannedExpenseDialogProps) {
   const [open, setOpen] = useState(false)
   const [useFundFinancing, setUseFundFinancing] = useState(false)
@@ -194,9 +196,9 @@ export function AddPlannedExpenseDialog({
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
-          <Plus className="h-4 w-4" />
-          Добавить
+        <Button variant="ghost" size="sm" className={cn('h-8 px-2.5 text-xs', triggerClassName)}>
+          <Plus className="h-3.5 w-3.5" />
+          <span className="hidden sm:inline ml-1.5">Добавить</span>
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[480px] overflow-hidden">
