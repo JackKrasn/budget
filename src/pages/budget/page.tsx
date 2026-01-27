@@ -43,6 +43,8 @@ import {
   useSkipPlannedIncome,
   useGeneratePlannedIncomes,
   useCreateIncomeAndReceive,
+  useSetCurrencyBuffer,
+  useRecalculateLimits,
   budgetKeys,
   BudgetTable,
   MonthSelector,
@@ -55,8 +57,9 @@ import {
   mapFundBalanceToFinancing,
   DistributionSummarySection,
   FloatingBudgetBalance,
-  BudgetItemDialog,
   PaymentCalendar,
+  getCurrencyConfig,
+  CurrencyLimitsEditor,
 } from '@/features/budget'
 import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -91,8 +94,8 @@ export default function BudgetPage() {
   const [hiddenCategories, setHiddenCategoriesState] = useState<string[]>(getHiddenCategories)
   const [receiveIncomeDialogOpen, setReceiveIncomeDialogOpen] = useState(false)
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
-  const [editItemDialogOpen, setEditItemDialogOpen] = useState(false)
-  const [editingItem, setEditingItem] = useState<BudgetItemWithCategory | null>(null)
+  const [bufferEditorOpen, setBufferEditorOpen] = useState(false)
+  const [bufferEditingItem, setBufferEditingItem] = useState<BudgetItemWithCategory | null>(null)
   const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'calendar'>('list')
 
   // Вычисляем даты для фильтрации расходов
@@ -154,6 +157,8 @@ export default function BudgetPage() {
   const createIncomeAndReceive = useCreateIncomeAndReceive()
   const skipPlannedIncome = useSkipPlannedIncome()
   const generatePlannedIncomes = useGeneratePlannedIncomes()
+  const setCurrencyBuffer = useSetCurrencyBuffer()
+  const recalculateLimits = useRecalculateLimits()
 
   const budget = budgetData
   const allBudgets = allBudgetsData?.data ?? []
@@ -178,6 +183,16 @@ export default function BudgetPage() {
     return map
   }, [expenses])
 
+  // Считаем расходы по валютам (для плавающей кнопки)
+  const expensesByCurrency = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const expense of expenses) {
+      const currency = expense.currency || 'RUB'
+      map[currency] = (map[currency] || 0) + expense.amount
+    }
+    return map
+  }, [expenses])
+
   // Хелпер для извлечения actual_amount
   const getActualAmount = (
     value: number | { Float64: number; Valid: boolean } | null | undefined
@@ -192,10 +207,45 @@ export default function BudgetPage() {
 
   // Статистика
   const stats = useMemo(() => {
-    const totalPlanned = items.reduce((sum, i) => sum + i.plannedAmount, 0)
+    // totalLimit = plannedExpensesSum + all buffers from currencyLimits
+    const totalPlanned = items.reduce((sum, i) => sum + i.totalLimit, 0)
     // Используем реальные расходы из expenses API
     const totalActual = Object.values(actualByCategory).reduce((sum, amount) => sum + amount, 0)
     const variance = totalPlanned - totalActual
+
+    // Use currencySummary from API if available, otherwise aggregate from items
+    let currencyTotals: Record<string, { totalLimit: number; actualAmount: number; remaining: number; plannedAmount: number; bufferAmount: number }> = {}
+
+    if (budget?.currencySummary && budget.currencySummary.length > 0) {
+      // Use API data
+      for (const summary of budget.currencySummary) {
+        currencyTotals[summary.currency] = {
+          totalLimit: summary.totalLimit,
+          actualAmount: summary.totalActual,
+          remaining: summary.totalRemaining,
+          plannedAmount: summary.totalPlanned,
+          bufferAmount: summary.totalBuffer,
+        }
+      }
+    } else {
+      // Fallback: aggregate from budget items
+      for (const item of items) {
+        if (item.currencyLimits && item.currencyLimits.length > 0) {
+          for (const limit of item.currencyLimits) {
+            if (!currencyTotals[limit.currency]) {
+              currencyTotals[limit.currency] = { totalLimit: 0, actualAmount: 0, remaining: 0, plannedAmount: 0, bufferAmount: 0 }
+            }
+            currencyTotals[limit.currency].totalLimit += limit.totalLimit
+            currencyTotals[limit.currency].actualAmount += limit.actualAmount
+            currencyTotals[limit.currency].remaining += limit.remaining
+            currencyTotals[limit.currency].plannedAmount += limit.plannedAmount
+            currencyTotals[limit.currency].bufferAmount += limit.bufferAmount
+          }
+        }
+      }
+    }
+    const currencyTotalsArray = Object.entries(currencyTotals)
+    const hasMultiCurrency = currencyTotalsArray.length > 1 || currencyTotalsArray.some(([currency]) => currency !== 'RUB')
 
     // Обязательные расходы из planned_expenses (используем planned_amount_base — уже в RUB)
     const totalPlannedExpenses = plannedExpenses.reduce(
@@ -247,21 +297,21 @@ export default function BudgetPage() {
     const receivedIncome = actualIncomes.reduce((sum, i) => sum + i.amount, 0)
 
     // Распределения в фонды (входящие)
-    const expectedFundDistributions = budget?.distributionSummary?.totalExpectedDistribution ?? 0
-    const actualFundDistributions = budget?.distributionSummary?.totalActualDistribution ?? 0
+    const expectedFundDistributions = Number(budget?.distributionSummary?.totalExpectedDistribution) || 0
+    const actualFundDistributions = Number(budget?.distributionSummary?.totalActualDistribution) || 0
 
     // Общий доход для планирования = максимум из ожидаемого и реально полученного
-    const totalIncome = Math.max(expectedIncome, receivedIncome)
+    const totalIncome = Math.max(expectedIncome || 0, receivedIncome || 0)
 
     // Доступно для планирования (от планируемого дохода) = Ожидаемый доход - План по категориям - Распределения в фонды
     // Обязательные расходы уже входят в план по категориям, поэтому не вычитаем отдельно
-    const plannedAvailable = expectedIncome - totalPlanned - expectedFundDistributions
+    const plannedAvailable = (expectedIncome || 0) - (totalPlanned || 0) - expectedFundDistributions
 
     // Доступно для планирования (от максимального дохода) - для обратной совместимости
-    const availableForPlanning = totalIncome - totalPlanned - expectedFundDistributions
+    const availableForPlanning = totalIncome - (totalPlanned || 0) - expectedFundDistributions
 
     // Реально доступно = Полученный доход - Фактические расходы - Подтверждённые распределения
-    const actuallyAvailable = receivedIncome - totalActual - actualFundDistributions
+    const actuallyAvailable = (receivedIncome || 0) - (totalActual || 0) - actualFundDistributions
 
     return {
       totalPlanned,
@@ -287,8 +337,12 @@ export default function BudgetPage() {
       plannedAvailable,
       availableForPlanning,
       actuallyAvailable,
+      // Multi-currency
+      currencyTotals,
+      currencyTotalsArray,
+      hasMultiCurrency,
     }
-  }, [items, plannedExpenses, plannedIncomes, actualIncomes, actualByCategory, budget?.distributionSummary])
+  }, [items, plannedExpenses, plannedIncomes, actualIncomes, actualByCategory, budget])
 
   // Данные для секции финансирования из фондов
   const fundFinancingData = useMemo(() => {
@@ -400,42 +454,49 @@ export default function BudgetPage() {
     }
   }
 
-  // Сохранение настроек категории (с финансированием из фонда)
-  const handleSaveItem = async (
-    categoryId: string,
-    plannedAmount: number,
-    notes?: string,
-    fundId?: string,
-    fundAllocation?: number
+  // Сохранение буферов по валютам
+  const handleSaveCurrencyBuffers = async (
+    buffers: { currency: string; bufferAmount: number }[]
   ) => {
-    let budgetId = budget?.id
-
-    if (!budgetId) {
-      try {
-        const newBudget = await createBudget.mutateAsync({ year, month })
-        budgetId = newBudget.id
-      } catch {
-        toast.error('Ошибка создания бюджета')
-        return
-      }
+    if (!budget?.id || !bufferEditingItem?.id) {
+      toast.error('Не удалось найти категорию')
+      return
     }
 
     try {
-      await upsertItem.mutateAsync({
-        budgetId,
-        data: {
-          categoryId,
-          plannedAmount,
-          notes,
-          fundId,
-          fundAllocation,
-        },
+      // Сохраняем каждый буфер по очереди
+      for (const buffer of buffers) {
+        await setCurrencyBuffer.mutateAsync({
+          budgetId: budget.id,
+          itemId: bufferEditingItem.id,
+          data: {
+            currency: buffer.currency as Parameters<typeof setCurrencyBuffer.mutateAsync>[0]['data']['currency'],
+            bufferAmount: buffer.bufferAmount,
+          },
+        })
+      }
+      await queryClient.invalidateQueries({ queryKey: budgetKeys.byMonth(year, month) })
+      toast.success('Лимиты сохранены')
+    } catch (error) {
+      console.error('Ошибка сохранения буферов:', error)
+      toast.error('Ошибка сохранения')
+    }
+  }
+
+  // Пересчёт лимитов из запланированных расходов
+  const handleRecalculateLimits = async () => {
+    if (!budget?.id || !bufferEditingItem?.id) return
+
+    try {
+      await recalculateLimits.mutateAsync({
+        budgetId: budget.id,
+        itemId: bufferEditingItem.id,
       })
       await queryClient.invalidateQueries({ queryKey: budgetKeys.byMonth(year, month) })
-      toast.success('Настройки сохранены')
+      toast.success('Лимиты пересчитаны')
     } catch (error) {
-      console.error('Ошибка сохранения:', error)
-      toast.error('Ошибка сохранения')
+      console.error('Ошибка пересчёта:', error)
+      toast.error('Ошибка пересчёта')
     }
   }
 
@@ -621,7 +682,8 @@ export default function BudgetPage() {
   }
 
   const formatMoney = (amount: number) => {
-    return amount.toLocaleString('ru-RU', {
+    const safeAmount = Number.isFinite(amount) ? amount : 0
+    return safeAmount.toLocaleString('ru-RU', {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
@@ -728,6 +790,34 @@ export default function BudgetPage() {
                     </>
                   )}
                 </div>
+                {/* Multi-currency breakdown for planned expenses */}
+                {budget?.plannedExpensesCurrencySummary && budget.plannedExpensesCurrencySummary.length > 1 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {budget.plannedExpensesCurrencySummary
+                      .filter(s => s.totalPlanned > 0)
+                      .map((summary) => {
+                        const config = getCurrencyConfig(summary.currency as Parameters<typeof getCurrencyConfig>[0])
+                        return (
+                          <span
+                            key={summary.currency}
+                            className={cn(
+                              'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs tabular-nums',
+                              config.bgColor,
+                              config.color
+                            )}
+                          >
+                            <span className="font-semibold">{config.symbol}</span>
+                            <span>{formatMoney(summary.totalPlanned)}</span>
+                            {summary.totalPending > 0 && (
+                              <span className="text-muted-foreground/70">
+                                ({summary.pendingCount} ожид.)
+                              </span>
+                            )}
+                          </span>
+                        )
+                      })}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -740,7 +830,7 @@ export default function BudgetPage() {
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
                 <LayoutGrid className="h-4 w-4 text-primary" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-xs text-muted-foreground">Общее запланированное</p>
                 <p className="text-lg font-bold tabular-nums">
                   {formatMoney(budgetData?.total_planned ?? 0)} ₽
@@ -748,6 +838,30 @@ export default function BudgetPage() {
                 <p className="text-xs text-muted-foreground">
                   потрачено {formatMoney(stats.totalActual)} ₽
                 </p>
+                {/* Multi-currency breakdown */}
+                {stats.hasMultiCurrency && stats.currencyTotalsArray.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {stats.currencyTotalsArray.map(([currency, data]) => {
+                      const config = getCurrencyConfig(currency as Parameters<typeof getCurrencyConfig>[0])
+                      const isOver = data.remaining < 0
+                      return (
+                        <span
+                          key={currency}
+                          className={cn(
+                            'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs tabular-nums',
+                            config.bgColor,
+                            isOver ? 'text-destructive' : config.color
+                          )}
+                        >
+                          <span className="font-semibold">{config.symbol}</span>
+                          <span>{formatMoney(data.actualAmount)}</span>
+                          <span className="text-muted-foreground">/</span>
+                          <span>{formatMoney(data.totalLimit)}</span>
+                        </span>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -1097,9 +1211,9 @@ export default function BudgetPage() {
               onToggleCategory={handleToggleCategory}
               actualByCategory={actualByCategory}
               onCategoryClick={handleCategoryClick}
-              onEditCategory={(item) => {
-                setEditingItem(item)
-                setEditItemDialogOpen(true)
+              onEditBuffer={(item) => {
+                setBufferEditingItem(item)
+                setBufferEditorOpen(true)
               }}
               fundNames={fundsRaw.reduce((acc, f) => {
                 acc[f.fund.id] = f.fund.name
@@ -1150,19 +1264,23 @@ export default function BudgetPage() {
         isPending={createIncomeAndReceive.isPending}
       />
 
-      {/* Budget Item Dialog (настройки категории) */}
-      <BudgetItemDialog
-        item={editingItem}
-        open={editItemDialogOpen}
-        onOpenChange={setEditItemDialogOpen}
-        onSave={handleSaveItem}
-        isPending={upsertItem.isPending}
+      {/* Currency Limits Editor (редактирование буферов по валютам) */}
+      <CurrencyLimitsEditor
+        item={bufferEditingItem}
+        open={bufferEditorOpen}
+        onOpenChange={setBufferEditorOpen}
+        onSave={handleSaveCurrencyBuffers}
+        onRecalculate={handleRecalculateLimits}
+        isPending={setCurrencyBuffer.isPending}
       />
 
       {/* Floating Budget Balance */}
       <FloatingBudgetBalance
         availableForPlanning={stats.availableForPlanning}
         actuallyAvailable={stats.actuallyAvailable}
+        expensesByCurrency={expensesByCurrency}
+        limitsByCurrency={stats.currencyTotals}
+        onExpensesClick={() => navigate('/expenses')}
         isVisible={!isLoading && !error}
       />
     </div>

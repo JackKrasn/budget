@@ -198,6 +198,11 @@ export function PlannedExpensesSection({
   const pendingExpenses = enrichedExpenses.filter((e) => e.status === 'pending')
   const confirmedExpenses = enrichedExpenses.filter((e) => e.status === 'confirmed')
 
+  // Хелпер для извлечения exchange_rate
+  const getExchangeRate = (e: PlannedExpenseWithDetails): number => {
+    return getActualAmount(e.exchange_rate as number | { Float64: number; Valid: boolean } | null) ?? 1
+  }
+
   // Группировка по фондам (используем exchange_rate из расхода)
   const fundBreakdown = enrichedExpenses.reduce<Record<string, { name: string; amount: number }>>((acc, e) => {
     const fundedAmount = getActualAmount(e.funded_amount)
@@ -206,7 +211,7 @@ export function PlannedExpensesSection({
         acc[e.fund_id] = { name: e.fund_name, amount: 0 }
       }
       // Конвертируем по курсу расхода
-      acc[e.fund_id].amount += fundedAmount * (e.exchange_rate ?? 1)
+      acc[e.fund_id].amount += fundedAmount * getExchangeRate(e)
     }
     return acc
   }, {})
@@ -216,8 +221,9 @@ export function PlannedExpensesSection({
     planned: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0),
     confirmed: confirmedExpenses.reduce((sum, e) => {
       const actualAmount = getActualAmount(e.actual_amount)
-      if (actualAmount !== null && e.exchange_rate) {
-        return sum + actualAmount * e.exchange_rate
+      const rate = getExchangeRate(e)
+      if (actualAmount !== null && rate !== 1) {
+        return sum + actualAmount * rate
       }
       return sum + e.planned_amount_base
     }, 0),
@@ -225,14 +231,14 @@ export function PlannedExpensesSection({
     // Финансирование из фондов (funded_amount приходит как { Float64, Valid })
     fromFunds: enrichedExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * getExchangeRate(e), 0),
     pendingFromFunds: pendingExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * getExchangeRate(e), 0),
     fromBudget: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0) -
       enrichedExpenses
         .filter((e) => getActualAmount(e.funded_amount))
-        .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
+        .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * getExchangeRate(e), 0),
     fundBreakdown: Object.values(fundBreakdown),
   }
 
@@ -331,7 +337,7 @@ export function PlannedExpensesSection({
                       const currencySymbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
                       const isNonRub = currency !== 'RUB'
                       // Используем exchange_rate из расхода вместо поиска по курсам
-                      const rate = expense.exchange_rate ?? 1
+                      const rate = getExchangeRate(expense)
 
                       if (expense.status === 'confirmed' && actualAmount != null) {
                         const savings = expense.planned_amount - actualAmount
