@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -32,6 +33,7 @@ import {
   useGeneratePlannedIncomes,
   useCreateIncomeAndReceive,
   PlannedExpensesSection,
+  PlannedExpensesByCategory,
   PlannedIncomesSection,
   AddPlannedExpenseDialog,
   ReceiveIncomeDialog,
@@ -47,7 +49,7 @@ export default function PlannedPaymentsPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'category' | 'calendar'>('list')
   const [receiveIncomeDialogOpen, setReceiveIncomeDialogOpen] = useState(false)
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
 
@@ -303,6 +305,18 @@ export default function PlannedPaymentsPage() {
               size="sm"
               className={cn(
                 'h-8 px-3 gap-1.5',
+                viewMode === 'category' && 'bg-background shadow-sm'
+              )}
+              onClick={() => setViewMode('category')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="text-sm hidden sm:inline">Категории</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-8 px-3 gap-1.5',
                 viewMode === 'calendar' && 'bg-background shadow-sm'
               )}
               onClick={() => setViewMode('calendar')}
@@ -432,7 +446,7 @@ export default function PlannedPaymentsPage() {
       </div>
 
       {/* Основной контент */}
-      {viewMode === 'list' ? (
+      {viewMode === 'list' && (
         <div className="space-y-6">
           {/* Доходы */}
           <Card>
@@ -490,7 +504,66 @@ export default function PlannedPaymentsPage() {
             </CardContent>
           </Card>
         </div>
-      ) : (
+      )}
+
+      {viewMode === 'category' && (
+        <div className="space-y-6">
+          {/* Доходы */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Banknote className="h-5 w-5 text-emerald-500" />
+                <CardTitle className="text-base">Запланированные доходы</CardTitle>
+                {stats.pendingIncomesCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {stats.pendingIncomesCount} ожидают
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <PlannedIncomesSection
+                incomes={plannedIncomes}
+                onReceive={handleReceiveIncome}
+                onSkip={handleSkipIncome}
+                isPending={skipPlannedIncome.isPending || createIncomeAndReceive.isPending}
+                onIncomeClick={(incomeId) => navigate(`/incomes/${incomeId}`)}
+                onPlannedIncomeClick={(plannedIncomeId) => navigate(`/planned-incomes/${plannedIncomeId}`)}
+                hideWrapper
+              />
+            </CardContent>
+          </Card>
+
+          {/* Расходы по категориям */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-orange-500" />
+                <CardTitle className="text-base">Расходы по категориям</CardTitle>
+                {stats.pendingExpensesCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {stats.pendingExpensesCount} ожидают
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <PlannedExpensesByCategory
+                expenses={plannedExpenses}
+                accounts={accounts}
+                categories={categories}
+                onConfirm={handleConfirmPlanned}
+                onSkip={handleSkipPlanned}
+                onDelete={handleDeletePlanned}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
+              />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {viewMode === 'calendar' && (
         <Card>
           <CardContent className="p-4">
             <PaymentCalendar

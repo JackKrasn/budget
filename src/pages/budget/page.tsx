@@ -50,6 +50,7 @@ import {
   MonthSelector,
   CopyBudgetDialog,
   PlannedExpensesSection,
+  PlannedExpensesByCategory,
   PlannedIncomesSection,
   AddPlannedExpenseDialog,
   ReceiveIncomeDialog,
@@ -96,7 +97,7 @@ export default function BudgetPage() {
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
   const [bufferEditorOpen, setBufferEditorOpen] = useState(false)
   const [bufferEditingItem, setBufferEditingItem] = useState<BudgetItemWithCategory | null>(null)
-  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'calendar'>('list')
+  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'category' | 'calendar'>('list')
 
   // Вычисляем даты для фильтрации расходов
   const dateFrom = useMemo(() => {
@@ -1101,47 +1102,62 @@ export default function BudgetPage() {
               )
             }
             headerAction={
-              <div className="flex items-center gap-2">
-                {/* Переключатель вида */}
-                <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1 bg-muted/30">
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* Переключатель видов */}
+                <div className="inline-flex items-center rounded-lg border border-border/50 bg-muted/40 p-0.5">
                   <Button
                     variant="ghost"
                     size="sm"
                     className={cn(
-                      'h-7 px-2.5 gap-1.5',
-                      plannedViewMode === 'list' && 'bg-background shadow-sm'
+                      'h-7 px-2 gap-1 rounded-md text-xs',
+                      plannedViewMode === 'list' && 'bg-background shadow-sm text-foreground'
                     )}
                     onClick={() => setPlannedViewMode('list')}
                   >
                     <List className="h-3.5 w-3.5" />
-                    <span className="text-xs hidden sm:inline">Список</span>
+                    <span className="hidden sm:inline">Список</span>
                   </Button>
                   <Button
                     variant="ghost"
                     size="sm"
                     className={cn(
-                      'h-7 px-2.5 gap-1.5',
-                      plannedViewMode === 'calendar' && 'bg-background shadow-sm'
+                      'h-7 px-2 gap-1 rounded-md text-xs',
+                      plannedViewMode === 'category' && 'bg-background shadow-sm text-foreground'
+                    )}
+                    onClick={() => setPlannedViewMode('category')}
+                  >
+                    <LayoutGrid className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Категории</span>
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className={cn(
+                      'h-7 px-2 gap-1 rounded-md text-xs',
+                      plannedViewMode === 'calendar' && 'bg-background shadow-sm text-foreground'
                     )}
                     onClick={() => setPlannedViewMode('calendar')}
                   >
                     <CalendarDays className="h-3.5 w-3.5" />
-                    <span className="text-xs hidden sm:inline">Календарь</span>
+                    <span className="hidden sm:inline">Календарь</span>
                   </Button>
                 </div>
+
+                {/* Кнопки действий */}
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-7 px-2 gap-1 text-xs"
                   onClick={handleGeneratePlanned}
                   disabled={generatePlanned.isPending || createBudget.isPending}
                 >
                   <RefreshCw
                     className={cn(
-                      'mr-2 h-4 w-4',
+                      'h-3.5 w-3.5',
                       generatePlanned.isPending && 'animate-spin'
                     )}
                   />
-                  Сгенерировать
+                  <span className="hidden sm:inline">Сгенерировать</span>
                 </Button>
                 {budget?.id && (
                   <AddPlannedExpenseDialog
@@ -1157,15 +1173,16 @@ export default function BudgetPage() {
                 <Button
                   variant="outline"
                   size="sm"
+                  className="h-7 px-2 gap-1 text-xs"
                   onClick={() => navigate('/planned-payments')}
                 >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Открыть
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">Открыть</span>
                 </Button>
               </div>
             }
           >
-            {plannedViewMode === 'list' ? (
+            {plannedViewMode === 'list' && (
               <PlannedExpensesSection
                 expenses={plannedExpenses}
                 accounts={accounts}
@@ -1179,7 +1196,20 @@ export default function BudgetPage() {
                 hideWrapper
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
-            ) : (
+            )}
+            {plannedViewMode === 'category' && (
+              <PlannedExpensesByCategory
+                expenses={plannedExpenses}
+                accounts={accounts}
+                categories={categories}
+                onConfirm={handleConfirmPlanned}
+                onSkip={handleSkipPlanned}
+                onDelete={handleDeletePlanned}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
+              />
+            )}
+            {plannedViewMode === 'calendar' && (
               <PaymentCalendar
                 expenses={plannedExpenses}
                 incomes={plannedIncomes}
