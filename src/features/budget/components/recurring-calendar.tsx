@@ -45,19 +45,26 @@ export function RecurringCalendar({
   const recurringItems = useMemo<CalendarRecurring[]>(() => {
     const result: CalendarRecurring[] = []
 
-    // Добавляем расходы
+    // Добавляем расходы (только те, у которых есть day_of_month)
     for (const expense of expenses) {
-      result.push({
-        id: expense.id,
-        type: 'expense',
-        name: expense.name,
-        amount: expense.amount,
-        dayOfMonth: expense.day_of_month,
-        isActive: expense.is_active,
-        categoryName: expense.category_name,
-        categoryColor: expense.category_color,
-        original: expense,
-      })
+      // Пропускаем daily расходы - они не имеют конкретного дня
+      if (expense.frequency === 'daily') continue
+      // Для weekly нужна отдельная логика - пока пропускаем
+      if (expense.frequency === 'weekly') continue
+      // Для monthly и yearly показываем в календаре
+      if (expense.day_of_month) {
+        result.push({
+          id: expense.id,
+          type: 'expense',
+          name: expense.name,
+          amount: expense.amount,
+          dayOfMonth: expense.day_of_month,
+          isActive: expense.is_active,
+          categoryName: expense.category_name,
+          categoryColor: expense.category_color,
+          original: expense,
+        })
+      }
     }
 
     // Добавляем доходы

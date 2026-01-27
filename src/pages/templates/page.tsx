@@ -22,7 +22,7 @@ import {
 import { useExpenseCategories, useExchangeRates } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
-import type { RecurringExpenseWithCategory, RecurringIncome, Fund } from '@/lib/api/types'
+import type { RecurringExpenseWithCategory, RecurringIncome, Fund, RecurringExpenseFrequency } from '@/lib/api/types'
 
 export default function TemplatesPage() {
   // Состояние для расходов
@@ -99,7 +99,10 @@ export default function TemplatesPage() {
     name: string
     amount: number
     currency: string
-    dayOfMonth: number
+    frequency: RecurringExpenseFrequency
+    dayOfMonth?: number
+    dayOfWeek?: number
+    monthOfYear?: number
     isActive: boolean
   }) => {
     try {
@@ -113,7 +116,10 @@ export default function TemplatesPage() {
             name: data.name,
             amount: data.amount,
             currency: data.currency,
+            frequency: data.frequency,
             dayOfMonth: data.dayOfMonth,
+            dayOfWeek: data.dayOfWeek,
+            monthOfYear: data.monthOfYear,
             isActive: data.isActive,
           },
         })

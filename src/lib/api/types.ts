@@ -791,6 +791,8 @@ export interface BudgetsListParams {
 
 // === Recurring Expenses (Шаблоны повторяющихся расходов) ===
 
+export type RecurringExpenseFrequency = 'daily' | 'weekly' | 'monthly' | 'yearly'
+
 export interface RecurringExpense {
   id: UUID
   category_id: UUID
@@ -799,7 +801,10 @@ export interface RecurringExpense {
   name: string
   amount: number
   currency: string
-  day_of_month: number
+  frequency: RecurringExpenseFrequency
+  day_of_month?: number
+  day_of_week?: number // 0=пн, 1=вт, 2=ср, 3=чт, 4=пт, 5=сб, 6=вс
+  month_of_year?: number // 1-12
   is_active: boolean
   created_at: ISODate
   updated_at: ISODate
@@ -821,7 +826,10 @@ export interface CreateRecurringExpenseRequest {
   name: string
   amount: number
   currency: string
-  dayOfMonth: number
+  frequency: RecurringExpenseFrequency
+  dayOfMonth?: number
+  dayOfWeek?: number // 0=пн, 1=вт, 2=ср, 3=чт, 4=пт, 5=сб, 6=вс
+  monthOfYear?: number // 1-12
   isActive?: boolean
 }
 
@@ -832,7 +840,10 @@ export interface UpdateRecurringExpenseRequest {
   name?: string
   amount?: number
   currency?: string
+  frequency?: RecurringExpenseFrequency
   dayOfMonth?: number
+  dayOfWeek?: number // 0=пн, 1=вт, 2=ср, 3=чт, 4=пт, 5=сб, 6=вс
+  monthOfYear?: number // 1-12
   isActive?: boolean
 }
 

@@ -6,6 +6,9 @@ import {
   Trash2,
   RefreshCw,
   Calendar,
+  CalendarDays,
+  CalendarClock,
+  CalendarRange,
   ToggleLeft,
   ToggleRight,
 } from 'lucide-react'
@@ -29,10 +32,29 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { Badge } from '@/components/ui/badge'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { RecurringExpenseWithCategory, ExchangeRate } from '@/lib/api/types'
+import type { RecurringExpenseWithCategory, ExchangeRate, RecurringExpenseFrequency } from '@/lib/api/types'
 import { CURRENCY_SYMBOLS } from '@/types'
+
+const DAYS_OF_WEEK_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс']
+
+const MONTHS_SHORT = [
+  '', 'янв', 'фев', 'мар', 'апр', 'май', 'июн',
+  'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'
+]
+
+const FREQUENCY_CONFIG: Record<RecurringExpenseFrequency, {
+  label: string
+  icon: typeof Calendar
+  color: string
+}> = {
+  daily: { label: 'Ежедневно', icon: CalendarClock, color: 'text-blue-500' },
+  weekly: { label: 'Еженедельно', icon: CalendarDays, color: 'text-violet-500' },
+  monthly: { label: 'Ежемесячно', icon: Calendar, color: 'text-emerald-500' },
+  yearly: { label: 'Ежегодно', icon: CalendarRange, color: 'text-amber-500' },
+}
 
 interface RecurringExpensesSectionProps {
   expenses: RecurringExpenseWithCategory[]
@@ -84,6 +106,33 @@ export function RecurringExpensesSection({
     return `${formatMoney(amount)} ${symbol}`
   }
 
+  // Форматирование периодичности
+  const formatSchedule = (expense: RecurringExpenseWithCategory): string => {
+    const frequency = expense.frequency || 'monthly'
+
+    switch (frequency) {
+      case 'daily':
+        return 'Каждый день'
+      case 'weekly':
+        if (expense.day_of_week !== undefined && expense.day_of_week !== null) {
+          return DAYS_OF_WEEK_SHORT[expense.day_of_week]
+        }
+        return '—'
+      case 'monthly':
+        if (expense.day_of_month) {
+          return `${expense.day_of_month}-е число`
+        }
+        return '—'
+      case 'yearly':
+        if (expense.day_of_month && expense.month_of_year) {
+          return `${expense.day_of_month} ${MONTHS_SHORT[expense.month_of_year]}`
+        }
+        return '—'
+      default:
+        return '—'
+    }
+  }
+
   const handleDelete = async () => {
     if (deleteId) {
       await onDelete(deleteId)
@@ -91,18 +140,45 @@ export function RecurringExpensesSection({
     }
   }
 
-  // Сортируем: активные сначала, потом по дню месяца
+  // Сортируем: активные сначала, потом по частоте и дню
   const sortedExpenses = [...expenses].sort((a, b) => {
     if (a.is_active !== b.is_active) {
       return a.is_active ? -1 : 1
     }
-    return a.day_of_month - b.day_of_month
+    // Сортировка по частоте: daily < weekly < monthly < yearly
+    const frequencyOrder: Record<RecurringExpenseFrequency, number> = {
+      daily: 0,
+      weekly: 1,
+      monthly: 2,
+      yearly: 3,
+    }
+    const freqA = a.frequency || 'monthly'
+    const freqB = b.frequency || 'monthly'
+    if (freqA !== freqB) {
+      return frequencyOrder[freqA] - frequencyOrder[freqB]
+    }
+    // Внутри одной частоты сортируем по дню
+    return (a.day_of_month || 0) - (b.day_of_month || 0)
   })
 
   // Считаем общую сумму активных расходов (в RUB)
+  // Для daily и weekly умножаем на примерное количество в месяц
   const totalActiveRub = expenses
     .filter((e) => e.is_active)
-    .reduce((sum, e) => sum + toRub(e.amount, e.currency || 'RUB'), 0)
+    .reduce((sum, e) => {
+      const baseAmount = toRub(e.amount, e.currency || 'RUB')
+      const frequency = e.frequency || 'monthly'
+      switch (frequency) {
+        case 'daily':
+          return sum + baseAmount * 30
+        case 'weekly':
+          return sum + baseAmount * 4.33
+        case 'yearly':
+          return sum + baseAmount / 12
+        default:
+          return sum + baseAmount
+      }
+    }, 0)
 
   return (
     <motion.div
@@ -120,7 +196,7 @@ export function RecurringExpensesSection({
               <span className="text-sm text-muted-foreground">
                 Всего в месяц:{' '}
                 <span className="font-semibold text-foreground">
-                  {formatMoney(totalActiveRub)} ₽
+                  ~{formatMoney(totalActiveRub)} ₽
                 </span>
               </span>
               <Button variant="outline" size="sm" onClick={onAdd}>
@@ -146,97 +222,114 @@ export function RecurringExpensesSection({
               <TableHeader>
                 <TableRow className="hover:bg-transparent">
                   <TableHead>Название</TableHead>
-                  <TableHead className="w-[100px] text-center">День</TableHead>
+                  <TableHead className="w-[160px]">Периодичность</TableHead>
                   <TableHead className="w-[120px] text-right">Сумма</TableHead>
-                  <TableHead className="w-[100px] text-center">Статус</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
+                  <TableHead className="w-[80px] text-center">Статус</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sortedExpenses.map((expense) => (
-                  <TableRow
-                    key={expense.id}
-                    className={cn(
-                      'group',
-                      !expense.is_active && 'opacity-50'
-                    )}
-                  >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <CategoryIcon
-                          code={expense.category_code}
-                          iconName={expense.category_icon}
-                          color={expense.category_color}
-                          size="md"
-                        />
-                        <div>
-                          <p className="font-medium">{expense.name}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {expense.category_name}
-                            {expense.fund_name && ` • ${expense.fund_name}`}
-                          </p>
+                {sortedExpenses.map((expense) => {
+                  const frequency = expense.frequency || 'monthly'
+                  const freqConfig = FREQUENCY_CONFIG[frequency]
+                  const FreqIcon = freqConfig.icon
+
+                  return (
+                    <TableRow
+                      key={expense.id}
+                      className={cn(
+                        'group',
+                        !expense.is_active && 'opacity-50'
+                      )}
+                    >
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <CategoryIcon
+                            code={expense.category_code}
+                            iconName={expense.category_icon}
+                            color={expense.category_color}
+                            size="md"
+                          />
+                          <div>
+                            <p className="font-medium">{expense.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {expense.category_name}
+                              {expense.fund_name && ` • ${expense.fund_name}`}
+                            </p>
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
+                      </TableCell>
 
-                    <TableCell className="text-center">
-                      <span className="inline-flex items-center gap-1 text-sm">
-                        <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                        {expense.day_of_month}
-                      </span>
-                    </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className={cn(
+                              'flex items-center gap-1.5 font-normal',
+                              frequency === 'daily' && 'bg-blue-500/10 text-blue-600 dark:text-blue-400',
+                              frequency === 'weekly' && 'bg-violet-500/10 text-violet-600 dark:text-violet-400',
+                              frequency === 'monthly' && 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
+                              frequency === 'yearly' && 'bg-amber-500/10 text-amber-600 dark:text-amber-400'
+                            )}
+                          >
+                            <FreqIcon className="h-3.5 w-3.5" />
+                            <span>{formatSchedule(expense)}</span>
+                          </Badge>
+                        </div>
+                      </TableCell>
 
-                    <TableCell className="text-right">
-                      <div className="flex flex-col items-end">
-                        <span className="tabular-nums font-medium">
-                          {formatMoneyWithCurrency(expense.amount, expense.currency || 'RUB')}
-                        </span>
-                        {expense.currency && expense.currency !== 'RUB' && (
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            ≈ {formatMoney(toRub(expense.amount, expense.currency))} ₽
+                      <TableCell className="text-right">
+                        <div className="flex flex-col items-end">
+                          <span className="tabular-nums font-medium">
+                            {formatMoneyWithCurrency(expense.amount, expense.currency || 'RUB')}
                           </span>
-                        )}
-                      </div>
-                    </TableCell>
+                          {expense.currency && expense.currency !== 'RUB' && (
+                            <span className="text-xs text-muted-foreground tabular-nums">
+                              ≈ {formatMoney(toRub(expense.amount, expense.currency))} ₽
+                            </span>
+                          )}
+                        </div>
+                      </TableCell>
 
-                    <TableCell className="text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2"
-                        onClick={() => onToggleActive(expense.id, !expense.is_active)}
-                        disabled={isToggling}
-                      >
-                        {expense.is_active ? (
-                          <ToggleRight className="h-5 w-5 text-emerald-500" />
-                        ) : (
-                          <ToggleLeft className="h-5 w-5 text-muted-foreground" />
-                        )}
-                      </Button>
-                    </TableCell>
-
-                    <TableCell>
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <TableCell className="text-center">
                         <Button
                           variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => onEdit(expense)}
+                          size="sm"
+                          className="h-8 px-2"
+                          onClick={() => onToggleActive(expense.id, !expense.is_active)}
+                          disabled={isToggling}
                         >
-                          <Edit2 className="h-4 w-4" />
+                          {expense.is_active ? (
+                            <ToggleRight className="h-5 w-5 text-emerald-500" />
+                          ) : (
+                            <ToggleLeft className="h-5 w-5 text-muted-foreground" />
+                          )}
                         </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-7 w-7"
-                          onClick={() => setDeleteId(expense.id)}
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                      </TableCell>
+
+                      <TableCell>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => onEdit(expense)}
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={() => setDeleteId(expense.id)}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
