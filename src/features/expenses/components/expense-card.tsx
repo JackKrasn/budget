@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/tooltip'
 import { getIconByName } from '@/lib/icon-registry'
 import type { ExpenseListRow } from '@/lib/api/types'
+import { CURRENCY_SYMBOLS } from '@/types'
 
 function formatMoney(amount: number): string {
   return new Intl.NumberFormat('ru-RU', {
@@ -40,7 +41,7 @@ function formatExpenseAmount(expense: ExpenseListRow): { main: string; secondary
   }
 
   // Для валютных расходов показываем сумму в валюте и в рублях
-  const currencySymbol = currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency === 'GEL' ? '₾' : currency === 'TRY' ? '₺' : currency
+  const currencySymbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
   return {
     main: `-${currencySymbol}${formatMoney(expense.amount)}`,
     secondary: expense.amountBase ? `≈ ${formatMoney(expense.amountBase)} ₽` : undefined,

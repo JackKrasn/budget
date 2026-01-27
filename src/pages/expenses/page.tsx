@@ -25,10 +25,6 @@ import {
   ExpenseRow,
   CreateExpenseDialog,
   EditExpenseDialog,
-  AccountFilter,
-  CategoryFilter,
-  TagFilter,
-  FundFilter,
   CategoryGrid,
   TagGrid,
   type CategorySummary,
@@ -48,7 +44,8 @@ import {
   useBalanceAdjustments,
   useDeleteBalanceAdjustment,
 } from '@/features/accounts'
-import { DateRangePicker, ViewModeTabs, type ViewMode } from '@/components/common'
+import { DateRangePicker, ViewModeTabs, DayHeader, groupExpensesByCurrency, FiltersPanel, type ViewMode } from '@/components/common'
+import { CURRENCY_SYMBOLS } from '@/types'
 
 function formatMoney(amount: number | undefined | null): string {
   const value = Number(amount) || 0
@@ -179,6 +176,21 @@ export default function ExpensesPage() {
   const transfers = transfersData?.data ?? []
   const adjustments = adjustmentsData?.data ?? []
 
+  // Calculate total expenses by currency
+  const expenseTotalsByCurrency = useMemo(() => {
+    const totals: Record<string, number> = {}
+    let totalInBase = 0
+
+    expenses.forEach((expense) => {
+      const currency = expense.currency || 'RUB'
+      totals[currency] = (totals[currency] || 0) + expense.amount
+      // Суммируем в базовой валюте
+      totalInBase += expense.amountBase ?? expense.amount
+    })
+
+    return { totals, totalInBase }
+  }, [expenses])
+
   // Получить выбранный фонд для заголовка
   const selectedFund = selectedFundId
     ? funds.find((f) => f.fund.id === selectedFundId)
@@ -188,9 +200,20 @@ export default function ExpensesPage() {
   const categorySummaries = useMemo<CategorySummary[]>(() => {
     // Create a map of category expenses (используем amount_base для конвертации в рубли)
     const expensesByCategory: Record<string, number> = {}
+    // Also track expenses by category AND currency
+    const expensesByCategoryCurrency: Record<string, Record<string, number>> = {}
+
     expenses.forEach((expense) => {
+      const currency = expense.currency || 'RUB'
+      // Total in base currency
       expensesByCategory[expense.categoryId] =
         (expensesByCategory[expense.categoryId] || 0) + (expense.amountBase ?? expense.amount)
+      // By currency
+      if (!expensesByCategoryCurrency[expense.categoryId]) {
+        expensesByCategoryCurrency[expense.categoryId] = {}
+      }
+      expensesByCategoryCurrency[expense.categoryId][currency] =
+        (expensesByCategoryCurrency[expense.categoryId][currency] || 0) + expense.amount
     })
 
     // Create summaries from budget items first
@@ -198,6 +221,14 @@ export default function ExpensesPage() {
 
     // Add budget items
     budgetItems.forEach((item) => {
+      // Build currency limits from budget item
+      const currencyLimits = item.currencyLimits?.map((cl) => ({
+        currency: cl.currency,
+        totalLimit: cl.totalLimit,
+        actualAmount: expensesByCategoryCurrency[item.categoryId]?.[cl.currency] || 0,
+        remaining: cl.totalLimit - (expensesByCategoryCurrency[item.categoryId]?.[cl.currency] || 0),
+      })) || []
+
       summariesMap[item.categoryId] = {
         categoryId: item.categoryId,
         categoryCode: item.categoryCode,
@@ -205,8 +236,9 @@ export default function ExpensesPage() {
         categoryIcon: item.categoryIcon,
         categoryColor: item.categoryColor,
         actualAmount: expensesByCategory[item.categoryId] || 0,
-        plannedAmount: item.plannedAmount,
+        totalLimit: item.totalLimit,
         plannedExpensesSum: item.plannedExpensesSum,
+        currencyLimits: currencyLimits.length > 0 ? currencyLimits : undefined,
       }
     })
 
@@ -220,7 +252,7 @@ export default function ExpensesPage() {
           categoryIcon: cat.icon,
           categoryColor: cat.color,
           actualAmount: expensesByCategory[cat.id],
-          plannedAmount: 0,
+          totalLimit: 0,
         }
       }
     })
@@ -311,12 +343,11 @@ export default function ExpensesPage() {
         const totalExpenses = expenseOps
           .reduce((sum, op) => sum + ((op.data as ExpenseListRow).amountBase ?? (op.data as ExpenseListRow).amount), 0)
 
-        // Группируем по валютам (кроме RUB)
+        // Группируем по всем валютам
         const expensesByCurrency = expenseOps.reduce((acc, op) => {
           const expense = op.data as ExpenseListRow
-          if (expense.currency && expense.currency !== 'RUB') {
-            acc[expense.currency] = (acc[expense.currency] || 0) + expense.amount
-          }
+          const currency = expense.currency || 'RUB'
+          acc[currency] = (acc[currency] || 0) + expense.amount
           return acc
         }, {} as Record<string, number>)
 
@@ -338,25 +369,6 @@ export default function ExpensesPage() {
     if (confirm('Вы уверены, что хотите удалить этот расход?')) {
       deleteExpense.mutate(id)
     }
-  }
-
-  const formatDateHeader = (dateStr: string) => {
-    const date = new Date(dateStr)
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-
-    if (dateStr === today.toISOString().split('T')[0]) {
-      return 'Сегодня'
-    }
-    if (dateStr === yesterday.toISOString().split('T')[0]) {
-      return 'Вчера'
-    }
-    return date.toLocaleDateString('ru-RU', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-    })
   }
 
   const handleCategoryClick = (categoryId: string) => {
@@ -397,11 +409,53 @@ export default function ExpensesPage() {
     ? budgetItems.find((item) => item.categoryId === selectedCategoryId)
     : null
   const totalPlanned = selectedCategoryId
-    ? (selectedBudgetItem?.plannedAmount ?? 0)
+    ? (selectedBudgetItem?.totalLimit ?? 0)
     : (currentBudget?.total_planned ?? 0)
-  const totalActual = summary?.totalAmount ?? 0
+  // Use locally calculated total to ensure currency conversions are correct
+  const totalActual = expenseTotalsByCurrency.totalInBase
   const totalProgress =
     totalPlanned > 0 ? Math.min((totalActual / totalPlanned) * 100, 100) : 0
+
+  // Calculate budget totals by currency (for multi-currency progress bars)
+  const budgetByCurrency = useMemo(() => {
+    const result: Record<string, { planned: number; actual: number }> = {}
+
+    // If category is selected, use its currency limits
+    if (selectedCategoryId && selectedBudgetItem?.currencyLimits) {
+      selectedBudgetItem.currencyLimits.forEach((cl) => {
+        if (cl.totalLimit > 0 || cl.actualAmount > 0) {
+          result[cl.currency] = {
+            planned: cl.totalLimit,
+            actual: expenseTotalsByCurrency.totals[cl.currency] || 0,
+          }
+        }
+      })
+    } else {
+      // Aggregate all budget items' currency limits
+      budgetItems.forEach((item) => {
+        item.currencyLimits?.forEach((cl) => {
+          if (!result[cl.currency]) {
+            result[cl.currency] = { planned: 0, actual: 0 }
+          }
+          result[cl.currency].planned += cl.totalLimit
+        })
+      })
+      // Add actual expenses by currency
+      Object.entries(expenseTotalsByCurrency.totals).forEach(([currency, amount]) => {
+        if (!result[currency]) {
+          result[currency] = { planned: 0, actual: 0 }
+        }
+        result[currency].actual = amount
+      })
+    }
+
+    return result
+  }, [selectedCategoryId, selectedBudgetItem, budgetItems, expenseTotalsByCurrency])
+
+  // Check if we have multi-currency budget
+  const hasMultiCurrencyBudget = Object.keys(budgetByCurrency).filter(
+    (c) => budgetByCurrency[c].planned > 0 || budgetByCurrency[c].actual > 0
+  ).length > 1
 
   const currentMonthName = useMemo(() => {
     const isFullMonth =
@@ -494,7 +548,7 @@ export default function ExpensesPage() {
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
       >
         {/* Total Expenses */}
         <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
@@ -503,11 +557,33 @@ export default function ExpensesPage() {
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive/10">
                 <TrendingDown className="h-5 w-5 text-destructive" />
               </div>
-              <div>
+              <div className="flex-1 min-w-0">
                 <p className="text-sm text-muted-foreground">Потрачено</p>
-                <p className="text-xl font-bold tabular-nums">
-                  {formatMoney(totalActual)} ₽
-                </p>
+                {/* Show separate amounts per currency */}
+                {Object.keys(expenseTotalsByCurrency.totals).length > 1 ? (
+                  <div className="space-y-1 mt-1">
+                    {Object.entries(expenseTotalsByCurrency.totals)
+                      .sort(([a], [b]) => (a === 'RUB' ? -1 : b === 'RUB' ? 1 : a.localeCompare(b)))
+                      .map(([currency, amount]) => {
+                        const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+                        const isRub = currency === 'RUB'
+                        return (
+                          <div key={currency} className="flex items-baseline gap-1.5">
+                            <span className={`font-bold tabular-nums ${isRub ? 'text-xl' : 'text-lg text-muted-foreground'}`}>
+                              {formatMoney(amount)}
+                            </span>
+                            <span className={`text-sm ${isRub ? 'text-muted-foreground' : 'text-muted-foreground/70'}`}>
+                              {symbol}
+                            </span>
+                          </div>
+                        )
+                      })}
+                  </div>
+                ) : (
+                  <p className="text-xl font-bold tabular-nums">
+                    {formatMoney(expenseTotalsByCurrency.totalInBase)} ₽
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -547,26 +623,10 @@ export default function ExpensesPage() {
           </CardContent>
         </Card>
 
-        {/* Records Count */}
-        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
-          <CardContent className="p-5">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-chart-3/10">
-                <Receipt className="h-5 w-5 text-chart-3" />
-              </div>
-              <div>
-                <p className="text-sm text-muted-foreground">Записей</p>
-                <p className="text-xl font-bold tabular-nums">
-                  {expenses.length}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
       </motion.div>
 
       {/* Progress Bar */}
-      {totalPlanned > 0 && !isBudgetLoading && (
+      {(totalPlanned > 0 || hasMultiCurrencyBudget) && !isBudgetLoading && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -576,24 +636,78 @@ export default function ExpensesPage() {
             <CardContent className="p-5">
               <div className="flex items-center justify-between mb-3">
                 <span className="text-sm font-medium">Исполнение бюджета</span>
-                <span className="text-sm text-muted-foreground">
-                  {Math.round(totalProgress)}%
-                </span>
+                {!hasMultiCurrencyBudget && (
+                  <span className="text-sm text-muted-foreground">
+                    {Math.round(totalProgress)}%
+                  </span>
+                )}
               </div>
-              <Progress
-                value={totalProgress}
-                className={`h-3 ${
-                  totalActual > totalPlanned ? '[&>div]:bg-destructive' : ''
-                }`}
-              />
-              <div className="flex justify-between mt-2 text-xs text-muted-foreground">
-                <span>{formatMoney(totalActual)} ₽ потрачено</span>
-                <span>
-                  {totalActual > totalPlanned
-                    ? `Перерасход: ${formatMoney(totalActual - totalPlanned)} ₽`
-                    : `Осталось: ${formatMoney(totalPlanned - totalActual)} ₽`}
-                </span>
-              </div>
+
+              {/* Multi-currency progress bars */}
+              {hasMultiCurrencyBudget ? (
+                <div className="space-y-4">
+                  {Object.entries(budgetByCurrency)
+                    .filter(([, data]) => data.planned > 0 || data.actual > 0)
+                    .map(([currency, data]) => {
+                      const currProgress = data.planned > 0
+                        ? Math.min((data.actual / data.planned) * 100, 100)
+                        : 0
+                      const isOver = data.actual > data.planned && data.planned > 0
+                      const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+
+                      return (
+                        <div key={currency} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-medium">{currency}</span>
+                            <span className="text-muted-foreground">
+                              {data.planned > 0 ? `${Math.round(currProgress)}%` : 'без лимита'}
+                            </span>
+                          </div>
+                          {data.planned > 0 ? (
+                            <Progress
+                              value={currProgress}
+                              className={`h-2 ${isOver ? '[&>div]:bg-destructive' : ''}`}
+                            />
+                          ) : (
+                            <div className="h-2 bg-muted/50 rounded-full overflow-hidden">
+                              <div className="h-full bg-amber-500/50 rounded-full" style={{ width: '100%' }} />
+                            </div>
+                          )}
+                          <div className="flex justify-between text-[11px] text-muted-foreground">
+                            <span>{symbol}{formatMoney(data.actual)} потрачено</span>
+                            {data.planned > 0 ? (
+                              <span className={isOver ? 'text-destructive font-medium' : ''}>
+                                {isOver
+                                  ? `Перерасход: ${symbol}${formatMoney(data.actual - data.planned)}`
+                                  : `Осталось: ${symbol}${formatMoney(data.planned - data.actual)}`}
+                              </span>
+                            ) : (
+                              <span className="text-amber-600">лимит не установлен</span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                </div>
+              ) : (
+                /* Single currency progress bar */
+                <>
+                  <Progress
+                    value={totalProgress}
+                    className={`h-3 ${
+                      totalActual > totalPlanned ? '[&>div]:bg-destructive' : ''
+                    }`}
+                  />
+                  <div className="flex justify-between mt-2 text-xs text-muted-foreground">
+                    <span>{formatMoney(totalActual)} ₽ потрачено</span>
+                    <span>
+                      {totalActual > totalPlanned
+                        ? `Перерасход: ${formatMoney(totalActual - totalPlanned)} ₽`
+                        : `Осталось: ${formatMoney(totalPlanned - totalActual)} ₽`}
+                    </span>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -613,61 +727,39 @@ export default function ExpensesPage() {
           onRangeChange={handleDateRangeChange}
         />
 
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Category Filter */}
-          {categories.length > 0 && (
-            <CategoryFilter
-              categories={categories}
-              selectedId={selectedCategoryId}
-              onSelect={(id) => {
-                setSelectedCategoryId(id)
-                setSelectedTagId(null)
-                if (id) {
-                  setViewMode('list')
-                }
-              }}
-            />
-          )}
-
-          {/* Tag Filter */}
-          {tags.length > 0 && (
-            <TagFilter
-              tags={tags}
-              selectedId={selectedTagId}
-              onSelect={(id) => {
-                setSelectedTagId(id)
-                setSelectedCategoryId(null)
-                if (id) {
-                  setViewMode('list')
-                }
-              }}
-            />
-          )}
-
-          {/* Account Filter */}
-          {accounts.length > 0 && (
-            <AccountFilter
-              accounts={accounts}
-              selectedId={selectedAccountId}
-              onSelect={setSelectedAccountId}
-            />
-          )}
-
-          {/* Fund Filter */}
-          {funds.length > 0 && (
-            <FundFilter
-              funds={funds}
-              selectedId={selectedFundId}
-              onSelect={(id) => {
-                setSelectedFundId(id)
-                if (id) {
-                  setViewMode('list')
-                }
-              }}
-            />
-          )}
-
-          <div className="flex-1" />
+        {/* Filters Panel */}
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <FiltersPanel
+            categories={categories}
+            tags={tags}
+            accounts={accounts}
+            funds={funds}
+            selectedCategoryId={selectedCategoryId}
+            selectedTagId={selectedTagId}
+            selectedAccountId={selectedAccountId}
+            selectedFundId={selectedFundId}
+            onCategoryChange={(id) => {
+              setSelectedCategoryId(id)
+              setSelectedTagId(null)
+              if (id) {
+                setViewMode('list')
+              }
+            }}
+            onTagChange={(id) => {
+              setSelectedTagId(id)
+              setSelectedCategoryId(null)
+              if (id) {
+                setViewMode('list')
+              }
+            }}
+            onAccountChange={setSelectedAccountId}
+            onFundChange={(id) => {
+              setSelectedFundId(id)
+              if (id) {
+                setViewMode('list')
+              }
+            }}
+          />
 
           {/* View Mode */}
           <ViewModeTabs
@@ -726,36 +818,23 @@ export default function ExpensesPage() {
             >
               {allOperationsByDate.length > 0 ? (
                 allOperationsByDate.map((group) => {
-                  const currencySymbols: Record<string, string> = { USD: '$', EUR: '€', GEL: '₾', TRY: '₺' }
-                  const currencyParts = Object.entries(group.expensesByCurrency)
-                    .map(([cur, amt]) => `${currencySymbols[cur] || cur}${formatMoney(amt)}`)
-                    .join(' + ')
+                  // Group transfers by currency
+                  const transfersByCurrency = group.operations
+                    .filter((op) => op.type === 'transfer')
+                    .reduce((acc, op) => {
+                      const transfer = op.data as TransferWithAccounts
+                      const currency = transfer.from_currency || 'RUB'
+                      acc[currency] = (acc[currency] || 0) + transfer.amount
+                      return acc
+                    }, {} as Record<string, number>)
+
                   return (
                   <div key={group.date} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-muted-foreground capitalize">
-                        {formatDateHeader(group.date)}
-                      </h3>
-                      <div className="flex items-center gap-3 text-xs">
-                        {group.totalExpenses > 0 && (
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-rose-500 font-medium tabular-nums">
-                              −{formatMoney(group.totalExpenses)} ₽
-                            </span>
-                            {currencyParts && (
-                              <span className="text-muted-foreground tabular-nums">
-                                ({currencyParts})
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {group.totalTransfers > 0 && (
-                          <span className="text-blue-500 font-medium tabular-nums">
-                            ↔ {formatMoney(group.totalTransfers)} ₽
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    <DayHeader
+                      date={group.date}
+                      expensesByCurrency={Object.keys(group.expensesByCurrency).length > 0 ? group.expensesByCurrency : undefined}
+                      transfersByCurrency={Object.keys(transfersByCurrency).length > 0 ? transfersByCurrency : undefined}
+                    />
                     <motion.div
                       className="space-y-2"
                       variants={container}
@@ -930,35 +1009,13 @@ export default function ExpensesPage() {
             >
               {expensesByDate.length > 0 ? (
                 expensesByDate.map(([date, dateExpenses]) => {
-                  const dayTotal = dateExpenses.reduce((sum, e) => sum + (e.amountBase ?? e.amount), 0)
-                  // Группируем суммы по валютам (кроме RUB)
-                  const currencyTotals = dateExpenses.reduce((acc, e) => {
-                    if (e.currency && e.currency !== 'RUB') {
-                      acc[e.currency] = (acc[e.currency] || 0) + e.amount
-                    }
-                    return acc
-                  }, {} as Record<string, number>)
-                  const currencySymbols: Record<string, string> = { USD: '$', EUR: '€', GEL: '₾', TRY: '₺' }
-                  const currencyParts = Object.entries(currencyTotals)
-                    .map(([cur, amt]) => `${currencySymbols[cur] || cur}${formatMoney(amt)}`)
-                    .join(' + ')
+                  const expensesByCurrency = groupExpensesByCurrency(dateExpenses)
                   return (
                   <div key={date} className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-sm font-medium text-muted-foreground capitalize">
-                        {formatDateHeader(date)}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold tabular-nums text-destructive">
-                          −{formatMoney(dayTotal)} ₽
-                        </span>
-                        {currencyParts && (
-                          <span className="text-xs text-muted-foreground tabular-nums">
-                            ({currencyParts})
-                          </span>
-                        )}
-                      </div>
-                    </div>
+                    <DayHeader
+                      date={date}
+                      expensesByCurrency={expensesByCurrency}
+                    />
                     <motion.div
                       className="space-y-2"
                       variants={container}

@@ -7,6 +7,7 @@ import {
 import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { CategoryIcon } from '@/components/common/category-icon'
+import { getCurrencySymbol } from '@/components/common/day-header'
 import { cn } from '@/lib/utils'
 
 function formatMoney(amount: number): string {
@@ -16,15 +17,25 @@ function formatMoney(amount: number): string {
   }).format(amount)
 }
 
+// Currency limit summary for display
+export interface CurrencyLimitSummary {
+  currency: string
+  totalLimit: number
+  actualAmount: number
+  remaining: number
+}
+
 export interface CategorySummary {
   categoryId: string
   categoryCode: string
   categoryName: string
   categoryIcon: string
   categoryColor: string
-  actualAmount: number
-  plannedAmount: number
+  actualAmount: number // Total in base currency (RUB)
+  totalLimit: number // totalLimit = plannedExpensesSum + bufferAmount (in RUB)
   plannedExpensesSum?: number // Обязательные платежи (кредиты и т.д.)
+  // Multi-currency support
+  currencyLimits?: CurrencyLimitSummary[]
 }
 
 interface CategoryCardProps {
@@ -32,17 +43,74 @@ interface CategoryCardProps {
   onClick?: () => void
 }
 
+// Currency progress bar component
+function CurrencyProgressBar({
+  limit,
+  color,
+}: {
+  limit: CurrencyLimitSummary
+  color: string
+}) {
+  const progress = limit.totalLimit > 0
+    ? Math.min((limit.actualAmount / limit.totalLimit) * 100, 100)
+    : 0
+  const isOverBudget = limit.remaining < 0
+  const progressPercent = limit.totalLimit > 0
+    ? Math.round((limit.actualAmount / limit.totalLimit) * 100)
+    : 0
+
+  return (
+    <div className="space-y-1">
+      <div className="flex justify-between items-center text-xs">
+        <span className="text-muted-foreground font-medium">
+          {getCurrencySymbol(limit.currency)}
+        </span>
+        <span className={cn(
+          'tabular-nums',
+          isOverBudget ? 'text-destructive font-medium' : 'text-muted-foreground'
+        )}>
+          {formatMoney(limit.actualAmount)} / {formatMoney(limit.totalLimit)}
+        </span>
+      </div>
+      <Progress
+        value={isOverBudget ? 100 : progress}
+        className="h-1.5"
+        indicatorColor={isOverBudget ? undefined : color}
+      />
+      <div className="flex justify-between text-[10px]">
+        <span className={cn(isOverBudget ? 'text-destructive' : 'text-muted-foreground')}>
+          {progressPercent}%
+        </span>
+        {isOverBudget ? (
+          <span className="text-destructive">
+            +{formatMoney(Math.abs(limit.remaining))}
+          </span>
+        ) : (
+          <span className="text-muted-foreground">
+            ост. {formatMoney(limit.remaining)}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 export function CategoryCard({ category, onClick }: CategoryCardProps) {
-  // plannedAmount already includes plannedExpensesSum (formula: plannedAmount = plannedExpensesSum + bufferAmount)
-  const totalPlanned = category.plannedAmount
+  // Check for multi-currency limits
+  const hasMultiCurrency = category.currencyLimits && category.currencyLimits.length > 0
+  const activeCurrencyLimits = category.currencyLimits?.filter(l => l.totalLimit > 0 || l.actualAmount > 0) || []
+
+  // totalLimit already includes plannedExpensesSum (formula: totalLimit = plannedExpensesSum + bufferAmount)
+  const totalPlanned = category.totalLimit
 
   const progress =
     totalPlanned > 0
       ? Math.min((category.actualAmount / totalPlanned) * 100, 100)
       : 0
   const diff = totalPlanned - category.actualAmount
-  // Перерасход только если есть план И расходы превысили план
-  const isOverBudget = totalPlanned > 0 && diff < 0
+  // Перерасход: проверяем как общий лимит, так и по валютам
+  const hasOverBudgetCurrency = activeCurrencyLimits.some(l => l.remaining < 0)
+  const isOverBudget = (totalPlanned > 0 && diff < 0) || hasOverBudgetCurrency
   const isUnderBudget = totalPlanned > 0 && diff > 0 && category.actualAmount > 0
   const progressPercent =
     totalPlanned > 0
@@ -133,7 +201,7 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
               </span>
               <span className="ml-1 text-sm text-muted-foreground">₽</span>
             </div>
-            {totalPlanned > 0 && (
+            {totalPlanned > 0 && !hasMultiCurrency && (
               <div className="text-right">
                 <span className="text-sm text-muted-foreground">из </span>
                 <span className="text-sm font-medium tabular-nums">
@@ -143,8 +211,19 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
             )}
           </div>
 
-          {/* Progress bar */}
-          {totalPlanned > 0 && (
+          {/* Multi-currency progress bars */}
+          {hasMultiCurrency && activeCurrencyLimits.length > 0 ? (
+            <div className="mt-3 space-y-2">
+              {activeCurrencyLimits.map((limit) => (
+                <CurrencyProgressBar
+                  key={limit.currency}
+                  limit={limit}
+                  color={category.categoryColor}
+                />
+              ))}
+            </div>
+          ) : totalPlanned > 0 ? (
+            /* Single currency progress bar */
             <div className="mt-3 space-y-1.5">
               <Progress
                 value={isOverBudget ? 100 : progress}
@@ -166,10 +245,10 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
                 )}
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* No plan indicator */}
-          {totalPlanned === 0 && category.actualAmount > 0 && (
+          {totalPlanned === 0 && category.actualAmount > 0 && !hasMultiCurrency && (
             <p className="mt-3 text-xs text-muted-foreground">
               План не установлен
             </p>

@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { PiggyBank } from 'lucide-react'
+import { motion } from 'framer-motion'
+import { PiggyBank, Coins, ChevronRight } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -30,9 +31,13 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
 import { FundIcon, CategoryIcon } from '@/components/common'
 import { useFunds } from '@/features/funds'
-import type { BudgetItemWithCategory } from '@/lib/api/types'
+import { cn } from '@/lib/utils'
+import { CurrencyLimitsGrid } from './currency-limit-badge'
+import { CurrencyLimitsEditor } from './currency-limits-editor'
+import type { BudgetItemWithCategory, BudgetCurrency } from '@/lib/api/types'
 
 const formSchema = z.object({
   plannedAmount: z.string().min(1, 'Введите сумму'),
@@ -48,6 +53,7 @@ interface BudgetItemDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSave: (categoryId: string, plannedAmount: number, notes?: string, fundId?: string, fundAllocation?: number) => Promise<void>
+  onSaveCurrencyBuffers?: (categoryId: string, buffers: { currency: BudgetCurrency; bufferAmount: number }[]) => Promise<void>
   isPending?: boolean
 }
 
@@ -56,11 +62,16 @@ export function BudgetItemDialog({
   open,
   onOpenChange,
   onSave,
+  onSaveCurrencyBuffers,
   isPending,
 }: BudgetItemDialogProps) {
   const [useFundFinancing, setUseFundFinancing] = useState(false)
+  const [currencyLimitsEditorOpen, setCurrencyLimitsEditorOpen] = useState(false)
   const { data: fundsData } = useFunds({ status: 'active' })
   const funds = fundsData?.data ?? []
+
+  // Check if item has multi-currency limits
+  const hasMultiCurrencyLimits = item?.currencyLimits && item.currencyLimits.length > 0
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -77,7 +88,7 @@ export function BudgetItemDialog({
       const hasFund = !!item.fundId
       setUseFundFinancing(hasFund)
       form.reset({
-        plannedAmount: String(item.plannedAmount),
+        plannedAmount: String(item.totalLimit),
         notes: item.notes || '',
         fundId: item.fundId || '',
         fundAllocation: item.fundAllocation ? String(item.fundAllocation) : '',
@@ -121,12 +132,18 @@ export function BudgetItemDialog({
     onOpenChange(false)
   }
 
+  const handleSaveCurrencyBuffers = async (buffers: { currency: BudgetCurrency; bufferAmount: number }[]) => {
+    if (!item || !onSaveCurrencyBuffers) return
+    await onSaveCurrencyBuffers(item.categoryId, buffers)
+  }
+
   if (!item) return null
 
-  const variance = item.plannedAmount - item.actualAmount
+  const variance = item.totalLimit - item.actualAmount
   const isOverBudget = variance < 0
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -163,6 +180,59 @@ export function BudgetItemDialog({
             </p>
           </div>
         </div>
+
+        {/* Multi-currency limits section */}
+        {hasMultiCurrencyLimits && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            className="mb-4 space-y-3 rounded-lg border border-border/50 bg-gradient-to-br from-muted/30 to-muted/10 p-4"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Coins className="h-4 w-4 text-primary" />
+                <span className="text-sm font-medium">Мультивалютные лимиты</span>
+                <Badge variant="secondary" className="text-xs">
+                  {item.currencyLimits?.length} валют
+                </Badge>
+              </div>
+              {onSaveCurrencyBuffers && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 text-xs"
+                  onClick={() => setCurrencyLimitsEditorOpen(true)}
+                >
+                  Настроить
+                  <ChevronRight className="ml-1 h-3 w-3" />
+                </Button>
+              )}
+            </div>
+            <CurrencyLimitsGrid
+              limits={item.currencyLimits || []}
+              compact
+            />
+          </motion.div>
+        )}
+
+        {/* Button to add multi-currency limits if not present */}
+        {!hasMultiCurrencyLimits && onSaveCurrencyBuffers && (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className={cn(
+              'mb-4 w-full h-10 gap-2',
+              'border-dashed hover:border-solid',
+              'text-muted-foreground hover:text-foreground'
+            )}
+            onClick={() => setCurrencyLimitsEditorOpen(true)}
+          >
+            <Coins className="h-4 w-4" />
+            Настроить мультивалютные лимиты
+          </Button>
+        )}
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -354,5 +424,17 @@ export function BudgetItemDialog({
         </Form>
       </DialogContent>
     </Dialog>
+
+    {/* Currency Limits Editor Dialog */}
+    {onSaveCurrencyBuffers && (
+      <CurrencyLimitsEditor
+        item={item}
+        open={currencyLimitsEditorOpen}
+        onOpenChange={setCurrencyLimitsEditorOpen}
+        onSave={handleSaveCurrencyBuffers}
+        isPending={isPending}
+      />
+    )}
+    </>
   )
 }
