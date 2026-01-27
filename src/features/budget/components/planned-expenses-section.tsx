@@ -28,7 +28,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { PlannedExpenseWithDetails, PlannedExpenseStatus, AccountWithType, ExpenseCategoryWithTags, ExchangeRate } from '@/lib/api/types'
+import type { PlannedExpenseWithDetails, PlannedExpenseStatus, AccountWithType, ExpenseCategoryWithTags } from '@/lib/api/types'
 import { ConfirmPlannedExpenseDialog } from './confirm-planned-expense-dialog'
 import { CURRENCY_SYMBOLS } from '@/types'
 
@@ -37,8 +37,6 @@ interface PlannedExpensesSectionProps {
   accounts: AccountWithType[]
   /** Список категорий для обогащения данных (если бэкенд не возвращает детали) */
   categories?: ExpenseCategoryWithTags[]
-  /** Курсы валют для конвертации */
-  exchangeRates?: ExchangeRate[]
   onConfirm: (
     id: string,
     data: {
@@ -74,7 +72,6 @@ export function PlannedExpensesSection({
   expenses,
   accounts,
   categories,
-  exchangeRates = [],
   onConfirm,
   onSkip,
   onDelete,
@@ -114,15 +111,6 @@ export function PlannedExpensesSection({
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     })
-  }
-
-  // Получить курс валюты к RUB
-  const getExchangeRate = (currency: string): number => {
-    if (currency === 'RUB') return 1
-    const rate = exchangeRates.find(
-      (r) => r.from_currency === currency && r.to_currency === 'RUB'
-    )
-    return rate?.rate ?? 1
   }
 
   // Форматирование суммы с символом валюты
@@ -210,43 +198,41 @@ export function PlannedExpensesSection({
   const pendingExpenses = enrichedExpenses.filter((e) => e.status === 'pending')
   const confirmedExpenses = enrichedExpenses.filter((e) => e.status === 'confirmed')
 
-  // Конвертация суммы в RUB
-  const toRub = (amount: number, currency: string) => {
-    const rate = getExchangeRate(currency)
-    return amount * rate
-  }
-
-  // Группировка по фондам (конвертируем в RUB)
+  // Группировка по фондам (используем exchange_rate из расхода)
   const fundBreakdown = enrichedExpenses.reduce<Record<string, { name: string; amount: number }>>((acc, e) => {
     const fundedAmount = getActualAmount(e.funded_amount)
     if (fundedAmount && e.fund_name && e.fund_id) {
       if (!acc[e.fund_id]) {
         acc[e.fund_id] = { name: e.fund_name, amount: 0 }
       }
-      acc[e.fund_id].amount += toRub(fundedAmount, e.currency || 'RUB')
+      // Конвертируем по курсу расхода
+      acc[e.fund_id].amount += fundedAmount * (e.exchange_rate ?? 1)
     }
     return acc
   }, {})
 
   const totals = {
-    // Все суммы конвертируем в RUB для итогов
-    planned: enrichedExpenses.reduce((sum, e) => sum + toRub(e.planned_amount, e.currency || 'RUB'), 0),
-    confirmed: confirmedExpenses.reduce(
-      (sum, e) => sum + toRub(getActualAmount(e.actual_amount) ?? e.planned_amount, e.currency || 'RUB'),
-      0
-    ),
-    pending: pendingExpenses.reduce((sum, e) => sum + toRub(e.planned_amount, e.currency || 'RUB'), 0),
+    // Используем planned_amount_base — уже в RUB
+    planned: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0),
+    confirmed: confirmedExpenses.reduce((sum, e) => {
+      const actualAmount = getActualAmount(e.actual_amount)
+      if (actualAmount !== null && e.exchange_rate) {
+        return sum + actualAmount * e.exchange_rate
+      }
+      return sum + e.planned_amount_base
+    }, 0),
+    pending: pendingExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0),
     // Финансирование из фондов (funded_amount приходит как { Float64, Valid })
     fromFunds: enrichedExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + toRub(getActualAmount(e.funded_amount) ?? 0, e.currency || 'RUB'), 0),
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
     pendingFromFunds: pendingExpenses
       .filter((e) => getActualAmount(e.funded_amount))
-      .reduce((sum, e) => sum + toRub(getActualAmount(e.funded_amount) ?? 0, e.currency || 'RUB'), 0),
-    fromBudget: enrichedExpenses.reduce((sum, e) => sum + toRub(e.planned_amount, e.currency || 'RUB'), 0) -
+      .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
+    fromBudget: enrichedExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0) -
       enrichedExpenses
         .filter((e) => getActualAmount(e.funded_amount))
-        .reduce((sum, e) => sum + toRub(getActualAmount(e.funded_amount) ?? 0, e.currency || 'RUB'), 0),
+        .reduce((sum, e) => sum + (getActualAmount(e.funded_amount) ?? 0) * (e.exchange_rate ?? 1), 0),
     fundBreakdown: Object.values(fundBreakdown),
   }
 
@@ -344,7 +330,8 @@ export function PlannedExpensesSection({
                       const currency = expense.currency || 'RUB'
                       const currencySymbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
                       const isNonRub = currency !== 'RUB'
-                      const rate = getExchangeRate(currency)
+                      // Используем exchange_rate из расхода вместо поиска по курсам
+                      const rate = expense.exchange_rate ?? 1
 
                       if (expense.status === 'confirmed' && actualAmount != null) {
                         const savings = expense.planned_amount - actualAmount
@@ -387,7 +374,7 @@ export function PlannedExpensesSection({
                           </span>
                           {isNonRub && expense.status !== 'skipped' && (
                             <span className="text-xs text-muted-foreground tabular-nums">
-                              ≈ {formatMoney(expense.planned_amount * rate)} ₽
+                              ≈ {formatMoney(expense.planned_amount_base)} ₽
                             </span>
                           )}
                         </div>

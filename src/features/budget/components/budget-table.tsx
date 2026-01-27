@@ -19,6 +19,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
 import type { BudgetItemWithCategory, ExpenseCategoryWithTags } from '@/lib/api/types'
@@ -216,6 +221,12 @@ export function BudgetTable({
       fundAllocation: 0,
     }
 
+    // Multi-currency breakdown
+    const plannedAmountRub = existingItem?.plannedAmountRub ?? 0
+    const plannedAmountUsd = existingItem?.plannedAmountUsd ?? 0
+    const plannedAmountEur = existingItem?.plannedAmountEur ?? 0
+    const hasMultiCurrency = plannedAmountUsd > 0 || plannedAmountEur > 0
+
     return {
       categoryId: category.id,
       categoryName: category.name,
@@ -234,6 +245,11 @@ export function BudgetTable({
       fundAllocation,
       fundName,
       budgetItem,
+      // Multi-currency
+      plannedAmountRub,
+      plannedAmountUsd,
+      plannedAmountEur,
+      hasMultiCurrency,
     }
   })
 
@@ -248,9 +264,15 @@ export function BudgetTable({
       mandatory: acc.mandatory + row.plannedExpensesSum,
       actual: acc.actual + row.actual,
       variance: acc.variance + row.variance,
+      // Multi-currency totals
+      plannedRub: acc.plannedRub + row.plannedAmountRub,
+      plannedUsd: acc.plannedUsd + row.plannedAmountUsd,
+      plannedEur: acc.plannedEur + row.plannedAmountEur,
     }),
-    { buffer: 0, planned: 0, mandatory: 0, actual: 0, variance: 0 }
+    { buffer: 0, planned: 0, mandatory: 0, actual: 0, variance: 0, plannedRub: 0, plannedUsd: 0, plannedEur: 0 }
   )
+
+  const hasMultiCurrencyTotals = totals.plannedUsd > 0 || totals.plannedEur > 0
 
   const formatMoney = (amount: number) => {
     return amount.toLocaleString('ru-RU', {
@@ -404,9 +426,55 @@ export function BudgetTable({
                 </TableCell>
 
                 <TableCell className="text-right">
-                  <span className="tabular-nums font-semibold">
-                    {formatMoney(row.totalPlanned)} ₽
-                  </span>
+                  {row.hasMultiCurrency ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span className="tabular-nums font-semibold cursor-help border-b border-dashed border-muted-foreground/50">
+                          {formatMoney(row.totalPlanned)} ₽
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent side="left" className="text-left">
+                        <div className="space-y-1">
+                          <p className="font-medium">Разбивка по валютам:</p>
+                          {row.plannedAmountRub > 0 && (
+                            <p className="tabular-nums">{formatMoney(row.plannedAmountRub)} ₽</p>
+                          )}
+                          {row.plannedAmountUsd > 0 && (() => {
+                            // Вычисляем курс: (totalPlanned - rub - eur_in_rub) / usd
+                            // Для упрощения считаем сколько рублей приходится на USD
+                            const usdInRub = row.plannedExpensesSum - row.plannedAmountRub -
+                              (row.plannedAmountEur > 0 ? (row.plannedExpensesSum - row.plannedAmountRub) * row.plannedAmountEur / (row.plannedAmountUsd + row.plannedAmountEur) : 0)
+                            const rate = row.plannedAmountUsd > 0 ? usdInRub / row.plannedAmountUsd : 0
+                            return (
+                              <p className="tabular-nums">
+                                ${formatMoney(row.plannedAmountUsd)}
+                                <span className="text-muted-foreground ml-1">
+                                  (~{formatMoney(usdInRub)} ₽, курс {rate.toFixed(2)})
+                                </span>
+                              </p>
+                            )
+                          })()}
+                          {row.plannedAmountEur > 0 && (() => {
+                            const eurInRub = row.plannedExpensesSum - row.plannedAmountRub -
+                              (row.plannedAmountUsd > 0 ? (row.plannedExpensesSum - row.plannedAmountRub) * row.plannedAmountUsd / (row.plannedAmountUsd + row.plannedAmountEur) : 0)
+                            const rate = row.plannedAmountEur > 0 ? eurInRub / row.plannedAmountEur : 0
+                            return (
+                              <p className="tabular-nums">
+                                €{formatMoney(row.plannedAmountEur)}
+                                <span className="text-muted-foreground ml-1">
+                                  (~{formatMoney(eurInRub)} ₽, курс {rate.toFixed(2)})
+                                </span>
+                              </p>
+                            )
+                          })()}
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <span className="tabular-nums font-semibold">
+                      {formatMoney(row.totalPlanned)} ₽
+                    </span>
+                  )}
                 </TableCell>
 
                 <TableCell className="text-right">
@@ -458,7 +526,51 @@ export function BudgetTable({
               {formatMoney(totals.mandatory)} ₽
             </TableCell>
             <TableCell className="text-right tabular-nums">
-              {formatMoney(totals.planned)} ₽
+              {hasMultiCurrencyTotals ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="cursor-help border-b border-dashed border-muted-foreground/50">
+                      {formatMoney(totals.planned)} ₽
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="text-left">
+                    <div className="space-y-1">
+                      <p className="font-medium">Разбивка по валютам:</p>
+                      {totals.plannedRub > 0 && (
+                        <p className="tabular-nums">{formatMoney(totals.plannedRub)} ₽</p>
+                      )}
+                      {totals.plannedUsd > 0 && (() => {
+                        const usdInRub = totals.mandatory - totals.plannedRub -
+                          (totals.plannedEur > 0 ? (totals.mandatory - totals.plannedRub) * totals.plannedEur / (totals.plannedUsd + totals.plannedEur) : 0)
+                        const rate = totals.plannedUsd > 0 ? usdInRub / totals.plannedUsd : 0
+                        return (
+                          <p className="tabular-nums">
+                            ${formatMoney(totals.plannedUsd)}
+                            <span className="text-muted-foreground ml-1">
+                              (~{formatMoney(usdInRub)} ₽, курс {rate.toFixed(2)})
+                            </span>
+                          </p>
+                        )
+                      })()}
+                      {totals.plannedEur > 0 && (() => {
+                        const eurInRub = totals.mandatory - totals.plannedRub -
+                          (totals.plannedUsd > 0 ? (totals.mandatory - totals.plannedRub) * totals.plannedUsd / (totals.plannedUsd + totals.plannedEur) : 0)
+                        const rate = totals.plannedEur > 0 ? eurInRub / totals.plannedEur : 0
+                        return (
+                          <p className="tabular-nums">
+                            €{formatMoney(totals.plannedEur)}
+                            <span className="text-muted-foreground ml-1">
+                              (~{formatMoney(eurInRub)} ₽, курс {rate.toFixed(2)})
+                            </span>
+                          </p>
+                        )
+                      })()}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <>{formatMoney(totals.planned)} ₽</>
+              )}
             </TableCell>
             <TableCell className="text-right tabular-nums text-muted-foreground">
               {formatMoney(totals.actual)} ₽

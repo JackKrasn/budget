@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { Check, Wallet, PiggyBank, CalendarIcon } from 'lucide-react'
+import { Check, PiggyBank, CalendarIcon } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,

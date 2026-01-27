@@ -37,7 +37,7 @@ import {
   ReceiveIncomeDialog,
   PaymentCalendar,
 } from '@/features/budget'
-import { useExpenseCategories, useExchangeRates } from '@/features/expenses'
+import { useExpenseCategories } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
 import type { PlannedIncome, FundBalance } from '@/lib/api/types'
@@ -67,7 +67,6 @@ export default function PlannedPaymentsPage() {
   const { data: categoriesData } = useExpenseCategories()
   const { data: fundsData } = useFunds()
   const { data: accountsData } = useAccounts()
-  const { data: exchangeRatesData } = useExchangeRates()
 
   // Мутации
   const createBudget = useCreateBudget()
@@ -85,14 +84,13 @@ export default function PlannedPaymentsPage() {
   const categories = categoriesData?.data ?? []
   const fundsRaw = (fundsData?.data ?? []) as FundBalance[]
   const accounts = accountsData?.data ?? []
-  const exchangeRates = exchangeRatesData?.data ?? []
 
   // Статистика
   const stats = useMemo(() => {
     const pendingExpenses = plannedExpenses.filter((e) => e.status === 'pending')
     const pendingIncomes = plannedIncomes.filter((i) => i.status === 'pending')
 
-    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.planned_amount, 0)
+    const totalPendingExpenses = pendingExpenses.reduce((sum, e) => sum + e.planned_amount_base, 0)
     const totalPendingIncomes = pendingIncomes.reduce((sum, i) => sum + i.expected_amount, 0)
 
     // Просроченные (дата до сегодня, но не выполнены)
@@ -480,7 +478,6 @@ export default function PlannedPaymentsPage() {
                 expenses={plannedExpenses}
                 accounts={accounts}
                 categories={categories}
-                exchangeRates={exchangeRates}
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
                 onDelete={handleDeletePlanned}
