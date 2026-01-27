@@ -62,7 +62,7 @@ export const plannedExpensesApi = {
    */
   confirmWithExpense: (
     id: string,
-    data: { actualAmount?: number; accountId?: string; date?: string; notes?: string }
+    data: { actualAmount?: number; accountId?: string; date?: string; notes?: string; tagIds?: string[]; categoryId?: string }
   ) =>
     apiClient.post<PlannedExpenseWithDetails>(
       `${ENDPOINT}/${id}/confirm-with-expense`,

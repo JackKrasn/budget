@@ -89,9 +89,26 @@ interface FundAllocation {
   maxAmount: number
 }
 
+interface DefaultExpenseValues {
+  categoryId?: string
+  accountId?: string
+  amount?: number
+  currency?: string
+  date?: string
+  description?: string
+}
+
 interface CreateExpenseDialogProps {
   children: React.ReactNode
   defaultAccountId?: string
+  /** Предзаполненные значения для формы */
+  defaultValues?: DefaultExpenseValues
+  /** Контролируемое состояние открытия диалога */
+  open?: boolean
+  /** Callback при изменении состояния открытия */
+  onOpenChange?: (open: boolean) => void
+  /** Callback после успешного создания расхода */
+  onSuccess?: (expenseId: string) => void
 }
 
 const CURRENCY_CONFIG: Record<string, { symbol: string; name: string }> = {
@@ -109,8 +126,22 @@ function getCurrencySymbol(currency: string): string {
 export function CreateExpenseDialog({
   children,
   defaultAccountId,
+  defaultValues,
+  open: controlledOpen,
+  onOpenChange,
+  onSuccess,
 }: CreateExpenseDialogProps) {
-  const [open, setOpen] = useState(false)
+  const [internalOpen, setInternalOpen] = useState(false)
+
+  // Поддержка контролируемого и неконтролируемого состояния
+  const isControlled = controlledOpen !== undefined
+  const open = isControlled ? controlledOpen : internalOpen
+  const setOpen = (value: boolean) => {
+    if (!isControlled) {
+      setInternalOpen(value)
+    }
+    onOpenChange?.(value)
+  }
   const [fundAllocations, setFundAllocations] = useState<FundAllocation[]>([])
   const [selectedFundId, setSelectedFundId] = useState<string>('')
   const [selectedAssetId, setSelectedAssetId] = useState<string>('')
@@ -128,12 +159,12 @@ export function CreateExpenseDialog({
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      categoryId: '',
-      accountId: defaultAccountId || '',
-      amount: '',
-      currency: 'RUB',
-      date: new Date().toISOString().split('T')[0],
-      description: '',
+      categoryId: defaultValues?.categoryId || '',
+      accountId: defaultValues?.accountId || defaultAccountId || '',
+      amount: defaultValues?.amount?.toString() || '',
+      currency: defaultValues?.currency || 'RUB',
+      date: defaultValues?.date || new Date().toISOString().split('T')[0],
+      description: defaultValues?.description || '',
       tagIds: [],
       useFundAllocation: false,
     },
@@ -260,7 +291,7 @@ export function CreateExpenseDialog({
         : undefined
 
     try {
-      await createExpense.mutateAsync({
+      const result = await createExpense.mutateAsync({
         categoryId: values.categoryId,
         accountId: values.accountId,
         amount: parseFloat(values.amount),
@@ -274,6 +305,7 @@ export function CreateExpenseDialog({
       form.reset()
       setFundAllocations([])
       setOpen(false)
+      onSuccess?.(result.id)
     } catch {
       // Error handled in mutation
     }
@@ -296,11 +328,27 @@ export function CreateExpenseDialog({
     }
   }, [defaultAccountId, form])
 
+  // Update form when defaultValues change (for controlled mode with prefilled values)
+  useEffect(() => {
+    if (open && defaultValues) {
+      form.reset({
+        categoryId: defaultValues.categoryId || '',
+        accountId: defaultValues.accountId || defaultAccountId || '',
+        amount: defaultValues.amount?.toString() || '',
+        currency: defaultValues.currency || 'RUB',
+        date: defaultValues.date || new Date().toISOString().split('T')[0],
+        description: defaultValues.description || '',
+        tagIds: [],
+        useFundAllocation: false,
+      })
+    }
+  }, [open, defaultValues, defaultAccountId, form])
+
   const hasFundsWithCurrency = availableFunds.length > 0 || fundAllocations.length > 0
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>{children}</DialogTrigger>
+      {!isControlled && <DialogTrigger asChild>{children}</DialogTrigger>}
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[480px] p-0 gap-0 bg-background">
         <DialogHeader className="px-5 pt-4 pb-3 border-b border-border/40">
           <div className="flex items-center gap-2.5">

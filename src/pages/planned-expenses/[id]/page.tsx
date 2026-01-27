@@ -103,8 +103,10 @@ export default function PlannedExpenseDetailsPage() {
   const handleConfirm = async (data: {
     actualAmount?: number
     accountId: string
+    categoryId?: string
     date: string
     notes?: string
+    tagIds?: string[]
   }) => {
     if (!plannedExpense) return
 

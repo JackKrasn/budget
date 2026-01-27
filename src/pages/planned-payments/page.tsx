@@ -50,7 +50,7 @@ export default function PlannedPaymentsPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [viewMode, setViewMode] = useState<'list' | 'category' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'category' | 'calendar'>('category')
   const [receiveIncomeDialogOpen, setReceiveIncomeDialogOpen] = useState(false)
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
 
@@ -149,8 +149,10 @@ export default function PlannedPaymentsPage() {
     data: {
       actualAmount?: number
       accountId: string
+      categoryId?: string
       date: string
       notes?: string
+      tagIds?: string[]
     }
   ) => {
     try {

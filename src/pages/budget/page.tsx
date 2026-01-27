@@ -98,7 +98,7 @@ export default function BudgetPage() {
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
   const [bufferEditorOpen, setBufferEditorOpen] = useState(false)
   const [bufferEditingItem, setBufferEditingItem] = useState<BudgetItemWithCategory | null>(null)
-  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'category' | 'calendar'>('list')
+  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'category' | 'calendar'>('category')
 
   // Вычисляем даты для фильтрации расходов
   const dateFrom = useMemo(() => {
@@ -521,8 +521,10 @@ export default function BudgetPage() {
     data: {
       actualAmount?: number
       accountId: string
+      categoryId?: string
       date: string
       notes?: string
+      tagIds?: string[]
     }
   ) => {
     try {

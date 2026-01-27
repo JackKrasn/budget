@@ -42,8 +42,10 @@ interface PlannedExpensesSectionProps {
     data: {
       actualAmount?: number
       accountId: string
+      categoryId?: string
       date: string
       notes?: string
+      tagIds?: string[]
     }
   ) => Promise<void>
   onSkip: (id: string) => Promise<void>
@@ -151,8 +153,10 @@ export function PlannedExpensesSection({
   const handleConfirm = async (data: {
     actualAmount?: number
     accountId: string
+    categoryId?: string
     date: string
     notes?: string
+    tagIds?: string[]
   }) => {
     if (!selectedExpense) return
 

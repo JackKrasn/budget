@@ -130,7 +130,7 @@ export function useConfirmPlannedExpenseWithExpense() {
       data,
     }: {
       id: string
-      data: { actualAmount?: number; accountId?: string; date?: string; notes?: string }
+      data: { actualAmount?: number; accountId?: string; date?: string; notes?: string; tagIds?: string[]; categoryId?: string }
       budgetId?: string
     }) => plannedExpensesApi.confirmWithExpense(id, data),
     onSuccess: (_, variables) => {

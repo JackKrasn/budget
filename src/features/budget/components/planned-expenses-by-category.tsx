@@ -33,8 +33,10 @@ interface PlannedExpensesByCategoryProps {
     data: {
       actualAmount?: number
       accountId: string
+      categoryId?: string
       date: string
       notes?: string
+      tagIds?: string[]
     }
   ) => Promise<void>
   onSkip: (id: string) => Promise<void>
@@ -209,8 +211,10 @@ export function PlannedExpensesByCategory({
   const handleConfirm = async (data: {
     actualAmount?: number
     accountId: string
+    categoryId?: string
     date: string
     notes?: string
+    tagIds?: string[]
   }) => {
     if (!selectedExpense) return
 
@@ -278,11 +282,8 @@ export function PlannedExpensesByCategory({
         const isExpanded = expandedCategories.has(group.categoryId)
         const hasOverdue = group.expenses.some(isOverdue)
 
-        // Сортируем расходы внутри группы
+        // Сортируем расходы внутри группы только по дате (хронологически, как в календаре)
         const sortedExpenses = [...group.expenses].sort((a, b) => {
-          const statusOrder = { pending: 0, confirmed: 1, skipped: 2 }
-          const orderDiff = statusOrder[a.status] - statusOrder[b.status]
-          if (orderDiff !== 0) return orderDiff
           const dateA = getDateString(a.planned_date)
           const dateB = getDateString(b.planned_date)
           return new Date(dateA).getTime() - new Date(dateB).getTime()
