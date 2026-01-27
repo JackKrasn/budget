@@ -61,6 +61,7 @@ import {
   PaymentCalendar,
   getCurrencyConfig,
   CurrencyLimitsEditor,
+  PlannedExpensesTotals,
 } from '@/features/budget'
 import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -1217,6 +1218,9 @@ export default function BudgetPage() {
                 month={month}
               />
             )}
+
+            {/* Футер с итогами по валютам */}
+            <PlannedExpensesTotals expenses={plannedExpenses} />
           </CollapsibleSection>
 
           {/* Секция 2: Таблица категорий */}

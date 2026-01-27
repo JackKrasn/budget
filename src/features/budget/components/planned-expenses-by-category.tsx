@@ -52,6 +52,11 @@ const STATUS_CONFIG: Record<
   skipped: { label: 'Пропущено', icon: SkipForward, color: 'text-muted-foreground' },
 }
 
+interface CurrencyTotal {
+  planned: number
+  confirmed: number
+}
+
 interface CategoryGroup {
   categoryId: string
   categoryName: string
@@ -64,6 +69,7 @@ interface CategoryGroup {
   pendingCount: number
   confirmedCount: number
   skippedCount: number
+  currencyTotals: Record<string, CurrencyTotal>
 }
 
 // Helper functions
@@ -146,6 +152,7 @@ export function PlannedExpensesByCategory({
           pendingCount: 0,
           confirmedCount: 0,
           skippedCount: 0,
+          currencyTotals: {},
         })
       }
 
@@ -153,16 +160,25 @@ export function PlannedExpensesByCategory({
       group.expenses.push(expense)
       group.totalPlanned += expense.planned_amount_base
 
+      // Агрегируем по валютам
+      const currency = expense.currency || 'RUB'
+      if (!group.currencyTotals[currency]) {
+        group.currencyTotals[currency] = { planned: 0, confirmed: 0 }
+      }
+
       if (expense.status === 'pending') {
         group.pendingCount++
+        group.currencyTotals[currency].planned += expense.planned_amount
       } else if (expense.status === 'confirmed') {
         group.confirmedCount++
         const actualAmount = getActualAmount(expense.actual_amount)
         if (actualAmount !== null) {
           const rate = getExchangeRate(expense)
           group.totalConfirmed += actualAmount * rate
+          group.currencyTotals[currency].confirmed += actualAmount
         } else {
           group.totalConfirmed += expense.planned_amount_base
+          group.currencyTotals[currency].confirmed += expense.planned_amount
         }
       } else {
         group.skippedCount++
@@ -308,7 +324,18 @@ export function PlannedExpensesByCategory({
                 )}
 
                 <span className="text-sm font-medium tabular-nums">
-                  {formatMoney(group.totalPlanned)} ₽
+                  {Object.entries(group.currencyTotals)
+                    .filter(([, totals]) => totals.planned > 0 || totals.confirmed > 0)
+                    .map(([curr, totals], idx, arr) => {
+                      const symbol = CURRENCY_SYMBOLS[curr as keyof typeof CURRENCY_SYMBOLS] || curr
+                      const total = totals.planned + totals.confirmed
+                      return (
+                        <span key={curr}>
+                          {formatMoney(total)} {symbol}
+                          {idx < arr.length - 1 && <span className="text-muted-foreground mx-1">+</span>}
+                        </span>
+                      )
+                    })}
                 </span>
 
                 <ChevronDown

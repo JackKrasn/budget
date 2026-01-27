@@ -38,6 +38,7 @@ import {
   AddPlannedExpenseDialog,
   ReceiveIncomeDialog,
   PaymentCalendar,
+  PlannedExpensesTotals,
 } from '@/features/budget'
 import { useExpenseCategories } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -501,6 +502,7 @@ export default function PlannedPaymentsPage() {
                 hideWrapper
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
+              <PlannedExpensesTotals expenses={plannedExpenses} />
             </CardContent>
           </Card>
         </div>
@@ -558,6 +560,7 @@ export default function PlannedPaymentsPage() {
                 isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
+              <PlannedExpensesTotals expenses={plannedExpenses} />
             </CardContent>
           </Card>
         </div>
@@ -574,6 +577,7 @@ export default function PlannedPaymentsPage() {
               onExpenseClick={(expense) => navigate(`/planned-expenses/${expense.id}`)}
               onIncomeClick={(income) => navigate(`/planned-incomes/${income.id}`)}
             />
+            <PlannedExpensesTotals expenses={plannedExpenses} />
           </CardContent>
         </Card>
       )}
