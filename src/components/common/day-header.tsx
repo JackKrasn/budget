@@ -1,3 +1,5 @@
+import { Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
 function formatMoney(amount: number): string {
@@ -48,6 +50,8 @@ interface DayHeaderProps {
   transfersByCurrency?: CurrencyTotals
   adjustmentsByCurrency?: CurrencyTotals
   fundDepositsByCurrency?: CurrencyTotals
+  /** Callback для добавления расхода на этот день */
+  onAddExpense?: (date: string) => void
   className?: string
 }
 
@@ -84,6 +88,7 @@ export function DayHeader({
   transfersByCurrency,
   adjustmentsByCurrency,
   fundDepositsByCurrency,
+  onAddExpense,
   className,
 }: DayHeaderProps) {
   const hasExpenses = expensesByCurrency && Object.keys(expensesByCurrency).length > 0
@@ -92,10 +97,22 @@ export function DayHeader({
   const hasFundDeposits = fundDepositsByCurrency && Object.keys(fundDepositsByCurrency).length > 0
 
   return (
-    <div className={cn('flex items-center justify-between', className)}>
-      <h3 className="text-sm font-medium text-muted-foreground capitalize">
-        {formatDateHeader(date)}
-      </h3>
+    <div className={cn('flex items-center justify-between group', className)}>
+      <div className="flex items-center gap-2">
+        <h3 className="text-sm font-medium text-muted-foreground capitalize">
+          {formatDateHeader(date)}
+        </h3>
+        {onAddExpense && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-muted-foreground hover:text-foreground"
+            onClick={() => onAddExpense(date)}
+          >
+            <Plus className="h-3.5 w-3.5" />
+          </Button>
+        )}
+      </div>
       <div className="flex items-center gap-3 text-xs flex-wrap justify-end">
         {hasExpenses && (
           <CurrencyAmounts

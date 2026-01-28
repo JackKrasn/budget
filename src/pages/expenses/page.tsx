@@ -48,20 +48,6 @@ function formatMoney(amount: number | undefined | null): string {
   }).format(value)
 }
 
-const container = {
-  hidden: { opacity: 0 },
-  show: {
-    opacity: 1,
-    transition: {
-      staggerChildren: 0.05,
-    },
-  },
-}
-
-const item = {
-  hidden: { opacity: 0, y: 10 },
-  show: { opacity: 1, y: 0 },
-}
 
 const SELECTED_ACCOUNT_KEY = 'budget-selected-account-id'
 
@@ -75,6 +61,7 @@ export default function ExpensesPage() {
     categoryFromUrl || tagFromUrl || fundFromUrl ? 'list' : 'categories'
   )
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [expenseDefaultDate, setExpenseDefaultDate] = useState<string | undefined>(undefined)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     categoryFromUrl
   )
@@ -286,6 +273,18 @@ export default function ExpensesPage() {
     if (confirm('Вы уверены, что хотите удалить этот расход?')) {
       deleteExpense.mutate(id)
     }
+  }
+
+  // Добавить расход на конкретный день
+  const handleAddExpenseOnDay = (date: string) => {
+    setExpenseDefaultDate(date)
+    setCreateDialogOpen(true)
+  }
+
+  // Открыть диалог без предустановленной даты
+  const handleAddExpense = () => {
+    setExpenseDefaultDate(undefined)
+    setCreateDialogOpen(true)
   }
 
   const handleCategoryClick = (categoryId: string) => {
@@ -816,23 +815,28 @@ export default function ExpensesPage() {
                     <DayHeader
                       date={date}
                       expensesByCurrency={expensesByCurrency}
+                      onAddExpense={handleAddExpenseOnDay}
                     />
-                    <motion.div
-                      className="space-y-2"
-                      variants={container}
-                      initial="hidden"
-                      animate="show"
-                    >
-                      {dateExpenses.map((expense) => (
-                        <motion.div key={expense.id} variants={item}>
-                          <ExpenseRow
-                            expense={expense}
-                            onEdit={() => handleEdit(expense)}
-                            onDelete={() => handleDelete(expense.id)}
-                          />
-                        </motion.div>
-                      ))}
-                    </motion.div>
+                    <div className="space-y-2">
+                      <AnimatePresence mode="popLayout">
+                        {dateExpenses.map((expense) => (
+                          <motion.div
+                            key={expense.id}
+                            initial={{ opacity: 0, y: -10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 10 }}
+                            transition={{ duration: 0.2 }}
+                            layout
+                          >
+                            <ExpenseRow
+                              expense={expense}
+                              onEdit={() => handleEdit(expense)}
+                              onDelete={() => handleDelete(expense.id)}
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                   </div>
                   )
                 })
@@ -874,6 +878,7 @@ export default function ExpensesPage() {
       {/* Create Expense Dialog (controlled) */}
       <CreateExpenseDialog
         defaultAccountId={selectedAccountId || undefined}
+        defaultValues={expenseDefaultDate ? { date: expenseDefaultDate } : undefined}
         open={createDialogOpen}
         onOpenChange={setCreateDialogOpen}
       >
@@ -881,7 +886,7 @@ export default function ExpensesPage() {
       </CreateExpenseDialog>
 
       {/* Floating Add Button */}
-      <FloatingAddButton onClick={() => setCreateDialogOpen(true)} />
+      <FloatingAddButton onClick={handleAddExpense} />
     </div>
   )
 }
