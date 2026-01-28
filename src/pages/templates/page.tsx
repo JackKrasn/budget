@@ -28,10 +28,17 @@ import type { RecurringExpenseWithCategory, RecurringIncome, Fund, RecurringExpe
 
 type ViewMode = 'categories' | 'list' | 'calendar'
 
+interface ExpenseDefaultValues {
+  categoryId?: string
+  dayOfMonth?: number
+  frequency?: RecurringExpenseFrequency
+}
+
 export default function TemplatesPage() {
   // Состояние для расходов
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false)
   const [editingExpense, setEditingExpense] = useState<RecurringExpenseWithCategory | null>(null)
+  const [expenseDefaults, setExpenseDefaults] = useState<ExpenseDefaultValues | undefined>(undefined)
 
   // Состояние для доходов
   const [incomeDialogOpen, setIncomeDialogOpen] = useState(false)
@@ -107,6 +114,21 @@ export default function TemplatesPage() {
   // === Обработчики для расходов ===
   const handleAddExpense = () => {
     setEditingExpense(null)
+    setExpenseDefaults(undefined)
+    setExpenseDialogOpen(true)
+  }
+
+  // Добавить расход с заданной категорией (из вида "Категории")
+  const handleAddExpenseInCategory = (categoryId: string) => {
+    setEditingExpense(null)
+    setExpenseDefaults({ categoryId })
+    setExpenseDialogOpen(true)
+  }
+
+  // Добавить расход с заданным днём (из календаря)
+  const handleAddExpenseOnDay = (dayOfMonth: number) => {
+    setEditingExpense(null)
+    setExpenseDefaults({ dayOfMonth, frequency: 'monthly' })
     setExpenseDialogOpen(true)
   }
 
@@ -335,6 +357,7 @@ export default function TemplatesPage() {
                 onEdit={handleEditExpense}
                 onDelete={handleDeleteExpense}
                 onToggleActive={handleToggleExpenseActive}
+                onAddInCategory={handleAddExpenseInCategory}
                 isDeleting={deleteRecurringExpense.isPending}
                 isToggling={updateRecurringExpense.isPending}
               />
@@ -348,6 +371,7 @@ export default function TemplatesPage() {
           incomes={recurringIncomes}
           onExpenseClick={handleEditExpense}
           onIncomeClick={handleEditIncome}
+          onDayClick={handleAddExpenseOnDay}
         />
       )}
 
@@ -359,6 +383,7 @@ export default function TemplatesPage() {
         categories={categories}
         accounts={accounts}
         funds={funds}
+        defaultValues={expenseDefaults}
         onSubmit={handleSubmitExpense}
         isPending={createRecurringExpense.isPending || updateRecurringExpense.isPending}
       />

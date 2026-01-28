@@ -10,6 +10,7 @@ import {
   CalendarDays,
   CalendarClock,
   CalendarRange,
+  Plus,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -68,6 +69,8 @@ interface RecurringExpensesByCategoryProps {
   onEdit: (expense: RecurringExpenseWithCategory) => void
   onDelete: (id: string) => Promise<void>
   onToggleActive: (id: string, isActive: boolean) => Promise<void>
+  /** Callback при клике на "Добавить" в категории */
+  onAddInCategory?: (categoryId: string) => void
   isDeleting?: boolean
   isToggling?: boolean
 }
@@ -78,6 +81,7 @@ export function RecurringExpensesByCategory({
   onEdit,
   onDelete,
   onToggleActive,
+  onAddInCategory,
   isDeleting,
   isToggling,
 }: RecurringExpensesByCategoryProps) {
@@ -263,6 +267,20 @@ export function RecurringExpensesByCategory({
                   <span className="text-sm font-medium tabular-nums text-muted-foreground">
                     ~{formatMoney(group.totalAmount)} ₽/мес
                   </span>
+                )}
+
+                {onAddInCategory && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 shrink-0"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onAddInCategory(group.categoryId)
+                    }}
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                  </Button>
                 )}
 
                 <ChevronDown

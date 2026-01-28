@@ -136,6 +136,12 @@ const formSchema = z.object({
 
 type FormData = z.infer<typeof formSchema>
 
+interface DefaultValues {
+  categoryId?: string
+  dayOfMonth?: number
+  frequency?: RecurringExpenseFrequency
+}
+
 interface RecurringExpenseDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -143,6 +149,8 @@ interface RecurringExpenseDialogProps {
   categories: ExpenseCategoryWithTags[]
   accounts: AccountWithType[]
   funds: Fund[]
+  /** Значения по умолчанию для новых шаблонов */
+  defaultValues?: DefaultValues
   onSubmit: (data: {
     categoryId: string
     accountId?: string
@@ -166,6 +174,7 @@ export function RecurringExpenseDialog({
   categories,
   accounts,
   funds,
+  defaultValues,
   onSubmit,
   isPending,
 }: RecurringExpenseDialogProps) {
@@ -220,22 +229,23 @@ export function RecurringExpenseDialog({
         setOptionsOpen(true)
       }
     } else {
+      // Применяем defaultValues если есть
       form.reset({
         name: '',
-        categoryId: '',
+        categoryId: defaultValues?.categoryId || '',
         currency: 'RUB',
         accountId: '',
         fundId: '',
         amount: '',
-        frequency: 'monthly',
-        dayOfMonth: '1',
+        frequency: defaultValues?.frequency || 'monthly',
+        dayOfMonth: defaultValues?.dayOfMonth ? String(defaultValues.dayOfMonth) : '1',
         dayOfWeek: '',
         monthOfYear: '',
         isActive: true,
       })
       setOptionsOpen(false)
     }
-  }, [expense, form])
+  }, [expense, form, defaultValues])
 
   // Reset account when currency changes (account must match currency)
   useEffect(() => {
