@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
 import { toast } from 'sonner'
-import { Repeat, List, CalendarDays } from 'lucide-react'
+import { Repeat, List, CalendarDays, LayoutGrid, Plus, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   useRecurringExpenses,
   useCreateRecurringExpense,
@@ -14,6 +15,7 @@ import {
   useUpdateRecurringIncome,
   useDeleteRecurringIncome,
   RecurringExpensesSection,
+  RecurringExpensesByCategory,
   RecurringExpenseDialog,
   RecurringIncomesSection,
   RecurringIncomeDialog,
@@ -24,6 +26,8 @@ import { useFunds } from '@/features/funds'
 import { useAccounts } from '@/features/accounts'
 import type { RecurringExpenseWithCategory, RecurringIncome, Fund, RecurringExpenseFrequency } from '@/lib/api/types'
 
+type ViewMode = 'categories' | 'list' | 'calendar'
+
 export default function TemplatesPage() {
   // Состояние для расходов
   const [expenseDialogOpen, setExpenseDialogOpen] = useState(false)
@@ -33,8 +37,8 @@ export default function TemplatesPage() {
   const [incomeDialogOpen, setIncomeDialogOpen] = useState(false)
   const [editingIncome, setEditingIncome] = useState<RecurringIncome | null>(null)
 
-  // Состояние для переключения вида
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  // Состояние для переключения вида (по умолчанию категории)
+  const [viewMode, setViewMode] = useState<ViewMode>('categories')
 
   // Данные
   const { data: recurringExpensesData } = useRecurringExpenses()
@@ -61,6 +65,44 @@ export default function TemplatesPage() {
   const funds: Fund[] = fundsRaw.map((f) => f.fund)
   const accounts = accountsData?.data ?? []
   const exchangeRates = exchangeRatesData?.data ?? []
+
+  // Функции для работы с курсами валют
+  const getExchangeRate = (currency: string): number => {
+    if (currency === 'RUB') return 1
+    const rate = exchangeRates.find(
+      (r) => r.from_currency === currency && r.to_currency === 'RUB'
+    )
+    return rate?.rate ?? 1
+  }
+
+  const toRub = (amount: number, currency: string): number => {
+    return amount * getExchangeRate(currency)
+  }
+
+  // Считаем общую сумму активных расходов (в RUB, месячный эквивалент)
+  const totalActiveExpensesRub = recurringExpenses
+    .filter((e) => e.is_active)
+    .reduce((sum, e) => {
+      const baseAmount = toRub(e.amount, e.currency || 'RUB')
+      const frequency = e.frequency || 'monthly'
+      switch (frequency) {
+        case 'daily':
+          return sum + baseAmount * 30
+        case 'weekly':
+          return sum + baseAmount * 4.33
+        case 'yearly':
+          return sum + baseAmount / 12
+        default:
+          return sum + baseAmount
+      }
+    }, 0)
+
+  const formatMoney = (amount: number) => {
+    return amount.toLocaleString('ru-RU', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    })
+  }
 
   // === Обработчики для расходов ===
   const handleAddExpense = () => {
@@ -207,59 +249,98 @@ export default function TemplatesPage() {
         </div>
 
         {/* Переключатель вида */}
-        <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1 bg-muted/30">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-8 px-3 gap-1.5',
-              viewMode === 'list' && 'bg-background shadow-sm'
-            )}
-            onClick={() => setViewMode('list')}
-          >
+        <ToggleGroup
+          type="single"
+          value={viewMode}
+          onValueChange={(value) => value && setViewMode(value as ViewMode)}
+          className="bg-muted/50 p-1 rounded-lg"
+        >
+          <ToggleGroupItem value="categories" aria-label="По категориям" className="gap-1.5 px-3">
+            <LayoutGrid className="h-4 w-4" />
+            <span className="text-sm hidden sm:inline">Категории</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="list" aria-label="Список" className="gap-1.5 px-3">
             <List className="h-4 w-4" />
-            <span className="text-sm">Список</span>
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'h-8 px-3 gap-1.5',
-              viewMode === 'calendar' && 'bg-background shadow-sm'
-            )}
-            onClick={() => setViewMode('calendar')}
-          >
+            <span className="text-sm hidden sm:inline">Список</span>
+          </ToggleGroupItem>
+          <ToggleGroupItem value="calendar" aria-label="Календарь" className="gap-1.5 px-3">
             <CalendarDays className="h-4 w-4" />
-            <span className="text-sm">Календарь</span>
-          </Button>
-        </div>
+            <span className="text-sm hidden sm:inline">Календарь</span>
+          </ToggleGroupItem>
+        </ToggleGroup>
       </div>
 
-      {viewMode === 'list' ? (
-        <>
-          {/* Секция: Шаблоны регулярных доходов */}
-          <RecurringIncomesSection
-            incomes={recurringIncomes}
-            onAdd={handleAddIncome}
-            onEdit={handleEditIncome}
-            onDelete={handleDeleteIncome}
-            onToggleActive={handleToggleIncomeActive}
-            isDeleting={deleteRecurringIncome.isPending}
-            isToggling={updateRecurringIncome.isPending}
-          />
+      {/* Секция: Шаблоны регулярных доходов - показываем в режимах списка и категорий */}
+      {(viewMode === 'list' || viewMode === 'categories') && (
+        <RecurringIncomesSection
+          incomes={recurringIncomes}
+          onAdd={handleAddIncome}
+          onEdit={handleEditIncome}
+          onDelete={handleDeleteIncome}
+          onToggleActive={handleToggleIncomeActive}
+          isDeleting={deleteRecurringIncome.isPending}
+          isToggling={updateRecurringIncome.isPending}
+        />
+      )}
 
-          {/* Секция: Шаблоны повторяющихся расходов */}
-          <RecurringExpensesSection
-            expenses={recurringExpenses}
-            exchangeRates={exchangeRates}
-            onAdd={handleAddExpense}
-            onEdit={handleEditExpense}
-            onDelete={handleDeleteExpense}
-            onToggleActive={handleToggleExpenseActive}
-            isDeleting={deleteRecurringExpense.isPending}
-            isToggling={updateRecurringExpense.isPending}
-          />
-        </>
+      {/* Секция: Шаблоны повторяющихся расходов */}
+      {viewMode === 'list' ? (
+        <RecurringExpensesSection
+          expenses={recurringExpenses}
+          exchangeRates={exchangeRates}
+          onAdd={handleAddExpense}
+          onEdit={handleEditExpense}
+          onDelete={handleDeleteExpense}
+          onToggleActive={handleToggleExpenseActive}
+          isDeleting={deleteRecurringExpense.isPending}
+          isToggling={updateRecurringExpense.isPending}
+        />
+      ) : viewMode === 'categories' ? (
+        <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <RefreshCw className="h-4 w-4 text-muted-foreground" />
+                Шаблоны повторяющихся расходов
+              </CardTitle>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">
+                  Всего в месяц:{' '}
+                  <span className="font-semibold text-foreground">
+                    ~{formatMoney(totalActiveExpensesRub)} ₽
+                  </span>
+                </span>
+                <Button variant="outline" size="sm" onClick={handleAddExpense}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  Добавить
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {recurringExpenses.length === 0 ? (
+              <div className="flex h-32 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/50 bg-muted/30">
+                <LayoutGrid className="h-8 w-8 text-muted-foreground/50" />
+                <p className="text-sm text-muted-foreground">
+                  Нет шаблонов повторяющихся расходов
+                </p>
+                <Button variant="outline" size="sm" onClick={handleAddExpense}>
+                  Создать шаблон
+                </Button>
+              </div>
+            ) : (
+              <RecurringExpensesByCategory
+                expenses={recurringExpenses}
+                exchangeRates={exchangeRates}
+                onEdit={handleEditExpense}
+                onDelete={handleDeleteExpense}
+                onToggleActive={handleToggleExpenseActive}
+                isDeleting={deleteRecurringExpense.isPending}
+                isToggling={updateRecurringExpense.isPending}
+              />
+            )}
+          </CardContent>
+        </Card>
       ) : (
         /* Календарный вид */
         <RecurringCalendar

@@ -18,6 +18,11 @@ import {
   CollapsibleTrigger,
 } from '@/components/ui/collapsible'
 import { Badge } from '@/components/ui/badge'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
 import type { PlannedExpenseWithDetails, PlannedExpenseStatus, AccountWithType, ExpenseCategoryWithTags } from '@/lib/api/types'
@@ -324,20 +329,52 @@ export function PlannedExpensesByCategory({
                   <AlertCircle className="h-4 w-4 text-red-500" />
                 )}
 
-                <span className="text-sm font-medium tabular-nums">
-                  {Object.entries(group.currencyTotals)
-                    .filter(([, totals]) => totals.planned > 0 || totals.confirmed > 0)
-                    .map(([curr, totals], idx, arr) => {
-                      const symbol = CURRENCY_SYMBOLS[curr as keyof typeof CURRENCY_SYMBOLS] || curr
-                      const total = totals.planned + totals.confirmed
-                      return (
-                        <span key={curr}>
-                          {formatMoney(total)} {symbol}
-                          {idx < arr.length - 1 && <span className="text-muted-foreground mx-1">+</span>}
-                        </span>
-                      )
-                    })}
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span className="text-sm font-medium tabular-nums cursor-help">
+                      {Object.entries(group.currencyTotals)
+                        .filter(([, totals]) => totals.planned > 0 || totals.confirmed > 0)
+                        .map(([curr, totals], idx, arr) => {
+                          const symbol = CURRENCY_SYMBOLS[curr as keyof typeof CURRENCY_SYMBOLS] || curr
+                          const total = totals.planned + totals.confirmed
+                          return (
+                            <span key={curr}>
+                              {formatMoney(total)} {symbol}
+                              {idx < arr.length - 1 && <span className="text-muted-foreground mx-1">+</span>}
+                            </span>
+                          )
+                        })}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="left" className="p-3">
+                    <div className="space-y-2 text-sm">
+                      {Object.entries(group.currencyTotals)
+                        .filter(([, totals]) => totals.planned > 0 || totals.confirmed > 0)
+                        .map(([curr, totals]) => {
+                          const symbol = CURRENCY_SYMBOLS[curr as keyof typeof CURRENCY_SYMBOLS] || curr
+                          return (
+                            <div key={curr} className="space-y-1">
+                              {Object.keys(group.currencyTotals).length > 1 && (
+                                <p className="font-medium text-foreground">{curr}</p>
+                              )}
+                              {totals.confirmed > 0 && (
+                                <div className="flex items-center gap-2 text-emerald-500">
+                                  <CheckCircle className="h-3.5 w-3.5" />
+                                  <span>Оплачено: {formatMoney(totals.confirmed)} {symbol}</span>
+                                </div>
+                              )}
+                              {totals.planned > 0 && (
+                                <div className="flex items-center gap-2 text-amber-500">
+                                  <Clock className="h-3.5 w-3.5" />
+                                  <span>Ожидает: {formatMoney(totals.planned)} {symbol}</span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
 
                 <ChevronDown
                   className={cn(
