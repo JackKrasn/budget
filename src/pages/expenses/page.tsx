@@ -819,22 +819,31 @@ export default function ExpensesPage() {
                     />
                     <div className="space-y-2">
                       <AnimatePresence mode="popLayout">
-                        {dateExpenses.map((expense) => (
-                          <motion.div
-                            key={expense.id}
-                            initial={{ opacity: 0, y: -10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
-                            transition={{ duration: 0.2 }}
-                            layout
-                          >
-                            <ExpenseRow
-                              expense={expense}
-                              onEdit={() => handleEdit(expense)}
-                              onDelete={() => handleDelete(expense.id)}
-                            />
-                          </motion.div>
-                        ))}
+                        {dateExpenses.map((expense) => {
+                          const account = accounts.find(a => a.id === expense.accountId)
+                          return (
+                            <motion.div
+                              key={expense.id}
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: 10 }}
+                              transition={{ duration: 0.2 }}
+                              layout
+                            >
+                              <ExpenseRow
+                                expense={expense}
+                                account={account ? {
+                                  name: account.name,
+                                  bankName: account.bank_name,
+                                  typeCode: account.type_code,
+                                  color: account.color,
+                                } : undefined}
+                                onEdit={() => handleEdit(expense)}
+                                onDelete={() => handleDelete(expense.id)}
+                              />
+                            </motion.div>
+                          )
+                        })}
                       </AnimatePresence>
                     </div>
                   </div>

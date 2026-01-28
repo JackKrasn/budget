@@ -9,7 +9,6 @@ import {
   MoreHorizontal,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -141,45 +140,54 @@ export default function CategoriesPage() {
         </div>
       )}
 
-      {/* Categories Grid */}
+      {/* Categories Table */}
       {!isLoading && !error && (
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
         >
-          {categories.map((category) => (
-            <Card
-              key={category.id}
-              className="group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm transition-all hover:border-border hover:shadow-lg hover:shadow-primary/5"
-            >
-              {/* Gradient overlay */}
-              <div
-                className="absolute inset-0 opacity-[0.03] transition-opacity group-hover:opacity-[0.06]"
-                style={{
-                  background: `linear-gradient(135deg, ${category.color} 0%, transparent 60%)`,
-                }}
-              />
+          <div className="rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+            {/* Header */}
+            <div className="grid grid-cols-[auto_1fr_auto_auto] gap-4 px-4 py-3 bg-muted/30 text-xs font-medium text-muted-foreground border-b border-border/30">
+              <div className="w-10" />
+              <div>Название</div>
+              <div className="w-24">Код</div>
+              <div className="w-10" />
+            </div>
 
-              <CardContent className="relative p-5">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <CategoryIcon
-                      code={category.code}
-                      iconName={category.icon}
-                      color={category.color}
-                      size="lg"
-                      className="transition-transform group-hover:scale-105"
-                    />
-                    <div>
-                      <h3 className="font-semibold">{category.name}</h3>
-                      <p className="text-xs text-muted-foreground">
-                        {category.code}
-                      </p>
-                    </div>
+            {/* Rows */}
+            <div className="divide-y divide-border/30">
+              {categories.map((category) => (
+                <div
+                  key={category.id}
+                  className="group grid grid-cols-[auto_1fr_auto_auto] gap-4 px-4 py-3 items-center transition-colors hover:bg-muted/30"
+                >
+                  {/* Icon */}
+                  <CategoryIcon
+                    code={category.code}
+                    iconName={category.icon}
+                    color={category.color}
+                    size="sm"
+                    className="h-10 w-10 rounded-lg"
+                  />
+
+                  {/* Name */}
+                  <div className="min-w-0 flex items-center gap-2">
+                    <span className="font-medium truncate">{category.name}</span>
+                    {category.is_system && (
+                      <span className="inline-block rounded-md bg-muted px-2 py-0.5 text-xs text-muted-foreground shrink-0">
+                        Системная
+                      </span>
+                    )}
                   </div>
 
+                  {/* Code */}
+                  <div className="w-24 text-sm text-muted-foreground font-mono">
+                    {category.code}
+                  </div>
+
+                  {/* Actions */}
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button
@@ -210,17 +218,9 @@ export default function CategoriesPage() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-
-                {category.is_system && (
-                  <div className="mt-3">
-                    <span className="inline-block rounded-md bg-muted px-2 py-1 text-xs text-muted-foreground">
-                      Системная
-                    </span>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+              ))}
+            </div>
+          </div>
         </motion.div>
       )}
 
