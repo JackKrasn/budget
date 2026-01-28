@@ -11,8 +11,7 @@ import {
   ChevronLeft,
   Target,
   ArrowLeftRight,
-  RefreshCw,
-  Tag,
+  Tag as TagIcon,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -32,19 +31,13 @@ import {
 } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
 import { ExpenseCategoryChart, ExpenseTagChart } from '@/features/analytics'
-import type { ExpenseListRow, BudgetItemWithCategory, TransferWithAccounts, BalanceAdjustmentWithAccount } from '@/lib/api/types'
+import type { ExpenseListRow, BudgetItemWithCategory } from '@/lib/api/types'
 import { useBudgetByMonth } from '@/features/budget'
 import {
   useAccounts,
   TransferDialog,
-  TransferRow,
-  BalanceAdjustmentRow,
-  useTransfers,
-  useDeleteTransfer,
-  useBalanceAdjustments,
-  useDeleteBalanceAdjustment,
 } from '@/features/accounts'
-import { DateRangePicker, ViewModeTabs, DayHeader, groupExpensesByCurrency, FiltersPanel, type ViewMode } from '@/components/common'
+import { DateRangePicker, DayHeader, groupExpensesByCurrency, ExpensesToolbar, FloatingAddButton, type ExpenseViewMode } from '@/components/common'
 import { CURRENCY_SYMBOLS } from '@/types'
 
 function formatMoney(amount: number | undefined | null): string {
@@ -78,9 +71,10 @@ export default function ExpensesPage() {
   const tagFromUrl = searchParams.get('tag')
   const fundFromUrl = searchParams.get('fund')
 
-  const [viewMode, setViewMode] = useState<ViewMode>(
+  const [viewMode, setViewMode] = useState<ExpenseViewMode>(
     categoryFromUrl || tagFromUrl || fundFromUrl ? 'list' : 'categories'
   )
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     categoryFromUrl
   )
@@ -151,21 +145,6 @@ export default function ExpensesPage() {
   const { data: currentBudget, isLoading: isBudgetLoading } = useBudgetByMonth(budgetYear, budgetMonth)
   const deleteExpense = useDeleteExpense()
 
-  // Transfers and balance adjustments
-  const { data: transfersData, isLoading: isTransfersLoading } = useTransfers({
-    from: dateRange.from.toISOString().split('T')[0],
-    to: dateRange.to.toISOString().split('T')[0],
-    accountId: selectedAccountId || undefined,
-  })
-  const deleteTransfer = useDeleteTransfer()
-
-  const { data: adjustmentsData, isLoading: isAdjustmentsLoading } = useBalanceAdjustments({
-    from: dateRange.from.toISOString().split('T')[0],
-    to: dateRange.to.toISOString().split('T')[0],
-    accountId: selectedAccountId || undefined,
-  })
-  const deleteAdjustment = useDeleteBalanceAdjustment()
-
   const expenses = expensesData?.data ?? []
   const summary = expensesData?.summary
   const categories = categoriesData?.data ?? []
@@ -173,8 +152,6 @@ export default function ExpensesPage() {
   const accounts = accountsData?.data ?? []
   const funds = fundsData?.data ?? []
   const budgetItems: BudgetItemWithCategory[] = currentBudget?.items ?? []
-  const transfers = transfersData?.data ?? []
-  const adjustments = adjustmentsData?.data ?? []
 
   // Calculate total expenses by currency
   const expenseTotalsByCurrency = useMemo(() => {
@@ -299,66 +276,6 @@ export default function ExpensesPage() {
     })
     return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
   }, [expenses])
-
-  // Group all operations by date for "all" view
-  type OperationType = 'expense' | 'transfer' | 'adjustment'
-  interface Operation {
-    id: string
-    type: OperationType
-    date: string
-    data: ExpenseListRow | TransferWithAccounts | BalanceAdjustmentWithAccount
-  }
-  interface DayGroup {
-    date: string
-    operations: Operation[]
-    totalExpenses: number
-    totalTransfers: number
-    expensesByCurrency: Record<string, number>
-  }
-
-  const allOperationsByDate = useMemo<DayGroup[]>(() => {
-    const operations: Operation[] = [
-      ...expenses.map((e) => ({ id: e.id, type: 'expense' as const, date: e.date, data: e })),
-      ...transfers.map((t) => ({ id: t.id, type: 'transfer' as const, date: t.date, data: t })),
-      ...adjustments.map((a) => ({ id: a.id, type: 'adjustment' as const, date: a.date, data: a })),
-    ]
-
-    const groups: Record<string, Operation[]> = {}
-    operations.forEach((op) => {
-      const dateKey = op.date.split('T')[0]
-      if (!groups[dateKey]) {
-        groups[dateKey] = []
-      }
-      groups[dateKey].push(op)
-    })
-
-    return Object.entries(groups)
-      .map(([date, ops]) => {
-        ops.sort((a, b) => {
-          const typeOrder = { expense: 0, transfer: 1, adjustment: 2 }
-          return typeOrder[a.type] - typeOrder[b.type]
-        })
-
-        const expenseOps = ops.filter((op) => op.type === 'expense')
-        const totalExpenses = expenseOps
-          .reduce((sum, op) => sum + ((op.data as ExpenseListRow).amountBase ?? (op.data as ExpenseListRow).amount), 0)
-
-        // Группируем по всем валютам
-        const expensesByCurrency = expenseOps.reduce((acc, op) => {
-          const expense = op.data as ExpenseListRow
-          const currency = expense.currency || 'RUB'
-          acc[currency] = (acc[currency] || 0) + expense.amount
-          return acc
-        }, {} as Record<string, number>)
-
-        const totalTransfers = ops
-          .filter((op) => op.type === 'transfer')
-          .reduce((sum, op) => sum + (op.data as TransferWithAccounts).amount, 0)
-
-        return { date, operations: ops, totalExpenses, totalTransfers, expensesByCurrency }
-      })
-      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
-  }, [expenses, transfers, adjustments])
 
   const handleEdit = (expense: ExpenseListRow) => {
     setEditingExpense(expense)
@@ -527,20 +444,12 @@ export default function ExpensesPage() {
             </p>
           </div>
         </div>
-        <div className="flex gap-2">
-          <TransferDialog>
-            <Button variant="outline">
-              <ArrowLeftRight className="mr-2 h-4 w-4" />
-              Перевод
-            </Button>
-          </TransferDialog>
-          <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
-            <Button>
-              <Plus className="mr-2 h-4 w-4" />
-              Добавить расход
-            </Button>
-          </CreateExpenseDialog>
-        </div>
+        <TransferDialog>
+          <Button variant="outline" size="sm">
+            <ArrowLeftRight className="mr-2 h-4 w-4" />
+            Перевод
+          </Button>
+        </TransferDialog>
       </motion.div>
 
       {/* Summary Stats */}
@@ -713,7 +622,7 @@ export default function ExpensesPage() {
         </motion.div>
       )}
 
-      {/* Filters & View Toggle */}
+      {/* Toolbar with View Mode & Filters */}
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -727,58 +636,46 @@ export default function ExpensesPage() {
           onRangeChange={handleDateRangeChange}
         />
 
-        {/* Filters Panel */}
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <FiltersPanel
-            categories={categories}
-            tags={tags}
-            accounts={accounts}
-            funds={funds}
-            selectedCategoryId={selectedCategoryId}
-            selectedTagId={selectedTagId}
-            selectedAccountId={selectedAccountId}
-            selectedFundId={selectedFundId}
-            onCategoryChange={(id) => {
-              setSelectedCategoryId(id)
-              setSelectedTagId(null)
-              if (id) {
-                setViewMode('list')
-              }
-            }}
-            onTagChange={(id) => {
-              setSelectedTagId(id)
+        {/* Unified Toolbar */}
+        <ExpensesToolbar
+          viewMode={viewMode}
+          onViewModeChange={(mode) => {
+            setViewMode(mode)
+            if (mode === 'categories' || mode === 'tags') {
               setSelectedCategoryId(null)
-              if (id) {
-                setViewMode('list')
-              }
-            }}
-            onAccountChange={setSelectedAccountId}
-            onFundChange={(id) => {
-              setSelectedFundId(id)
-              if (id) {
-                setViewMode('list')
-              }
-            }}
-          />
-
-          {/* View Mode */}
-          <ViewModeTabs
-            value={viewMode}
-            onChange={(v) => {
-              setViewMode(v)
-              if (v === 'all' || v === 'categories' || v === 'tags' || v === 'transfers' || v === 'adjustments') {
-                setSelectedCategoryId(null)
-                setSelectedTagId(null)
-              }
-            }}
-            allCount={expenses.length + transfers.length + adjustments.length}
-            expenseCount={expenses.length}
-            transferCount={transfers.length}
-            adjustmentCount={adjustments.length}
-            categoryCount={categorySummaries.length}
-            tagCount={tagSummaries.length}
-          />
-        </div>
+              setSelectedTagId(null)
+            }
+          }}
+          categories={categories}
+          tags={tags}
+          accounts={accounts}
+          funds={funds}
+          selectedCategoryId={selectedCategoryId}
+          selectedTagId={selectedTagId}
+          selectedAccountId={selectedAccountId}
+          selectedFundId={selectedFundId}
+          onCategoryChange={(id) => {
+            setSelectedCategoryId(id)
+            setSelectedTagId(null)
+            if (id) {
+              setViewMode('list')
+            }
+          }}
+          onTagChange={(id) => {
+            setSelectedTagId(id)
+            setSelectedCategoryId(null)
+            if (id) {
+              setViewMode('list')
+            }
+          }}
+          onAccountChange={setSelectedAccountId}
+          onFundChange={(id) => {
+            setSelectedFundId(id)
+            if (id) {
+              setViewMode('list')
+            }
+          }}
+        />
       </motion.div>
 
       {/* Loading State */}
@@ -808,103 +705,7 @@ export default function ExpensesPage() {
       {/* Content */}
       {!isLoading && !isBudgetLoading && !error && (
         <AnimatePresence mode="wait">
-          {viewMode === 'all' ? (
-            <motion.div
-              key="all"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-6"
-            >
-              {allOperationsByDate.length > 0 ? (
-                allOperationsByDate.map((group) => {
-                  // Group transfers by currency
-                  const transfersByCurrency = group.operations
-                    .filter((op) => op.type === 'transfer')
-                    .reduce((acc, op) => {
-                      const transfer = op.data as TransferWithAccounts
-                      const currency = transfer.from_currency || 'RUB'
-                      acc[currency] = (acc[currency] || 0) + transfer.amount
-                      return acc
-                    }, {} as Record<string, number>)
-
-                  return (
-                  <div key={group.date} className="space-y-3">
-                    <DayHeader
-                      date={group.date}
-                      expensesByCurrency={Object.keys(group.expensesByCurrency).length > 0 ? group.expensesByCurrency : undefined}
-                      transfersByCurrency={Object.keys(transfersByCurrency).length > 0 ? transfersByCurrency : undefined}
-                    />
-                    <motion.div
-                      className="space-y-2"
-                      variants={container}
-                      initial="hidden"
-                      animate="show"
-                    >
-                      {group.operations.map((op) => {
-                        if (op.type === 'expense') {
-                          const expense = op.data as ExpenseListRow
-                          return (
-                            <motion.div key={op.id} variants={item}>
-                              <ExpenseRow
-                                expense={expense}
-                                onEdit={() => handleEdit(expense)}
-                                onDelete={() => handleDelete(expense.id)}
-                              />
-                            </motion.div>
-                          )
-                        }
-                        if (op.type === 'transfer') {
-                          const transfer = op.data as TransferWithAccounts
-                          return (
-                            <motion.div key={op.id} variants={item}>
-                              <TransferRow
-                                transfer={transfer}
-                                onDelete={() => deleteTransfer.mutate(transfer.id)}
-                              />
-                            </motion.div>
-                          )
-                        }
-                        if (op.type === 'adjustment') {
-                          const adjustment = op.data as BalanceAdjustmentWithAccount
-                          return (
-                            <motion.div key={op.id} variants={item}>
-                              <BalanceAdjustmentRow
-                                adjustment={adjustment}
-                                onDelete={() => {
-                                  if (confirm('Удалить эту корректировку?')) {
-                                    deleteAdjustment.mutate(adjustment.id)
-                                  }
-                                }}
-                              />
-                            </motion.div>
-                          )
-                        }
-                        return null
-                      })}
-                    </motion.div>
-                  </div>
-                  )
-                })
-              ) : (
-                <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
-                  <Receipt className="h-12 w-12 text-muted-foreground/50" />
-                  <div className="text-center">
-                    <p className="font-medium">Нет операций</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      За этот период операции не найдены
-                    </p>
-                  </div>
-                  <CreateExpenseDialog defaultAccountId={selectedAccountId || undefined}>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Добавить расход
-                    </Button>
-                  </CreateExpenseDialog>
-                </div>
-              )}
-            </motion.div>
-          ) : viewMode === 'categories' ? (
+          {viewMode === 'categories' ? (
             <motion.div
               key="categories"
               initial={{ opacity: 0 }}
@@ -983,7 +784,7 @@ export default function ExpensesPage() {
                 </>
               ) : (
                 <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
-                  <Tag className="h-12 w-12 text-muted-foreground/50" />
+                  <TagIcon className="h-12 w-12 text-muted-foreground/50" />
                   <div className="text-center">
                     <p className="font-medium">Нет меток</p>
                     <p className="mt-1 text-sm text-muted-foreground">
@@ -1059,96 +860,6 @@ export default function ExpensesPage() {
                 </div>
               )}
             </motion.div>
-          ) : viewMode === 'transfers' ? (
-            <motion.div
-              key="transfers"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-6"
-            >
-              {isTransfersLoading ? (
-                <div className="flex h-[300px] items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : transfers.length > 0 ? (
-                <motion.div
-                  className="space-y-2"
-                  variants={container}
-                  initial="hidden"
-                  animate="show"
-                >
-                  {transfers.map((transfer) => (
-                    <motion.div key={transfer.id} variants={item}>
-                      <TransferRow
-                        transfer={transfer}
-                        onDelete={() => deleteTransfer.mutate(transfer.id)}
-                      />
-                    </motion.div>
-                  ))}
-                </motion.div>
-              ) : (
-                <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
-                  <ArrowLeftRight className="h-12 w-12 text-muted-foreground/50" />
-                  <div className="text-center">
-                    <p className="font-medium">Нет переводов</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      За этот период переводы не найдены
-                    </p>
-                  </div>
-                  <TransferDialog>
-                    <Button>
-                      <Plus className="mr-2 h-4 w-4" />
-                      Новый перевод
-                    </Button>
-                  </TransferDialog>
-                </div>
-              )}
-            </motion.div>
-          ) : viewMode === 'adjustments' ? (
-            <motion.div
-              key="adjustments"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-6"
-            >
-              {isAdjustmentsLoading ? (
-                <div className="flex h-[300px] items-center justify-center">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : adjustments.length > 0 ? (
-                <motion.div
-                  className="space-y-2"
-                  variants={container}
-                  initial="hidden"
-                  animate="show"
-                >
-                  {adjustments.map((adjustment) => (
-                    <motion.div key={adjustment.id} variants={item}>
-                      <BalanceAdjustmentRow
-                        adjustment={adjustment}
-                        onDelete={() => {
-                          if (confirm('Удалить эту корректировку?')) {
-                            deleteAdjustment.mutate(adjustment.id)
-                          }
-                        }}
-                      />
-                    </motion.div>
-                  ))}
-                </motion.div>
-              ) : (
-                <div className="flex h-[300px] flex-col items-center justify-center gap-4 rounded-xl border border-dashed border-border/50 bg-card/30">
-                  <RefreshCw className="h-12 w-12 text-muted-foreground/50" />
-                  <div className="text-center">
-                    <p className="font-medium">Нет корректировок</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      За этот период корректировки баланса не найдены
-                    </p>
-                  </div>
-                </div>
-              )}
-            </motion.div>
           ) : null}
         </AnimatePresence>
       )}
@@ -1159,6 +870,18 @@ export default function ExpensesPage() {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
       />
+
+      {/* Create Expense Dialog (controlled) */}
+      <CreateExpenseDialog
+        defaultAccountId={selectedAccountId || undefined}
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+      >
+        <span />
+      </CreateExpenseDialog>
+
+      {/* Floating Add Button */}
+      <FloatingAddButton onClick={() => setCreateDialogOpen(true)} />
     </div>
   )
 }

@@ -211,6 +211,20 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
             )}
           </div>
 
+          {/* Currency breakdown */}
+          {hasMultiCurrency && activeCurrencyLimits.length > 0 && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              {activeCurrencyLimits
+                .filter(l => l.actualAmount > 0)
+                .map((l, i, arr) => (
+                  <span key={l.currency}>
+                    {formatMoney(l.actualAmount)} {getCurrencySymbol(l.currency)}
+                    {i < arr.length - 1 && ' + '}
+                  </span>
+                ))}
+            </div>
+          )}
+
           {/* Multi-currency progress bars */}
           {hasMultiCurrency && activeCurrencyLimits.length > 0 ? (
             <div className="mt-3 space-y-2">
