@@ -55,6 +55,7 @@ import {
   EditAccountDialog,
   SyncBalanceDialog,
   TransferDialog,
+  RepayCreditCardDialog,
 } from '@/features/accounts'
 import type { AccountWithType } from '@/lib/api/types'
 import { getBankByName } from '@/lib/banks'
@@ -105,6 +106,8 @@ export default function AccountsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [syncAccount, setSyncAccount] = useState<AccountWithType | null>(null)
   const [syncDialogOpen, setSyncDialogOpen] = useState(false)
+  const [repayAccount, setRepayAccount] = useState<AccountWithType | null>(null)
+  const [repayDialogOpen, setRepayDialogOpen] = useState(false)
   const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'balance', direction: 'desc' })
   const [viewMode, setViewMode] = useState<ViewMode>('grouped')
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set())
@@ -248,6 +251,11 @@ export default function AccountsPage() {
     setSyncDialogOpen(true)
   }
 
+  const handleRepay = (account: AccountWithType) => {
+    setRepayAccount(account)
+    setRepayDialogOpen(true)
+  }
+
   const toggleGroupCollapse = (bankKey: string) => {
     setCollapsedGroups((prev) => {
       const next = new Set(prev)
@@ -268,6 +276,7 @@ export default function AccountsPage() {
         onArchive={() => handleArchive(account.id, account.is_archived)}
         onDelete={() => handleDelete(account.id)}
         onSyncBalance={() => handleSyncBalance(account)}
+        onRepay={() => handleRepay(account)}
       />
     </motion.div>
   )
@@ -807,6 +816,13 @@ export default function AccountsPage() {
         account={syncAccount}
         open={syncDialogOpen}
         onOpenChange={setSyncDialogOpen}
+      />
+
+      {/* Repay Credit Card Dialog */}
+      <RepayCreditCardDialog
+        creditCard={repayAccount}
+        open={repayDialogOpen}
+        onOpenChange={setRepayDialogOpen}
       />
     </div>
   )
