@@ -20,6 +20,7 @@ import {
   PieChart,
   Repeat,
   SlidersHorizontal,
+  Tag,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { HeaderRates } from '@/components/layout/header-rates'
@@ -88,6 +89,7 @@ const navGroups = [
     icon: SlidersHorizontal,
     items: [
       { title: 'Категории', icon: FolderOpen, href: '/categories' },
+      { title: 'Метки', icon: Tag, href: '/tags' },
       { title: 'Шаблоны', icon: Repeat, href: '/templates' },
       { title: 'Курсы валют', icon: TrendingDown, href: '/exchange-rates' },
     ],

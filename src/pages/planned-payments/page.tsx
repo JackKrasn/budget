@@ -25,6 +25,7 @@ import {
   usePlannedExpenses,
   useConfirmPlannedExpenseWithExpense,
   useSkipPlannedExpense,
+  useUnconfirmPlannedExpense,
   useDeletePlannedExpense,
   useGeneratePlannedExpenses,
   useCreatePlannedExpense,
@@ -75,6 +76,7 @@ export default function PlannedPaymentsPage() {
   const createBudget = useCreateBudget()
   const confirmPlannedWithExpense = useConfirmPlannedExpenseWithExpense()
   const skipPlanned = useSkipPlannedExpense()
+  const unconfirmPlanned = useUnconfirmPlannedExpense()
   const deletePlanned = useDeletePlannedExpense()
   const generatePlanned = useGeneratePlannedExpenses()
   const createPlanned = useCreatePlannedExpense()
@@ -181,6 +183,14 @@ export default function PlannedPaymentsPage() {
     }
   }
 
+  const handleUnconfirmPlanned = async (id: string) => {
+    try {
+      await unconfirmPlanned.mutateAsync({ id, budgetId })
+    } catch {
+      // Ошибка обрабатывается в хуке
+    }
+  }
+
   const handleGeneratePlanned = async () => {
     if (!budgetId) {
       // Создаём бюджет если его нет
@@ -204,6 +214,7 @@ export default function PlannedPaymentsPage() {
   const handleAddPlannedExpense = async (data: {
     budgetId: string
     categoryId: string
+    accountId?: string
     fundId?: string
     fundAssetId?: string
     fundedAmount?: number
@@ -441,6 +452,7 @@ export default function PlannedPaymentsPage() {
             year={year}
             month={month}
             categories={categories}
+            accounts={accounts}
             funds={fundsRaw}
             onAdd={handleAddPlannedExpense}
             isPending={createPlanned.isPending}
@@ -498,9 +510,10 @@ export default function PlannedPaymentsPage() {
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
                 onDelete={handleDeletePlanned}
+                onUnconfirm={handleUnconfirmPlanned}
                 onGenerate={handleGeneratePlanned}
                 isGenerating={generatePlanned.isPending || createBudget.isPending}
-                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending || unconfirmPlanned.isPending}
                 hideWrapper
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
@@ -559,7 +572,8 @@ export default function PlannedPaymentsPage() {
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
                 onDelete={handleDeletePlanned}
-                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                onUnconfirm={handleUnconfirmPlanned}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending || unconfirmPlanned.isPending}
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
               <PlannedExpensesTotals expenses={plannedExpenses} />

@@ -36,6 +36,7 @@ import {
   usePlannedExpenses,
   useConfirmPlannedExpenseWithExpense,
   useSkipPlannedExpense,
+  useUnconfirmPlannedExpense,
   useDeletePlannedExpense,
   useGeneratePlannedExpenses,
   useCreatePlannedExpense,
@@ -153,6 +154,7 @@ export default function BudgetPage() {
   const copyBudget = useCopyBudget()
   const confirmPlannedWithExpense = useConfirmPlannedExpenseWithExpense()
   const skipPlanned = useSkipPlannedExpense()
+  const unconfirmPlanned = useUnconfirmPlannedExpense()
   const deletePlanned = useDeletePlannedExpense()
   const generatePlanned = useGeneratePlannedExpenses()
   const createPlanned = useCreatePlannedExpense()
@@ -191,6 +193,20 @@ export default function BudgetPage() {
     for (const expense of expenses) {
       const currency = expense.currency || 'RUB'
       map[currency] = (map[currency] || 0) + expense.amount
+    }
+    return map
+  }, [expenses])
+
+  // Считаем расходы по категориям и валютам (для редактора мультивалютных лимитов)
+  const expensesByCategoryAndCurrency = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {}
+    for (const expense of expenses) {
+      const categoryId = expense.categoryId
+      const currency = expense.currency || 'RUB'
+      if (!map[categoryId]) {
+        map[categoryId] = {}
+      }
+      map[categoryId][currency] = (map[categoryId][currency] || 0) + expense.amount
     }
     return map
   }, [expenses])
@@ -460,17 +476,31 @@ export default function BudgetPage() {
   const handleSaveCurrencyBuffers = async (
     buffers: { currency: string; bufferAmount: number }[]
   ) => {
-    if (!budget?.id || !bufferEditingItem?.id) {
+    if (!budget?.id || !bufferEditingItem?.categoryId) {
       toast.error('Не удалось найти категорию')
       return
     }
 
     try {
+      let itemId = bufferEditingItem.id
+
+      // Если BudgetItem не существует (id пустой), создаём его через upsertItem
+      if (!itemId) {
+        const result = await upsertItem.mutateAsync({
+          budgetId: budget.id,
+          data: {
+            categoryId: bufferEditingItem.categoryId,
+            plannedAmount: 0, // Создаём с нулевым plannedAmount
+          },
+        })
+        itemId = result.id
+      }
+
       // Сохраняем каждый буфер по очереди
       for (const buffer of buffers) {
         await setCurrencyBuffer.mutateAsync({
           budgetId: budget.id,
-          itemId: bufferEditingItem.id,
+          itemId,
           data: {
             currency: buffer.currency as Parameters<typeof setCurrencyBuffer.mutateAsync>[0]['data']['currency'],
             bufferAmount: buffer.bufferAmount,
@@ -487,12 +517,26 @@ export default function BudgetPage() {
 
   // Пересчёт лимитов из запланированных расходов
   const handleRecalculateLimits = async () => {
-    if (!budget?.id || !bufferEditingItem?.id) return
+    if (!budget?.id || !bufferEditingItem?.categoryId) return
 
     try {
+      let itemId = bufferEditingItem.id
+
+      // Если BudgetItem не существует (id пустой), создаём его через upsertItem
+      if (!itemId) {
+        const result = await upsertItem.mutateAsync({
+          budgetId: budget.id,
+          data: {
+            categoryId: bufferEditingItem.categoryId,
+            plannedAmount: 0,
+          },
+        })
+        itemId = result.id
+      }
+
       await recalculateLimits.mutateAsync({
         budgetId: budget.id,
-        itemId: bufferEditingItem.id,
+        itemId,
       })
       await queryClient.invalidateQueries({ queryKey: budgetKeys.byMonth(year, month) })
       toast.success('Лимиты пересчитаны')
@@ -553,6 +597,14 @@ export default function BudgetPage() {
       await deletePlanned.mutateAsync(id)
     } catch {
       toast.error('Ошибка удаления')
+    }
+  }
+
+  const handleUnconfirmPlanned = async (id: string) => {
+    try {
+      await unconfirmPlanned.mutateAsync({ id, budgetId: budget?.id })
+    } catch {
+      toast.error('Ошибка отмены подтверждения')
     }
   }
 
@@ -655,6 +707,7 @@ export default function BudgetPage() {
   const handleAddPlannedExpense = async (data: {
     budgetId: string
     categoryId: string
+    accountId?: string
     fundId?: string
     fundedAmount?: number
     name: string
@@ -1155,6 +1208,7 @@ export default function BudgetPage() {
                       year={year}
                       month={month}
                       categories={categories}
+                      accounts={accounts}
                       funds={fundsRaw}
                       onAdd={handleAddPlannedExpense}
                       isPending={createPlanned.isPending}
@@ -1181,10 +1235,11 @@ export default function BudgetPage() {
                 categories={categories}
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
+                onUnconfirm={handleUnconfirmPlanned}
                 onDelete={handleDeletePlanned}
                 onGenerate={handleGeneratePlanned}
                 isGenerating={generatePlanned.isPending || createBudget.isPending}
-                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || unconfirmPlanned.isPending || deletePlanned.isPending}
                 hideWrapper
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
@@ -1196,8 +1251,9 @@ export default function BudgetPage() {
                 categories={categories}
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
+                onUnconfirm={handleUnconfirmPlanned}
                 onDelete={handleDeletePlanned}
-                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || unconfirmPlanned.isPending || deletePlanned.isPending}
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
             )}
@@ -1297,6 +1353,11 @@ export default function BudgetPage() {
         onSave={handleSaveCurrencyBuffers}
         onRecalculate={handleRecalculateLimits}
         isPending={setCurrencyBuffer.isPending}
+        actualExpensesByCurrency={
+          bufferEditingItem?.categoryId
+            ? expensesByCategoryAndCurrency[bufferEditingItem.categoryId] ?? {}
+            : {}
+        }
       />
 
       {/* Floating Budget Balance */}

@@ -163,6 +163,13 @@ export default function OperationsPage() {
   const fundDeposits = fundDepositsData?.data ?? []
   const accounts = accountsData?.data ?? []
 
+  // Map accounts by ID for quick lookup
+  const accountsMap = useMemo(() => {
+    const map = new Map<string, typeof accounts[0]>()
+    accounts.forEach(acc => map.set(acc.id, acc))
+    return map
+  }, [accounts])
+
   const isLoading = isExpensesLoading || isTransfersLoading || isAdjustmentsLoading || isFundDepositsLoading
 
   // Helper to check if operation involves selected account
@@ -519,10 +526,17 @@ export default function OperationsPage() {
                     {group.operations.map((op) => {
                       if (op.type === 'expense') {
                         const expense = op.data as ExpenseListRow
+                        const expenseAccount = accountsMap.get(expense.accountId)
                         return (
                           <ExpenseRow
                             key={op.id}
                             expense={expense}
+                            account={expenseAccount ? {
+                              name: expenseAccount.name,
+                              bankName: expenseAccount.bank_name,
+                              typeCode: expenseAccount.type_code,
+                              color: expenseAccount.color,
+                            } : undefined}
                             onEdit={() => handleEditExpense(expense)}
                             onDelete={() => handleDeleteExpense(expense)}
                           />

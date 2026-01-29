@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { EyeOff, Plus, Settings2, Check, X, PiggyBank } from 'lucide-react'
+import { EyeOff, Plus, Settings2, Check, X, PiggyBank, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Table,
@@ -23,6 +23,59 @@ import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
 import { getCurrencyConfig } from './currency-limit-badge'
 import type { BudgetItemWithCategory, ExpenseCategoryWithTags } from '@/lib/api/types'
+
+// Типы для сортировки
+type SortField = 'category' | 'buffer' | 'planned' | 'total' | 'actual' | 'variance'
+type SortDirection = 'asc' | 'desc'
+
+interface SortConfig {
+  field: SortField
+  direction: SortDirection
+}
+
+// Компонент для сортируемого заголовка колонки
+function SortableHeader({
+  label,
+  field,
+  sortConfig,
+  onSort,
+  className,
+}: {
+  label: string
+  field: SortField
+  sortConfig: SortConfig | null
+  onSort: (field: SortField) => void
+  className?: string
+}) {
+  const isActive = sortConfig?.field === field
+  const direction = isActive ? sortConfig.direction : null
+
+  return (
+    <button
+      type="button"
+      onClick={() => onSort(field)}
+      className={cn(
+        'inline-flex items-center gap-1 hover:text-foreground transition-colors group',
+        isActive ? 'text-foreground' : 'text-muted-foreground',
+        className
+      )}
+    >
+      <span>{label}</span>
+      <span className={cn(
+        'transition-opacity',
+        isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-50'
+      )}>
+        {direction === 'asc' ? (
+          <ArrowUp className="h-3.5 w-3.5" />
+        ) : direction === 'desc' ? (
+          <ArrowDown className="h-3.5 w-3.5" />
+        ) : (
+          <ArrowUpDown className="h-3.5 w-3.5" />
+        )}
+      </span>
+    </button>
+  )
+}
 
 interface BudgetTableProps {
   items: BudgetItemWithCategory[]
@@ -183,6 +236,23 @@ export function BudgetTable({
   onEditBuffer,
   fundNames = {},
 }: BudgetTableProps) {
+  // Состояние сортировки
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>(null)
+
+  const handleSort = (field: SortField) => {
+    setSortConfig((prev) => {
+      if (prev?.field === field) {
+        // Переключаем направление: asc -> desc -> null
+        if (prev.direction === 'asc') {
+          return { field, direction: 'desc' }
+        }
+        return null // Сброс сортировки
+      }
+      // Новое поле - начинаем с asc
+      return { field, direction: 'asc' }
+    })
+  }
+
   // Объединить все категории с данными бюджета
   const allRows = allCategories.map((category) => {
     const existingItem = items.find((i) => i.categoryId === category.id)
@@ -249,8 +319,50 @@ export function BudgetTable({
     }
   })
 
-  // Фильтруем скрытые категории для отображения
-  const rows = allRows.filter((row) => !row.isHidden)
+  // Фильтруем и сортируем строки
+  const rows = (() => {
+    const filtered = allRows.filter((row) => !row.isHidden)
+
+    if (!sortConfig) return filtered
+
+    return [...filtered].sort((a, b) => {
+      let aValue: number | string
+      let bValue: number | string
+
+      switch (sortConfig.field) {
+        case 'category':
+          aValue = a.categoryName.toLowerCase()
+          bValue = b.categoryName.toLowerCase()
+          break
+        case 'buffer':
+          aValue = a.bufferAmount
+          bValue = b.bufferAmount
+          break
+        case 'planned':
+          aValue = a.plannedExpensesSum
+          bValue = b.plannedExpensesSum
+          break
+        case 'total':
+          aValue = a.totalLimit
+          bValue = b.totalLimit
+          break
+        case 'actual':
+          aValue = a.actual
+          bValue = b.actual
+          break
+        case 'variance':
+          aValue = a.variance
+          bValue = b.variance
+          break
+        default:
+          return 0
+      }
+
+      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1
+      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+  })()
 
   // Итоги
   const totals = rows.reduce(
@@ -317,7 +429,12 @@ export function BudgetTable({
           <TableRow className="hover:bg-transparent">
             <TableHead className="w-[300px]">
               <div className="flex items-center gap-2">
-                <span>Категория</span>
+                <SortableHeader
+                  label="Категория"
+                  field="category"
+                  sortConfig={sortConfig}
+                  onSort={handleSort}
+                />
                 {(onToggleCategory || onAddCategory) && (
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -369,11 +486,51 @@ export function BudgetTable({
                 )}
               </div>
             </TableHead>
-            <TableHead className="w-[120px] text-right">Буфер</TableHead>
-            <TableHead className="w-[120px] text-right">Запланировано</TableHead>
-            <TableHead className="w-[120px] text-right">Итого план</TableHead>
-            <TableHead className="w-[120px] text-right">Факт</TableHead>
-            <TableHead className="w-[120px] text-right">Остаток</TableHead>
+            <TableHead className="w-[120px] text-right">
+              <SortableHeader
+                label="Буфер"
+                field="buffer"
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                className="justify-end"
+              />
+            </TableHead>
+            <TableHead className="w-[120px] text-right">
+              <SortableHeader
+                label="Запланировано"
+                field="planned"
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                className="justify-end"
+              />
+            </TableHead>
+            <TableHead className="w-[120px] text-right">
+              <SortableHeader
+                label="Итого план"
+                field="total"
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                className="justify-end"
+              />
+            </TableHead>
+            <TableHead className="w-[120px] text-right">
+              <SortableHeader
+                label="Факт"
+                field="actual"
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                className="justify-end"
+              />
+            </TableHead>
+            <TableHead className="w-[120px] text-right">
+              <SortableHeader
+                label="Остаток"
+                field="variance"
+                sortConfig={sortConfig}
+                onSort={handleSort}
+                className="justify-end"
+              />
+            </TableHead>
             <TableHead className="w-[50px]"></TableHead>
           </TableRow>
         </TableHeader>

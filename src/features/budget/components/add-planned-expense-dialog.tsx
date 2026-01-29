@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { Plus, PiggyBank, CalendarIcon, Sparkles, Banknote, Coins } from 'lucide-react'
+import { Plus, PiggyBank, CalendarIcon, Sparkles, Banknote, Coins, Wallet } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/select'
 import { CategoryIcon, FundIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
-import type { ExpenseCategoryWithTags, FundBalance } from '@/lib/api/types'
+import type { ExpenseCategoryWithTags, FundBalance, Account } from '@/lib/api/types'
 
 // Форматирует дату в YYYY-MM-DD без смещения часового пояса
 function formatDateToString(date: Date): string {
@@ -73,6 +73,7 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
 const formSchema = z.object({
   name: z.string().min(1, 'Введите название'),
   categoryId: z.string().min(1, 'Выберите категорию'),
+  accountId: z.string().optional(),
   fundId: z.string().optional(),
   fundAssetId: z.string().optional(),
   fundedAmount: z.string().optional(),
@@ -88,10 +89,12 @@ interface AddPlannedExpenseDialogProps {
   year: number
   month: number
   categories: ExpenseCategoryWithTags[]
+  accounts: Account[]
   funds: FundBalance[]
   onAdd: (data: {
     budgetId: string
     categoryId: string
+    accountId?: string
     fundId?: string
     fundAssetId?: string
     fundedAmount?: number
@@ -110,6 +113,7 @@ export function AddPlannedExpenseDialog({
   year,
   month,
   categories,
+  accounts,
   funds,
   onAdd,
   isPending,
@@ -131,6 +135,7 @@ export function AddPlannedExpenseDialog({
     defaultValues: {
       name: '',
       categoryId: '',
+      accountId: '',
       fundId: '',
       fundAssetId: '',
       fundedAmount: '',
@@ -172,6 +177,7 @@ export function AddPlannedExpenseDialog({
     await onAdd({
       budgetId,
       categoryId: data.categoryId,
+      accountId: data.accountId || undefined,
       fundId: useFundFinancing && data.fundId ? data.fundId : undefined,
       fundAssetId: useFundFinancing && data.fundAssetId ? data.fundAssetId : undefined,
       fundedAmount: useFundFinancing && data.fundedAmount ? parseFloat(data.fundedAmount) : undefined,
@@ -319,6 +325,56 @@ export function AddPlannedExpenseDialog({
                 )}
               />
             </div>
+
+            {/* Account selector */}
+            {accounts.length > 0 && (
+              <FormField
+                control={form.control}
+                name="accountId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                      Счёт оплаты (необязательно)
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 bg-muted/30 border-border/50">
+                          <SelectValue placeholder="Выберите счёт">
+                            {field.value && (() => {
+                              const selectedAccount = accounts.find(a => a.id === field.value)
+                              if (!selectedAccount) return null
+                              const symbol = CURRENCY_SYMBOLS[selectedAccount.currency] || selectedAccount.currency
+                              return (
+                                <span className="flex items-center gap-2">
+                                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                                  {selectedAccount.name}
+                                  <span className="text-muted-foreground">({symbol})</span>
+                                </span>
+                              )
+                            })()}
+                          </SelectValue>
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((account) => {
+                          const symbol = CURRENCY_SYMBOLS[account.currency] || account.currency
+                          return (
+                            <SelectItem key={account.id} value={account.id}>
+                              <span className="flex items-center gap-2">
+                                <Wallet className="h-4 w-4 text-muted-foreground" />
+                                {account.name}
+                                <span className="text-muted-foreground">({symbol})</span>
+                              </span>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
 
             {/* Date picker with Calendar */}
             <FormField

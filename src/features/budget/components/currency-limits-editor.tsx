@@ -41,6 +41,8 @@ interface CurrencyLimitsEditorProps {
   onSave: (buffers: { currency: BudgetCurrency; bufferAmount: number }[]) => Promise<void>
   onRecalculate?: () => Promise<void>
   isPending?: boolean
+  /** Фактические расходы по валютам для этой категории (currency -> amount) */
+  actualExpensesByCurrency?: Record<string, number>
 }
 
 export function CurrencyLimitsEditor({
@@ -50,31 +52,60 @@ export function CurrencyLimitsEditor({
   onSave,
   onRecalculate,
   isPending,
+  actualExpensesByCurrency = {},
 }: CurrencyLimitsEditorProps) {
   const [buffers, setBuffers] = useState<CurrencyBufferInput[]>([])
   const [isRecalculating, setIsRecalculating] = useState(false)
 
   useEffect(() => {
     if (item?.currencyLimits && item.currencyLimits.length > 0) {
-      setBuffers(
-        item.currencyLimits.map((limit) => ({
-          currency: limit.currency,
-          bufferAmount: String(limit.bufferAmount),
-          plannedAmount: limit.plannedAmount,
-          actualAmount: limit.actualAmount,
-        }))
-      )
+      // Используем существующие лимиты
+      const existingBuffers = item.currencyLimits.map((limit) => ({
+        currency: limit.currency,
+        bufferAmount: String(limit.bufferAmount),
+        plannedAmount: limit.plannedAmount,
+        actualAmount: limit.actualAmount,
+      }))
+
+      // Добавляем валюты из фактических расходов, которых нет в лимитах
+      const existingCurrencies = new Set(existingBuffers.map(b => b.currency))
+      for (const [currency, amount] of Object.entries(actualExpensesByCurrency)) {
+        if (!existingCurrencies.has(currency as BudgetCurrency)) {
+          existingBuffers.push({
+            currency: currency as BudgetCurrency,
+            bufferAmount: '',
+            plannedAmount: 0,
+            actualAmount: amount,
+          })
+        }
+      }
+
+      setBuffers(existingBuffers)
     } else {
-      // Default to RUB if no limits exist
-      setBuffers([{
-        currency: 'RUB',
-        bufferAmount: '',
-        plannedAmount: item?.plannedExpensesSum ?? 0,
-        actualAmount: item?.actualAmount ?? 0,
-        isNew: true,
-      }])
+      // Нет лимитов - создаём из фактических расходов по валютам
+      const currencyEntries = Object.entries(actualExpensesByCurrency)
+      if (currencyEntries.length > 0) {
+        setBuffers(
+          currencyEntries.map(([currency, amount]) => ({
+            currency: currency as BudgetCurrency,
+            bufferAmount: '',
+            plannedAmount: 0,
+            actualAmount: amount,
+            isNew: true,
+          }))
+        )
+      } else {
+        // Default to RUB if no expenses and no limits
+        setBuffers([{
+          currency: 'RUB',
+          bufferAmount: '',
+          plannedAmount: item?.plannedExpensesSum ?? 0,
+          actualAmount: item?.actualAmount ?? 0,
+          isNew: true,
+        }])
+      }
     }
-  }, [item])
+  }, [item, actualExpensesByCurrency])
 
   const handleBufferChange = (index: number, value: string) => {
     const newBuffers = [...buffers]

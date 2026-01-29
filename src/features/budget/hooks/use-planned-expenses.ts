@@ -163,6 +163,27 @@ export function useSkipPlannedExpense() {
   })
 }
 
+export function useUnconfirmPlannedExpense() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id }: { id: string; budgetId?: string }) =>
+      plannedExpensesApi.unconfirm(id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: plannedExpenseKeys.lists() })
+      if (variables.budgetId) {
+        queryClient.invalidateQueries({ queryKey: budgetKeys.detail(variables.budgetId) })
+      }
+      // Invalidate accounts to refresh balance (money returned)
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      toast.success('Подтверждение отменено')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
 export function useGeneratePlannedExpenses() {
   const queryClient = useQueryClient()
 

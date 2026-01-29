@@ -74,4 +74,10 @@ export const plannedExpensesApi = {
    */
   skip: (id: string) =>
     apiClient.post<PlannedExpenseWithDetails>(`${ENDPOINT}/${id}/skip`, {}),
+
+  /**
+   * Unconfirm planned expense (revert to pending, return money to account, delete linked expense)
+   */
+  unconfirm: (id: string) =>
+    apiClient.post<PlannedExpenseWithDetails>(`${ENDPOINT}/${id}/unconfirm`, {}),
 }

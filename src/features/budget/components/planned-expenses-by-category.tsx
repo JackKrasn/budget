@@ -10,6 +10,7 @@ import {
   Trash2,
   Wallet,
   AlertCircle,
+  Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -45,6 +46,7 @@ interface PlannedExpensesByCategoryProps {
     }
   ) => Promise<void>
   onSkip: (id: string) => Promise<void>
+  onUnconfirm?: (id: string) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   isPending?: boolean
   onExpenseClick?: (expenseId: string) => void
@@ -112,6 +114,7 @@ export function PlannedExpensesByCategory({
   categories,
   onConfirm,
   onSkip,
+  onUnconfirm,
   onDelete,
   isPending,
   onExpenseClick,
@@ -249,6 +252,19 @@ export function PlannedExpensesByCategory({
     setProcessingId(id)
     try {
       await onDelete(id)
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const handleUnconfirm = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!onUnconfirm) return
+    if (!confirm('Отменить подтверждение? Деньги будут возвращены на счёт, связанный расход удалён.')) return
+
+    setProcessingId(id)
+    try {
+      await onUnconfirm(id)
     } finally {
       setProcessingId(null)
     }
@@ -516,6 +532,20 @@ export function PlannedExpensesByCategory({
                               <Trash2 className="h-4 w-4 text-destructive" />
                             </Button>
                           )}
+                        </div>
+                      )}
+                      {expense.status === 'confirmed' && onUnconfirm && (
+                        <div className="flex gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                            onClick={(e) => handleUnconfirm(expense.id, e)}
+                            disabled={isPending || isProcessing}
+                            title="Отменить подтверждение"
+                          >
+                            <Undo2 className="h-4 w-4 text-amber-500" />
+                          </Button>
                         </div>
                       )}
                     </div>
