@@ -21,6 +21,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { BankCombobox } from '@/components/ui/bank-combobox'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Select,
   SelectContent,
@@ -35,9 +37,11 @@ import {
   Landmark,
   TrendingUp,
   Bitcoin,
+  AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useUpdateAccount, useAccountTypes } from '../hooks'
+import { useFunds } from '@/features/funds/hooks/use-funds'
 import type { AccountWithType } from '@/lib/api/types'
 
 const ACCOUNT_ICONS = [
@@ -76,6 +80,8 @@ const formSchema = z.object({
   icon: z.string().optional(),
   color: z.string().optional(),
   currentBalance: z.string().optional(),
+  isCredit: z.boolean().optional(),
+  linkedFundId: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -93,6 +99,10 @@ export function EditAccountDialog({
 }: EditAccountDialogProps) {
   const updateAccount = useUpdateAccount()
   const { data: accountTypesData, isLoading: isLoadingTypes } = useAccountTypes()
+  const { data: fundsData } = useFunds({ status: 'active' })
+
+  // Все активные фонды доступны для резервирования
+  const activeFunds = fundsData?.data || []
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -104,8 +114,12 @@ export function EditAccountDialog({
       icon: 'credit-card',
       color: '#10b981',
       currentBalance: '',
+      isCredit: false,
+      linkedFundId: '',
     },
   })
+
+  const isCredit = form.watch('isCredit')
 
   // Update form when account changes
   useEffect(() => {
@@ -118,6 +132,8 @@ export function EditAccountDialog({
         icon: account.icon || 'credit-card',
         color: account.color || '#10b981',
         currentBalance: String(account.current_balance),
+        isCredit: account.is_credit || false,
+        linkedFundId: account.linked_fund_id || '',
       })
     }
   }, [account, form])
@@ -135,6 +151,15 @@ export function EditAccountDialog({
         !isNaN(newBalance) &&
         newBalance !== account.current_balance
 
+      // Определяем linkedFundId: null для удаления, undefined для отсутствия изменения
+      let linkedFundId: string | null | undefined = undefined
+      if (values.isCredit) {
+        linkedFundId = values.linkedFundId || null
+      } else if (account.linked_fund_id) {
+        // Если убрали галочку "Кредитная карта", удаляем привязку к фонду
+        linkedFundId = null
+      }
+
       await updateAccount.mutateAsync({
         id: account.id,
         data: {
@@ -145,6 +170,8 @@ export function EditAccountDialog({
           icon: values.icon || undefined,
           color: values.color || undefined,
           currentBalance: balanceChanged ? newBalance : undefined,
+          isCredit: values.isCredit,
+          linkedFundId,
         },
       })
       onOpenChange(false)
@@ -279,6 +306,84 @@ export function EditAccountDialog({
                 </FormItem>
               )}
             />
+
+            {/* Is Credit */}
+            <FormField
+              control={form.control}
+              name="isCredit"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Кредитная карта</FormLabel>
+                    <FormDescription>
+                      Для кредитных карт при создании расхода средства автоматически резервируются в фонде
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Linked Fund for Credit Cards */}
+            {isCredit && (
+              <FormField
+                control={form.control}
+                name="linkedFundId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Фонд для резервирования</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите фонд..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activeFunds.length === 0 ? (
+                          <SelectItem value="_none" disabled>
+                            Нет фондов с накопительным счётом
+                          </SelectItem>
+                        ) : (
+                          activeFunds.map((fb) => (
+                            <SelectItem key={fb.fund.id} value={fb.fund.id}>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-3 w-3 rounded-full"
+                                  style={{ backgroundColor: fb.fund.color }}
+                                />
+                                {fb.fund.name}
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      При создании расхода с этой карты средства будут автоматически резервироваться в выбранном фонде
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Warning if credit card without fund */}
+            {isCredit && !form.watch('linkedFundId') && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Для кредитной карты необходимо указать фонд для резервирования, иначе создание расходов будет заблокировано
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Icon */}
             <FormField

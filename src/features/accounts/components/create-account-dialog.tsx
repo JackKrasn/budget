@@ -22,6 +22,8 @@ import {
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { BankCombobox } from '@/components/ui/bank-combobox'
+import { Checkbox } from '@/components/ui/checkbox'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import {
   Select,
   SelectContent,
@@ -36,9 +38,11 @@ import {
   Landmark,
   TrendingUp,
   Bitcoin,
+  AlertTriangle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useCreateAccount, useAccountTypes } from '../hooks'
+import { useFunds } from '@/features/funds/hooks/use-funds'
 
 const ACCOUNT_ICONS = [
   { value: 'credit-card', icon: CreditCard, label: 'Карта' },
@@ -76,6 +80,8 @@ const formSchema = z.object({
   icon: z.string().optional(),
   color: z.string().optional(),
   initialBalance: z.string().optional(),
+  isCredit: z.boolean().optional(),
+  linkedFundId: z.string().optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -88,6 +94,10 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
   const [open, setOpen] = useState(false)
   const createAccount = useCreateAccount()
   const { data: accountTypesData, isLoading: isLoadingTypes } = useAccountTypes()
+  const { data: fundsData } = useFunds({ status: 'active' })
+
+  // Все активные фонды доступны для резервирования
+  const activeFunds = fundsData?.data || []
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -99,8 +109,12 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
       icon: 'credit-card',
       color: '#10b981',
       initialBalance: '',
+      isCredit: false,
+      linkedFundId: '',
     },
   })
+
+  const isCredit = form.watch('isCredit')
 
   async function onSubmit(values: FormValues) {
     try {
@@ -116,6 +130,8 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
         icon: values.icon || undefined,
         color: values.color || undefined,
         initialBalance: initialBalance && !isNaN(initialBalance) ? initialBalance : undefined,
+        isCredit: values.isCredit || false,
+        linkedFundId: values.isCredit && values.linkedFundId ? values.linkedFundId : undefined,
       })
       form.reset()
       setOpen(false)
@@ -254,6 +270,84 @@ export function CreateAccountDialog({ children }: CreateAccountDialogProps) {
                 </FormItem>
               )}
             />
+
+            {/* Is Credit */}
+            <FormField
+              control={form.control}
+              name="isCredit"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
+                  <FormControl>
+                    <Checkbox
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                  <div className="space-y-1 leading-none">
+                    <FormLabel>Кредитная карта</FormLabel>
+                    <FormDescription>
+                      Для кредитных карт при создании расхода средства автоматически резервируются в фонде
+                    </FormDescription>
+                  </div>
+                </FormItem>
+              )}
+            />
+
+            {/* Linked Fund for Credit Cards */}
+            {isCredit && (
+              <FormField
+                control={form.control}
+                name="linkedFundId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Фонд для резервирования</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите фонд..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {activeFunds.length === 0 ? (
+                          <SelectItem value="_none" disabled>
+                            Нет фондов с накопительным счётом
+                          </SelectItem>
+                        ) : (
+                          activeFunds.map((fb) => (
+                            <SelectItem key={fb.fund.id} value={fb.fund.id}>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className="h-3 w-3 rounded-full"
+                                  style={{ backgroundColor: fb.fund.color }}
+                                />
+                                {fb.fund.name}
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <FormDescription>
+                      При создании расхода с этой карты средства будут автоматически резервироваться в выбранном фонде
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            )}
+
+            {/* Warning if credit card without fund */}
+            {isCredit && !form.watch('linkedFundId') && (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Для кредитной карты необходимо указать фонд для резервирования, иначе создание расходов будет заблокировано
+                </AlertDescription>
+              </Alert>
+            )}
 
             {/* Icon */}
             <FormField

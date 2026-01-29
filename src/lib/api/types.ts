@@ -51,6 +51,8 @@ export interface Account {
   icon?: string
   color?: string
   is_archived: boolean
+  is_credit: boolean
+  linked_fund_id?: UUID  // Фонд для авто-резервирования (только для кредитных карт)
   created_at: ISODate
   updated_at: ISODate
 }
@@ -68,6 +70,8 @@ export interface CreateAccountRequest {
   icon?: string
   color?: string
   initialBalance?: number
+  isCredit?: boolean
+  linkedFundId?: string  // Фонд для авто-резервирования (только для кредитных карт)
 }
 
 export interface UpdateAccountRequest {
@@ -79,6 +83,8 @@ export interface UpdateAccountRequest {
   color?: string
   isArchived?: boolean
   currentBalance?: number
+  isCredit?: boolean
+  linkedFundId?: string | null  // Фонд для авто-резервирования (null для удаления привязки)
 }
 
 export interface AccountsListResponse {
@@ -194,6 +200,7 @@ export interface Fund {
   icon: string
   color: string
   is_virtual: boolean
+  linked_account_id?: UUID  // Привязанный накопительный счёт (для не-виртуальных фондов)
   status: FundStatus
   created_at: ISODate
   updated_at: ISODate
@@ -581,6 +588,7 @@ export interface UpdateExpenseRequest {
   date?: string
   description?: string
   tagIds?: string[]
+  fundAllocations?: FundAllocationRequest[]  // null/undefined = не менять, [] = удалить все, [...] = заменить
 }
 
 export interface ExpensesSummary {
