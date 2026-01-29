@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react'
 import { getDaysInMonth } from 'date-fns'
-import { Banknote, Receipt, Power, PowerOff } from 'lucide-react'
+import { Banknote, Receipt, Power, PowerOff, Plus, CalendarDays, Sparkles } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import type { RecurringExpenseWithCategory, RecurringIncome } from '@/lib/api/types'
 
@@ -23,6 +30,8 @@ interface RecurringCalendarProps {
   incomes?: RecurringIncome[]
   onExpenseClick?: (expense: RecurringExpenseWithCategory) => void
   onIncomeClick?: (income: RecurringIncome) => void
+  /** Callback при клике на день для добавления шаблона */
+  onDayClick?: (day: number) => void
   /** Компактный режим */
   compact?: boolean
 }
@@ -32,6 +41,7 @@ export function RecurringCalendar({
   incomes = [],
   onExpenseClick,
   onIncomeClick,
+  onDayClick,
   compact = false,
 }: RecurringCalendarProps) {
   const [selectedDay, setSelectedDay] = useState<number | null>(null)
@@ -45,19 +55,26 @@ export function RecurringCalendar({
   const recurringItems = useMemo<CalendarRecurring[]>(() => {
     const result: CalendarRecurring[] = []
 
-    // Добавляем расходы
+    // Добавляем расходы (только те, у которых есть day_of_month)
     for (const expense of expenses) {
-      result.push({
-        id: expense.id,
-        type: 'expense',
-        name: expense.name,
-        amount: expense.amount,
-        dayOfMonth: expense.day_of_month,
-        isActive: expense.is_active,
-        categoryName: expense.category_name,
-        categoryColor: expense.category_color,
-        original: expense,
-      })
+      // Пропускаем daily расходы - они не имеют конкретного дня
+      if (expense.frequency === 'daily') continue
+      // Для weekly нужна отдельная логика - пока пропускаем
+      if (expense.frequency === 'weekly') continue
+      // Для monthly и yearly показываем в календаре
+      if (expense.day_of_month) {
+        result.push({
+          id: expense.id,
+          type: 'expense',
+          name: expense.name,
+          amount: expense.amount,
+          dayOfMonth: expense.day_of_month,
+          isActive: expense.is_active,
+          categoryName: expense.category_name,
+          categoryColor: expense.category_color,
+          original: expense,
+        })
+      }
     }
 
     // Добавляем доходы
@@ -238,88 +255,122 @@ export function RecurringCalendar({
         </div>
       </div>
 
-      {/* Детали выбранного дня */}
-      {selectedDay && selectedItems.length > 0 && (
-        <div className="rounded-lg border border-border/50 p-4 bg-card/50">
-          <h4 className="font-medium mb-3">
-            {selectedDay} число каждого месяца
-          </h4>
-          <div className="space-y-2">
-            {selectedItems.map((item) => (
-              <div
-                key={item.id}
-                onClick={() => handleItemClick(item)}
-                className={cn(
-                  'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01]',
-                  item.isActive
-                    ? item.type === 'expense'
-                      ? 'bg-orange-500/5 border-orange-500/20'
-                      : 'bg-emerald-500/5 border-emerald-500/20'
-                    : 'bg-muted/30 border-border opacity-60'
-                )}
-              >
+      {/* Диалог деталей выбранного дня */}
+      <Dialog open={!!selectedDay} onOpenChange={(open) => !open && setSelectedDay(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-primary" />
+              {selectedDay} число каждого месяца
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            {selectedItems.length > 0 ? (
+              selectedItems.map((item) => (
                 <div
+                  key={item.id}
+                  onClick={() => {
+                    handleItemClick(item)
+                    setSelectedDay(null)
+                  }}
                   className={cn(
-                    'flex h-8 w-8 items-center justify-center rounded-lg',
-                    item.type === 'expense'
-                      ? 'bg-orange-500/10'
-                      : 'bg-emerald-500/10'
+                    'flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all hover:scale-[1.01]',
+                    item.isActive
+                      ? item.type === 'expense'
+                        ? 'bg-orange-500/5 border-orange-500/20 hover:bg-orange-500/10'
+                        : 'bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/10'
+                      : 'bg-muted/30 border-border opacity-60 hover:opacity-80'
                   )}
                 >
-                  {item.type === 'expense' ? (
-                    <Receipt
-                      className="h-4 w-4"
-                      style={{ color: item.categoryColor || '#f97316' }}
-                    />
-                  ) : (
-                    <Banknote className="h-4 w-4 text-emerald-500" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium truncate">{item.name}</p>
-                    {!item.isActive && (
-                      <PowerOff className="h-3 w-3 text-muted-foreground" />
-                    )}
-                  </div>
-                  {item.categoryName && (
-                    <p className="text-xs text-muted-foreground">
-                      {item.categoryName}
-                    </p>
-                  )}
-                </div>
-                <div className="text-right">
-                  <p
+                  <div
                     className={cn(
-                      'font-semibold tabular-nums',
+                      'flex h-10 w-10 items-center justify-center rounded-xl',
                       item.type === 'expense'
-                        ? 'text-orange-500'
-                        : 'text-emerald-500',
-                      !item.isActive && 'opacity-50'
+                        ? 'bg-orange-500/10'
+                        : 'bg-emerald-500/10'
                     )}
                   >
-                    {item.type === 'expense' ? '-' : '+'}
-                    {formatMoney(item.amount)} ₽
-                  </p>
-                  <div className="flex items-center gap-1 text-xs text-muted-foreground justify-end">
-                    {item.isActive ? (
-                      <>
-                        <Power className="h-3 w-3 text-emerald-500" />
-                        <span>Активен</span>
-                      </>
+                    {item.type === 'expense' ? (
+                      <Receipt
+                        className="h-5 w-5"
+                        style={{ color: item.categoryColor || '#f97316' }}
+                      />
                     ) : (
-                      <>
-                        <PowerOff className="h-3 w-3" />
-                        <span>Отключён</span>
-                      </>
+                      <Banknote className="h-5 w-5 text-emerald-500" />
                     )}
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium truncate">{item.name}</p>
+                      {!item.isActive && (
+                        <PowerOff className="h-3 w-3 text-muted-foreground" />
+                      )}
+                    </div>
+                    {item.categoryName && (
+                      <p className="text-xs text-muted-foreground">
+                        {item.categoryName}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p
+                      className={cn(
+                        'font-semibold tabular-nums',
+                        item.type === 'expense'
+                          ? 'text-orange-500'
+                          : 'text-emerald-500',
+                        !item.isActive && 'opacity-50'
+                      )}
+                    >
+                      {item.type === 'expense' ? '-' : '+'}
+                      {formatMoney(item.amount)} ₽
+                    </p>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground justify-end">
+                      {item.isActive ? (
+                        <>
+                          <Power className="h-3 w-3 text-emerald-500" />
+                          <span>Активен</span>
+                        </>
+                      ) : (
+                        <>
+                          <PowerOff className="h-3 w-3" />
+                          <span>Отключён</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+                  <Sparkles className="h-8 w-8 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">
+                  Нет шаблонов на это число
+                </p>
+                <p className="text-xs text-muted-foreground/70 mb-4">
+                  Создайте первый шаблон расхода
+                </p>
               </div>
-            ))}
+            )}
+
+            {onDayClick && (
+              <Button
+                className="w-full"
+                onClick={() => {
+                  onDayClick(selectedDay!)
+                  setSelectedDay(null)
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Добавить шаблон
+              </Button>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
       {/* Легенда */}
       {!compact && (

@@ -13,6 +13,7 @@ import {
   Trash2,
   Wallet,
   AlertCircle,
+  Undo2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,11 +43,14 @@ interface PlannedExpensesSectionProps {
     data: {
       actualAmount?: number
       accountId: string
+      categoryId?: string
       date: string
       notes?: string
+      tagIds?: string[]
     }
   ) => Promise<void>
   onSkip: (id: string) => Promise<void>
+  onUnconfirm?: (id: string) => Promise<void>
   onDelete?: (id: string) => Promise<void>
   onGenerate?: () => Promise<void>
   isGenerating?: boolean
@@ -74,6 +78,7 @@ export function PlannedExpensesSection({
   categories,
   onConfirm,
   onSkip,
+  onUnconfirm,
   onDelete,
   onGenerate,
   isGenerating,
@@ -151,8 +156,10 @@ export function PlannedExpensesSection({
   const handleConfirm = async (data: {
     actualAmount?: number
     accountId: string
+    categoryId?: string
     date: string
     notes?: string
+    tagIds?: string[]
   }) => {
     if (!selectedExpense) return
 
@@ -180,6 +187,18 @@ export function PlannedExpensesSection({
     setProcessingId(id)
     try {
       await onDelete(id)
+    } finally {
+      setProcessingId(null)
+    }
+  }
+
+  const handleUnconfirm = async (id: string) => {
+    if (!onUnconfirm) return
+    if (!confirm('Отменить подтверждение? Деньги будут возвращены на счёт, связанный расход удалён.')) return
+
+    setProcessingId(id)
+    try {
+      await onUnconfirm(id)
     } finally {
       setProcessingId(null)
     }
@@ -466,6 +485,23 @@ export function PlannedExpensesSection({
                             <Trash2 className="h-4 w-4 text-destructive" />
                           </Button>
                         )}
+                      </div>
+                    )}
+                    {expense.status === 'confirmed' && onUnconfirm && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleUnconfirm(expense.id)
+                          }}
+                          disabled={isPending || isProcessing}
+                          title="Отменить подтверждение"
+                        >
+                          <Undo2 className="h-4 w-4 text-amber-500" />
+                        </Button>
                       </div>
                     )}
                   </TableCell>

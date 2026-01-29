@@ -151,7 +151,10 @@ export function AccountCard({
           {/* Balance */}
           <div className="mb-3 rounded-lg bg-background/50 p-3">
             <p className="text-xs text-muted-foreground mb-1">Баланс</p>
-            <p className="text-2xl font-bold tabular-nums">
+            <p className={cn(
+              'text-2xl font-bold tabular-nums',
+              account.current_balance < 0 && 'text-destructive'
+            )}>
               {account.current_balance.toLocaleString('ru-RU', {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,

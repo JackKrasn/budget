@@ -211,6 +211,20 @@ export function CategoryCard({ category, onClick }: CategoryCardProps) {
             )}
           </div>
 
+          {/* Currency breakdown */}
+          {hasMultiCurrency && activeCurrencyLimits.length > 0 && (
+            <div className="mt-1 text-xs text-muted-foreground">
+              {activeCurrencyLimits
+                .filter(l => l.actualAmount > 0)
+                .map((l, i, arr) => (
+                  <span key={l.currency}>
+                    {formatMoney(l.actualAmount)} {getCurrencySymbol(l.currency)}
+                    {i < arr.length - 1 && ' + '}
+                  </span>
+                ))}
+            </div>
+          )}
+
           {/* Multi-currency progress bars */}
           {hasMultiCurrency && activeCurrencyLimits.length > 0 ? (
             <div className="mt-3 space-y-2">
@@ -280,6 +294,133 @@ export function CategoryGrid({ categories, onCategoryClick }: CategoryGridProps)
           onClick={() => onCategoryClick?.(category.categoryId)}
         />
       ))}
+    </div>
+  )
+}
+
+// Table view of categories
+interface CategoryTableProps {
+  categories: CategorySummary[]
+  onCategoryClick?: (categoryId: string) => void
+}
+
+export function CategoryTable({ categories, onCategoryClick }: CategoryTableProps) {
+  // Sort by actual amount descending
+  const sortedCategories = [...categories].sort(
+    (a, b) => b.actualAmount - a.actualAmount
+  )
+
+  return (
+    <div className="rounded-lg border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden">
+      {/* Header */}
+      <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-4 py-3 bg-muted/30 text-xs font-medium text-muted-foreground border-b border-border/30">
+        <div className="w-9" />
+        <div>Категория</div>
+        <div className="w-28 text-right">Потрачено</div>
+        <div className="w-28 text-right">План</div>
+        <div className="w-24 text-right">Остаток</div>
+      </div>
+
+      {/* Rows */}
+      <div className="divide-y divide-border/30">
+        {sortedCategories.map((category) => {
+          const remaining = category.totalLimit - category.actualAmount
+          const isOverBudget = category.totalLimit > 0 && remaining < 0
+          const progress = category.totalLimit > 0
+            ? Math.min((category.actualAmount / category.totalLimit) * 100, 100)
+            : 0
+
+          return (
+            <motion.div
+              key={category.categoryId}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className={cn(
+                'grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-4 py-3 items-center cursor-pointer transition-colors hover:bg-muted/30',
+                isOverBudget && 'bg-destructive/5 hover:bg-destructive/10'
+              )}
+              onClick={() => onCategoryClick?.(category.categoryId)}
+            >
+              {/* Icon */}
+              <CategoryIcon
+                code={category.categoryCode}
+                iconName={category.categoryIcon}
+                color={category.categoryColor}
+                size="sm"
+                className="h-9 w-9 rounded-lg"
+              />
+
+              {/* Name + Progress */}
+              <div className="min-w-0">
+                <div className="font-medium truncate">{category.categoryName}</div>
+                {category.totalLimit > 0 && (
+                  <div className="mt-1.5">
+                    <Progress
+                      value={isOverBudget ? 100 : progress}
+                      className="h-1.5"
+                      indicatorColor={isOverBudget ? undefined : category.categoryColor}
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Actual Amount */}
+              <div className={cn(
+                'w-28 text-right font-semibold tabular-nums',
+                isOverBudget && 'text-destructive'
+              )}>
+                {formatMoney(category.actualAmount)} ₽
+              </div>
+
+              {/* Planned Amount */}
+              <div className="w-28 text-right text-muted-foreground tabular-nums">
+                {category.totalLimit > 0 ? `${formatMoney(category.totalLimit)} ₽` : '—'}
+              </div>
+
+              {/* Remaining */}
+              <div className={cn(
+                'w-24 text-right tabular-nums',
+                isOverBudget ? 'text-destructive font-medium' : 'text-muted-foreground'
+              )}>
+                {category.totalLimit > 0 ? (
+                  isOverBudget ? (
+                    <span className="flex items-center justify-end gap-1">
+                      <TrendingUp className="h-3 w-3" />
+                      +{formatMoney(Math.abs(remaining))}
+                    </span>
+                  ) : (
+                    `${formatMoney(remaining)} ₽`
+                  )
+                ) : '—'}
+              </div>
+            </motion.div>
+          )
+        })}
+      </div>
+
+      {/* Footer with totals */}
+      <div className="grid grid-cols-[auto_1fr_auto_auto_auto] gap-4 px-4 py-3 bg-muted/30 text-sm font-medium border-t border-border/30">
+        <div className="w-9" />
+        <div>Итого</div>
+        <div className="w-28 text-right tabular-nums">
+          {formatMoney(sortedCategories.reduce((sum, c) => sum + c.actualAmount, 0))} ₽
+        </div>
+        <div className="w-28 text-right tabular-nums text-muted-foreground">
+          {formatMoney(sortedCategories.reduce((sum, c) => sum + c.totalLimit, 0))} ₽
+        </div>
+        <div className="w-24 text-right tabular-nums">
+          {(() => {
+            const totalActual = sortedCategories.reduce((sum, c) => sum + c.actualAmount, 0)
+            const totalPlanned = sortedCategories.reduce((sum, c) => sum + c.totalLimit, 0)
+            const totalRemaining = totalPlanned - totalActual
+            return totalRemaining < 0 ? (
+              <span className="text-destructive">+{formatMoney(Math.abs(totalRemaining))}</span>
+            ) : (
+              <span>{formatMoney(totalRemaining)} ₽</span>
+            )
+          })()}
+        </div>
+      </div>
     </div>
   )
 }

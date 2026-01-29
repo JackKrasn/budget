@@ -50,13 +50,15 @@ export function useCreateExpense() {
 
   return useMutation({
     mutationFn: (data: CreateExpenseRequest) => expensesApi.create(data),
-    onSuccess: () => {
-      // Invalidate all expense queries (lists with any params)
-      queryClient.invalidateQueries({ queryKey: expenseKeys.all })
+    onSuccess: async () => {
+      // Invalidate and refetch all expense queries
+      await queryClient.invalidateQueries({ queryKey: expenseKeys.all })
+      // Wait for refetch to complete
+      await queryClient.refetchQueries({ queryKey: expenseKeys.lists() })
       // Invalidate all fund data (in case expense was funded from funds)
-      queryClient.invalidateQueries({ queryKey: fundKeys.all })
+      await queryClient.invalidateQueries({ queryKey: fundKeys.all })
       // Invalidate accounts to refresh balance
-      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      await queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Расход создан')
     },
     onError: (error) => {

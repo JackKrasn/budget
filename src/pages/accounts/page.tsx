@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
-import { Plus, CreditCard, AlertCircle, Loader2, ArrowLeftRight } from 'lucide-react'
+import { Plus, CreditCard, AlertCircle, Loader2, ArrowLeftRight, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   useAccounts,
   useDeleteAccount,
@@ -14,6 +21,14 @@ import {
   TransferDialog,
 } from '@/features/accounts'
 import type { AccountWithType } from '@/lib/api/types'
+
+type SortField = 'balance' | 'name' | 'created'
+type SortDirection = 'asc' | 'desc'
+
+interface SortConfig {
+  field: SortField
+  direction: SortDirection
+}
 
 const container = {
   hidden: { opacity: 0 },
@@ -35,15 +50,60 @@ export default function AccountsPage() {
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [syncAccount, setSyncAccount] = useState<AccountWithType | null>(null)
   const [syncDialogOpen, setSyncDialogOpen] = useState(false)
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ field: 'balance', direction: 'desc' })
 
   const { data, isLoading, error } = useAccounts()
   const deleteAccount = useDeleteAccount()
   const updateAccount = useUpdateAccount()
 
   const accounts = data?.data ?? []
-  const activeAccounts = accounts.filter((a) => !a.is_archived)
-  const archivedAccounts = accounts.filter((a) => a.is_archived)
   const totalBalance = data?.totalBalance ?? 0
+
+  // Sort accounts
+  const activeAccounts = useMemo(() => {
+    const filtered = accounts.filter((a) => !a.is_archived)
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortConfig.field) {
+        case 'balance':
+          comparison = a.current_balance - b.current_balance
+          break
+        case 'name':
+          comparison = a.name.localeCompare(b.name, 'ru')
+          break
+        case 'created':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          break
+      }
+      return sortConfig.direction === 'desc' ? -comparison : comparison
+    })
+  }, [accounts, sortConfig])
+
+  const archivedAccounts = useMemo(() => {
+    const filtered = accounts.filter((a) => a.is_archived)
+    return [...filtered].sort((a, b) => {
+      let comparison = 0
+      switch (sortConfig.field) {
+        case 'balance':
+          comparison = a.current_balance - b.current_balance
+          break
+        case 'name':
+          comparison = a.name.localeCompare(b.name, 'ru')
+          break
+        case 'created':
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+          break
+      }
+      return sortConfig.direction === 'desc' ? -comparison : comparison
+    })
+  }, [accounts, sortConfig])
+
+  const handleSortChange = (value: string) => {
+    const [field, direction] = value.split('-') as [SortField, SortDirection]
+    setSortConfig({ field, direction })
+  }
+
+  const getSortValue = () => `${sortConfig.field}-${sortConfig.direction}`
 
   const handleEdit = (account: AccountWithType) => {
     setEditAccount(account)
@@ -100,6 +160,62 @@ export default function AccountsPage() {
           </CreateAccountDialog>
         </div>
       </motion.div>
+
+      {/* Sort controls */}
+      {accounts.length > 1 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.05 }}
+          className="flex items-center gap-2"
+        >
+          <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm text-muted-foreground">Сортировка:</span>
+          <Select value={getSortValue()} onValueChange={handleSortChange}>
+            <SelectTrigger className="w-[200px] h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="balance-desc">
+                <div className="flex items-center gap-2">
+                  <ArrowDown className="h-3 w-3" />
+                  По балансу (убыв.)
+                </div>
+              </SelectItem>
+              <SelectItem value="balance-asc">
+                <div className="flex items-center gap-2">
+                  <ArrowUp className="h-3 w-3" />
+                  По балансу (возр.)
+                </div>
+              </SelectItem>
+              <SelectItem value="name-asc">
+                <div className="flex items-center gap-2">
+                  <ArrowUp className="h-3 w-3" />
+                  По названию (А-Я)
+                </div>
+              </SelectItem>
+              <SelectItem value="name-desc">
+                <div className="flex items-center gap-2">
+                  <ArrowDown className="h-3 w-3" />
+                  По названию (Я-А)
+                </div>
+              </SelectItem>
+              <SelectItem value="created-desc">
+                <div className="flex items-center gap-2">
+                  <ArrowDown className="h-3 w-3" />
+                  Сначала новые
+                </div>
+              </SelectItem>
+              <SelectItem value="created-asc">
+                <div className="flex items-center gap-2">
+                  <ArrowUp className="h-3 w-3" />
+                  Сначала старые
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </motion.div>
+      )}
 
       {/* Stats */}
       <motion.div

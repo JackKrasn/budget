@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react'
-import { X, Plus, Tag, Search } from 'lucide-react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { X, Plus, Tag, Search, Check } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -11,37 +12,38 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useExpenseTags, useCreateExpenseTag } from '../hooks'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { cn } from '@/lib/utils'
 
 interface TagSelectorProps {
   selectedTagIds: string[]
   onTagsChange: (tagIds: string[]) => void
 }
 
-const DEFAULT_COLORS = [
-  '#ef4444', // red
-  '#f97316', // orange
-  '#f59e0b', // amber
-  '#eab308', // yellow
-  '#84cc16', // lime
-  '#22c55e', // green
-  '#10b981', // emerald
-  '#14b8a6', // teal
-  '#06b6d4', // cyan
-  '#0ea5e9', // sky
-  '#3b82f6', // blue
-  '#6366f1', // indigo
-  '#8b5cf6', // violet
-  '#a855f7', // purple
-  '#d946ef', // fuchsia
-  '#ec4899', // pink
+const TAG_COLORS = [
+  { value: '#ef4444', name: 'Красный' },
+  { value: '#f97316', name: 'Оранжевый' },
+  { value: '#f59e0b', name: 'Янтарный' },
+  { value: '#eab308', name: 'Жёлтый' },
+  { value: '#84cc16', name: 'Лайм' },
+  { value: '#22c55e', name: 'Зелёный' },
+  { value: '#10b981', name: 'Изумруд' },
+  { value: '#14b8a6', name: 'Бирюза' },
+  { value: '#06b6d4', name: 'Циан' },
+  { value: '#0ea5e9', name: 'Небо' },
+  { value: '#3b82f6', name: 'Синий' },
+  { value: '#6366f1', name: 'Индиго' },
+  { value: '#8b5cf6', name: 'Фиолет' },
+  { value: '#a855f7', name: 'Пурпур' },
+  { value: '#d946ef', name: 'Фуксия' },
+  { value: '#ec4899', name: 'Розовый' },
 ]
 
 export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) {
-  const [isCreating, setIsCreating] = useState(false)
-  const [newTagName, setNewTagName] = useState('')
-  const [newTagColor, setNewTagColor] = useState(DEFAULT_COLORS[0])
   const [popoverOpen, setPopoverOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [newTagName, setNewTagName] = useState('')
+  const [newTagColor, setNewTagColor] = useState(TAG_COLORS[10].value)
 
   const { data: tagsData } = useExpenseTags()
   const createTag = useCreateExpenseTag()
@@ -49,19 +51,14 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
   const tags = tagsData?.data ?? []
   const selectedTags = tags.filter((tag) => selectedTagIds.includes(tag.id))
 
-  // Фильтруем доступные метки по поисковому запросу
-  const filteredAvailableTags = useMemo(() => {
-    const available = tags.filter((tag) => !selectedTagIds.includes(tag.id))
-
+  // Фильтруем метки по поисковому запросу
+  const filteredTags = useMemo(() => {
     if (!searchQuery.trim()) {
-      return available
+      return tags
     }
-
     const query = searchQuery.toLowerCase()
-    return available.filter((tag) =>
-      tag.name.toLowerCase().includes(query)
-    )
-  }, [tags, selectedTagIds, searchQuery])
+    return tags.filter((tag) => tag.name.toLowerCase().includes(query))
+  }, [tags, searchQuery])
 
   const handleToggleTag = (tagId: string) => {
     if (selectedTagIds.includes(tagId)) {
@@ -69,6 +66,10 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
     } else {
       onTagsChange([...selectedTagIds, tagId])
     }
+  }
+
+  const handleRemoveTag = (tagId: string) => {
+    onTagsChange(selectedTagIds.filter((id) => id !== tagId))
   }
 
   const handleCreateTag = async () => {
@@ -83,11 +84,10 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
       // Добавляем новый тег в выбранные
       onTagsChange([...selectedTagIds, newTag.id])
 
-      // Сбрасываем форму
+      // Сбрасываем форму создания
       setNewTagName('')
-      setNewTagColor(DEFAULT_COLORS[0])
+      setNewTagColor(TAG_COLORS[10].value)
       setIsCreating(false)
-      setSearchQuery('')
     } catch {
       // Ошибка обработана в хуке
     }
@@ -96,188 +96,284 @@ export function TagSelector({ selectedTagIds, onTagsChange }: TagSelectorProps) 
   const handleOpenChange = (open: boolean) => {
     setPopoverOpen(open)
     if (!open) {
+      // Сбрасываем состояние при закрытии
       setIsCreating(false)
       setSearchQuery('')
+      setNewTagName('')
+      setNewTagColor(TAG_COLORS[10].value)
     }
   }
 
   return (
     <div className="space-y-2">
-      <Label>Метки</Label>
+      <Label className="text-xs font-medium text-muted-foreground">Метки</Label>
 
-      {/* Selected tags */}
-      <div className="flex flex-wrap gap-2">
-        {selectedTags.map((tag) => (
-          <Badge
-            key={tag.id}
-            variant="secondary"
-            className="gap-1 pr-1"
-            style={{
-              backgroundColor: `${tag.color}20`,
-              color: tag.color,
-              borderColor: `${tag.color}40`,
-            }}
-          >
-            {tag.name}
-            <button
-              type="button"
-              onClick={() => handleToggleTag(tag.id)}
-              className="ml-1 rounded-full hover:bg-black/10 p-0.5"
+      {/* Selected tags display */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        <AnimatePresence mode="popLayout">
+          {selectedTags.map((tag) => (
+            <motion.div
+              key={tag.id}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              transition={{ duration: 0.15 }}
+              layout
             >
-              <X className="h-3 w-3" />
-            </button>
-          </Badge>
-        ))}
+              <Badge
+                variant="secondary"
+                className="gap-1 pr-1 h-6 text-xs font-medium border transition-all hover:shadow-sm"
+                style={{
+                  backgroundColor: `${tag.color}15`,
+                  color: tag.color,
+                  borderColor: `${tag.color}30`,
+                }}
+              >
+                <span
+                  className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: tag.color }}
+                />
+                {tag.name}
+                <button
+                  type="button"
+                  onClick={() => handleRemoveTag(tag.id)}
+                  className="ml-0.5 rounded-full hover:bg-black/10 dark:hover:bg-white/10 p-0.5 transition-colors"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </Badge>
+            </motion.div>
+          ))}
+        </AnimatePresence>
 
-        {/* Add tag button */}
+        {/* Add tag trigger */}
         <Popover open={popoverOpen} onOpenChange={handleOpenChange}>
           <PopoverTrigger asChild>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              className="h-6 px-2 text-xs"
+              className={cn(
+                'h-6 px-2 text-xs gap-1 border-dashed transition-all',
+                'hover:border-solid hover:bg-accent/50',
+                selectedTags.length === 0 && 'border-muted-foreground/30'
+              )}
             >
-              <Tag className="mr-1 h-3 w-3" />
-              Добавить метку
+              <Tag className="h-3 w-3" />
+              {selectedTags.length === 0 ? 'Добавить метку' : 'Ещё'}
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-80 p-0" align="start">
-            <div className="flex flex-col">
-              {!isCreating ? (
-                <>
-                  {/* Search */}
-                  <div className="p-3 border-b">
-                    <div className="relative">
-                      <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        placeholder="Поиск меток..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="pl-8"
-                      />
-                    </div>
-                  </div>
 
-                  {/* Tags list */}
-                  <ScrollArea className="h-64">
-                    <div className="p-3 space-y-1">
-                      {filteredAvailableTags.length > 0 ? (
-                        filteredAvailableTags.map((tag) => (
-                          <button
-                            key={tag.id}
-                            type="button"
-                            className="w-full flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-accent text-left transition-colors"
-                            onClick={() => {
-                              handleToggleTag(tag.id)
+          <PopoverContent
+            className="w-72 p-0 overflow-hidden"
+            align="start"
+            sideOffset={8}
+          >
+            {/* Search header */}
+            <div className="p-2.5 border-b bg-muted/30">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground/60" />
+                <Input
+                  placeholder="Поиск меток..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-8 pl-8 text-sm bg-background border-border/50 focus-visible:ring-1"
+                />
+              </div>
+            </div>
+
+            {/* Tags list with checkboxes */}
+            <ScrollArea className="h-48">
+              <div className="p-1.5">
+                {filteredTags.length > 0 ? (
+                  <div className="space-y-0.5">
+                    {filteredTags.map((tag) => {
+                      const isSelected = selectedTagIds.includes(tag.id)
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => handleToggleTag(tag.id)}
+                          className={cn(
+                            'w-full flex items-center gap-2.5 px-2.5 py-2 rounded-md text-left transition-all',
+                            'hover:bg-accent/60',
+                            isSelected && 'bg-accent/40'
+                          )}
+                        >
+                          {/* Custom checkbox indicator */}
+                          <div
+                            className={cn(
+                              'flex items-center justify-center h-4 w-4 rounded border-2 transition-all flex-shrink-0',
+                              isSelected
+                                ? 'border-transparent'
+                                : 'border-muted-foreground/30 bg-background'
+                            )}
+                            style={{
+                              backgroundColor: isSelected ? tag.color : undefined,
                             }}
                           >
-                            <div
-                              className="h-3 w-3 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: tag.color }}
-                            />
-                            <span className="text-sm flex-1 truncate">{tag.name}</span>
-                          </button>
-                        ))
-                      ) : (
-                        <div className="text-center py-8 text-sm text-muted-foreground">
-                          {searchQuery ? 'Метки не найдены' : 'Все метки уже выбраны'}
-                        </div>
-                      )}
-                    </div>
-                  </ScrollArea>
+                            {isSelected && (
+                              <Check className="h-3 w-3 text-white" strokeWidth={3} />
+                            )}
+                          </div>
 
-                  {/* Create button */}
-                  <div className="p-2 border-t">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="w-full justify-start"
-                      onClick={() => {
-                        setIsCreating(true)
-                        setSearchQuery('')
-                      }}
-                    >
-                      <Plus className="mr-2 h-4 w-4" />
-                      Создать новую метку
-                    </Button>
+                          {/* Tag color dot */}
+                          <span
+                            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                            style={{
+                              backgroundColor: tag.color,
+                              boxShadow: `0 0 0 2px ${tag.color}40`,
+                            }}
+                          />
+
+                          {/* Tag name */}
+                          <span className="text-sm flex-1 truncate font-medium">
+                            {tag.name}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
-                </>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-6 text-center">
+                    <Tag className="h-6 w-6 text-muted-foreground/30 mb-1.5" />
+                    <p className="text-sm text-muted-foreground">
+                      {searchQuery ? 'Метки не найдены' : 'Нет доступных меток'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+
+            {/* Create new tag section - expands below the list */}
+            <div className="border-t bg-muted/20">
+              {!isCreating ? (
+                <div className="p-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="w-full justify-start h-8 text-sm font-medium text-muted-foreground hover:text-foreground"
+                    onClick={() => {
+                      // Переносим поисковый запрос в название новой метки
+                      setNewTagName(searchQuery.trim())
+                      setSearchQuery('')
+                      setIsCreating(true)
+                    }}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    {searchQuery.trim()
+                      ? `Создать "${searchQuery.trim()}"`
+                      : 'Создать новую метку'}
+                  </Button>
+                </div>
               ) : (
-                <div className="p-4 space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="tag-name">Название метки</Label>
-                    <Input
-                      id="tag-name"
-                      placeholder="Например: Личное"
-                      value={newTagName}
-                      onChange={(e) => setNewTagName(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault()
-                          handleCreateTag()
-                        }
-                      }}
-                      autoFocus
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Цвет</Label>
-                    <div className="grid grid-cols-8 gap-2">
-                      {DEFAULT_COLORS.map((color) => (
-                        <button
-                          key={color}
-                          type="button"
-                          className={`h-7 w-7 rounded-md border-2 transition-all ${
-                            newTagColor === color
-                              ? 'border-foreground scale-110'
-                              : 'border-transparent hover:scale-105'
-                          }`}
-                          style={{ backgroundColor: color }}
-                          onClick={() => setNewTagColor(color)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Button
+                <div className="p-3 space-y-3">
+                  {/* Header */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Новая метка
+                    </span>
+                    <button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      className="flex-1"
                       onClick={() => {
                         setIsCreating(false)
                         setNewTagName('')
-                        setNewTagColor(DEFAULT_COLORS[0])
+                        setNewTagColor(TAG_COLORS[10].value)
                       }}
+                      className="text-xs text-muted-foreground hover:text-foreground transition-colors"
                     >
                       Отмена
-                    </Button>
+                    </button>
+                  </div>
+
+                  {/* Name input with inline button */}
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Название метки"
+                      value={newTagName}
+                      onChange={(e) => setNewTagName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && newTagName.trim()) {
+                          e.preventDefault()
+                          handleCreateTag()
+                        }
+                        if (e.key === 'Escape') {
+                          setIsCreating(false)
+                          setNewTagName('')
+                          setNewTagColor(TAG_COLORS[10].value)
+                        }
+                      }}
+                      className="h-8 text-sm flex-1"
+                      autoFocus
+                    />
                     <Button
                       type="button"
                       size="sm"
-                      className="flex-1"
+                      className="h-8 px-3 text-white shrink-0"
                       onClick={handleCreateTag}
                       disabled={!newTagName.trim() || createTag.isPending}
+                      style={{
+                        backgroundColor: newTagColor,
+                        borderColor: newTagColor,
+                      }}
                     >
-                      {createTag.isPending ? 'Создание...' : 'Создать'}
+                      {createTag.isPending ? '...' : 'OK'}
                     </Button>
                   </div>
+
+                  {/* Color picker - grid layout */}
+                  <div className="grid grid-cols-8 gap-1.5">
+                    {TAG_COLORS.map((color) => (
+                      <button
+                        key={color.value}
+                        type="button"
+                        title={color.name}
+                        onClick={() => setNewTagColor(color.value)}
+                        className={cn(
+                          'h-6 w-6 rounded-full relative flex-shrink-0',
+                          'focus:outline-none',
+                          newTagColor === color.value && 'ring-2 ring-offset-2 ring-offset-background'
+                        )}
+                        style={{
+                          backgroundColor: color.value,
+                          ['--tw-ring-color' as string]: color.value,
+                        }}
+                      >
+                        {newTagColor === color.value && (
+                          <Check className="absolute inset-0 m-auto h-3 w-3 text-white drop-shadow-sm" strokeWidth={3} />
+                        )}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Preview */}
+                  {newTagName.trim() && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Превью:</span>
+                      <Badge
+                        variant="secondary"
+                        className="h-5 text-xs font-medium border"
+                        style={{
+                          backgroundColor: `${newTagColor}15`,
+                          color: newTagColor,
+                          borderColor: `${newTagColor}30`,
+                        }}
+                      >
+                        <span
+                          className="w-1.5 h-1.5 rounded-full mr-1"
+                          style={{ backgroundColor: newTagColor }}
+                        />
+                        {newTagName.trim()}
+                      </Badge>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </PopoverContent>
         </Popover>
       </div>
-
-      {selectedTags.length === 0 && (
-        <p className="text-xs text-muted-foreground">
-          Добавьте метки для классификации расхода
-        </p>
-      )}
     </div>
   )
 }

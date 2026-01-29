@@ -130,7 +130,7 @@ export function useConfirmPlannedExpenseWithExpense() {
       data,
     }: {
       id: string
-      data: { actualAmount?: number; accountId?: string; date?: string; notes?: string }
+      data: { actualAmount?: number; accountId?: string; date?: string; notes?: string; tagIds?: string[]; categoryId?: string }
       budgetId?: string
     }) => plannedExpensesApi.confirmWithExpense(id, data),
     onSuccess: (_, variables) => {
@@ -156,6 +156,27 @@ export function useSkipPlannedExpense() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: plannedExpenseKeys.lists() })
       toast.success('Расход пропущен')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+export function useUnconfirmPlannedExpense() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ id }: { id: string; budgetId?: string }) =>
+      plannedExpensesApi.unconfirm(id),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: plannedExpenseKeys.lists() })
+      if (variables.budgetId) {
+        queryClient.invalidateQueries({ queryKey: budgetKeys.detail(variables.budgetId) })
+      }
+      // Invalidate accounts to refresh balance (money returned)
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      toast.success('Подтверждение отменено')
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)

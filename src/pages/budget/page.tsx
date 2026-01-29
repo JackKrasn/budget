@@ -36,6 +36,7 @@ import {
   usePlannedExpenses,
   useConfirmPlannedExpenseWithExpense,
   useSkipPlannedExpense,
+  useUnconfirmPlannedExpense,
   useDeletePlannedExpense,
   useGeneratePlannedExpenses,
   useCreatePlannedExpense,
@@ -50,6 +51,7 @@ import {
   MonthSelector,
   CopyBudgetDialog,
   PlannedExpensesSection,
+  PlannedExpensesByCategory,
   PlannedIncomesSection,
   AddPlannedExpenseDialog,
   ReceiveIncomeDialog,
@@ -60,6 +62,7 @@ import {
   PaymentCalendar,
   getCurrencyConfig,
   CurrencyLimitsEditor,
+  PlannedExpensesTotals,
 } from '@/features/budget'
 import { useExpenseCategories, useExpenses } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -96,7 +99,7 @@ export default function BudgetPage() {
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
   const [bufferEditorOpen, setBufferEditorOpen] = useState(false)
   const [bufferEditingItem, setBufferEditingItem] = useState<BudgetItemWithCategory | null>(null)
-  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'calendar'>('list')
+  const [plannedViewMode, setPlannedViewMode] = useState<'list' | 'category' | 'calendar'>('category')
 
   // Вычисляем даты для фильтрации расходов
   const dateFrom = useMemo(() => {
@@ -151,6 +154,7 @@ export default function BudgetPage() {
   const copyBudget = useCopyBudget()
   const confirmPlannedWithExpense = useConfirmPlannedExpenseWithExpense()
   const skipPlanned = useSkipPlannedExpense()
+  const unconfirmPlanned = useUnconfirmPlannedExpense()
   const deletePlanned = useDeletePlannedExpense()
   const generatePlanned = useGeneratePlannedExpenses()
   const createPlanned = useCreatePlannedExpense()
@@ -189,6 +193,20 @@ export default function BudgetPage() {
     for (const expense of expenses) {
       const currency = expense.currency || 'RUB'
       map[currency] = (map[currency] || 0) + expense.amount
+    }
+    return map
+  }, [expenses])
+
+  // Считаем расходы по категориям и валютам (для редактора мультивалютных лимитов)
+  const expensesByCategoryAndCurrency = useMemo(() => {
+    const map: Record<string, Record<string, number>> = {}
+    for (const expense of expenses) {
+      const categoryId = expense.categoryId
+      const currency = expense.currency || 'RUB'
+      if (!map[categoryId]) {
+        map[categoryId] = {}
+      }
+      map[categoryId][currency] = (map[categoryId][currency] || 0) + expense.amount
     }
     return map
   }, [expenses])
@@ -458,17 +476,31 @@ export default function BudgetPage() {
   const handleSaveCurrencyBuffers = async (
     buffers: { currency: string; bufferAmount: number }[]
   ) => {
-    if (!budget?.id || !bufferEditingItem?.id) {
+    if (!budget?.id || !bufferEditingItem?.categoryId) {
       toast.error('Не удалось найти категорию')
       return
     }
 
     try {
+      let itemId = bufferEditingItem.id
+
+      // Если BudgetItem не существует (id пустой), создаём его через upsertItem
+      if (!itemId) {
+        const result = await upsertItem.mutateAsync({
+          budgetId: budget.id,
+          data: {
+            categoryId: bufferEditingItem.categoryId,
+            plannedAmount: 0, // Создаём с нулевым plannedAmount
+          },
+        })
+        itemId = result.id
+      }
+
       // Сохраняем каждый буфер по очереди
       for (const buffer of buffers) {
         await setCurrencyBuffer.mutateAsync({
           budgetId: budget.id,
-          itemId: bufferEditingItem.id,
+          itemId,
           data: {
             currency: buffer.currency as Parameters<typeof setCurrencyBuffer.mutateAsync>[0]['data']['currency'],
             bufferAmount: buffer.bufferAmount,
@@ -485,12 +517,26 @@ export default function BudgetPage() {
 
   // Пересчёт лимитов из запланированных расходов
   const handleRecalculateLimits = async () => {
-    if (!budget?.id || !bufferEditingItem?.id) return
+    if (!budget?.id || !bufferEditingItem?.categoryId) return
 
     try {
+      let itemId = bufferEditingItem.id
+
+      // Если BudgetItem не существует (id пустой), создаём его через upsertItem
+      if (!itemId) {
+        const result = await upsertItem.mutateAsync({
+          budgetId: budget.id,
+          data: {
+            categoryId: bufferEditingItem.categoryId,
+            plannedAmount: 0,
+          },
+        })
+        itemId = result.id
+      }
+
       await recalculateLimits.mutateAsync({
         budgetId: budget.id,
-        itemId: bufferEditingItem.id,
+        itemId,
       })
       await queryClient.invalidateQueries({ queryKey: budgetKeys.byMonth(year, month) })
       toast.success('Лимиты пересчитаны')
@@ -519,8 +565,10 @@ export default function BudgetPage() {
     data: {
       actualAmount?: number
       accountId: string
+      categoryId?: string
       date: string
       notes?: string
+      tagIds?: string[]
     }
   ) => {
     try {
@@ -549,6 +597,14 @@ export default function BudgetPage() {
       await deletePlanned.mutateAsync(id)
     } catch {
       toast.error('Ошибка удаления')
+    }
+  }
+
+  const handleUnconfirmPlanned = async (id: string) => {
+    try {
+      await unconfirmPlanned.mutateAsync({ id, budgetId: budget?.id })
+    } catch {
+      toast.error('Ошибка отмены подтверждения')
     }
   }
 
@@ -651,6 +707,7 @@ export default function BudgetPage() {
   const handleAddPlannedExpense = async (data: {
     budgetId: string
     categoryId: string
+    accountId?: string
     fundId?: string
     fundedAmount?: number
     name: string
@@ -1102,84 +1159,105 @@ export default function BudgetPage() {
             }
             headerAction={
               <div className="flex items-center gap-2">
-                {/* Переключатель вида */}
-                <div className="flex items-center gap-1 rounded-lg border border-border/50 p-1 bg-muted/30">
+                {/* Переключатель видов - сегментированный контрол */}
+                <div className="inline-flex h-8 items-center rounded-lg bg-muted/50 p-1">
+                  {[
+                    { mode: 'list' as const, icon: List, label: 'Список' },
+                    { mode: 'category' as const, icon: LayoutGrid, label: 'Категории' },
+                    { mode: 'calendar' as const, icon: CalendarDays, label: 'Календарь' },
+                  ].map(({ mode, icon: Icon, label }) => (
+                    <button
+                      key={mode}
+                      onClick={() => setPlannedViewMode(mode)}
+                      className={cn(
+                        'inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all',
+                        plannedViewMode === mode
+                          ? 'bg-background text-foreground shadow-sm'
+                          : 'text-muted-foreground hover:text-foreground'
+                      )}
+                    >
+                      <Icon className="h-3.5 w-3.5" />
+                      <span className="hidden sm:inline">{label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Разделитель */}
+                <div className="h-4 w-px bg-border/60" />
+
+                {/* Кнопки действий */}
+                <div className="flex items-center gap-1">
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={cn(
-                      'h-7 px-2.5 gap-1.5',
-                      plannedViewMode === 'list' && 'bg-background shadow-sm'
-                    )}
-                    onClick={() => setPlannedViewMode('list')}
+                    className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={handleGeneratePlanned}
+                    disabled={generatePlanned.isPending || createBudget.isPending}
                   >
-                    <List className="h-3.5 w-3.5" />
-                    <span className="text-xs hidden sm:inline">Список</span>
+                    <RefreshCw
+                      className={cn(
+                        'h-3.5 w-3.5',
+                        generatePlanned.isPending && 'animate-spin'
+                      )}
+                    />
+                    <span className="hidden sm:inline ml-1.5">Сгенерировать</span>
                   </Button>
+                  {budget?.id && (
+                    <AddPlannedExpenseDialog
+                      budgetId={budget.id}
+                      year={year}
+                      month={month}
+                      categories={categories}
+                      accounts={accounts}
+                      funds={fundsRaw}
+                      onAdd={handleAddPlannedExpense}
+                      isPending={createPlanned.isPending}
+                      triggerClassName="h-8 text-muted-foreground hover:text-foreground"
+                    />
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={cn(
-                      'h-7 px-2.5 gap-1.5',
-                      plannedViewMode === 'calendar' && 'bg-background shadow-sm'
-                    )}
-                    onClick={() => setPlannedViewMode('calendar')}
+                    className="h-8 px-2.5 text-xs text-muted-foreground hover:text-foreground"
+                    onClick={() => navigate('/planned-payments')}
                   >
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    <span className="text-xs hidden sm:inline">Календарь</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline ml-1.5">Открыть</span>
                   </Button>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGeneratePlanned}
-                  disabled={generatePlanned.isPending || createBudget.isPending}
-                >
-                  <RefreshCw
-                    className={cn(
-                      'mr-2 h-4 w-4',
-                      generatePlanned.isPending && 'animate-spin'
-                    )}
-                  />
-                  Сгенерировать
-                </Button>
-                {budget?.id && (
-                  <AddPlannedExpenseDialog
-                    budgetId={budget.id}
-                    year={year}
-                    month={month}
-                    categories={categories}
-                    funds={fundsRaw}
-                    onAdd={handleAddPlannedExpense}
-                    isPending={createPlanned.isPending}
-                  />
-                )}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => navigate('/planned-payments')}
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Открыть
-                </Button>
               </div>
             }
           >
-            {plannedViewMode === 'list' ? (
+            {plannedViewMode === 'list' && (
               <PlannedExpensesSection
                 expenses={plannedExpenses}
                 accounts={accounts}
                 categories={categories}
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
+                onUnconfirm={handleUnconfirmPlanned}
                 onDelete={handleDeletePlanned}
                 onGenerate={handleGeneratePlanned}
                 isGenerating={generatePlanned.isPending || createBudget.isPending}
-                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || unconfirmPlanned.isPending || deletePlanned.isPending}
                 hideWrapper
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
-            ) : (
+            )}
+            {plannedViewMode === 'category' && (
+              <PlannedExpensesByCategory
+                expenses={plannedExpenses}
+                accounts={accounts}
+                categories={categories}
+                onConfirm={handleConfirmPlanned}
+                onSkip={handleSkipPlanned}
+                onUnconfirm={handleUnconfirmPlanned}
+                onDelete={handleDeletePlanned}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || unconfirmPlanned.isPending || deletePlanned.isPending}
+                onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
+              />
+            )}
+            {plannedViewMode === 'calendar' && (
               <PaymentCalendar
                 expenses={plannedExpenses}
                 incomes={plannedIncomes}
@@ -1187,6 +1265,9 @@ export default function BudgetPage() {
                 month={month}
               />
             )}
+
+            {/* Футер с итогами по валютам */}
+            <PlannedExpensesTotals expenses={plannedExpenses} />
           </CollapsibleSection>
 
           {/* Секция 2: Таблица категорий */}
@@ -1272,6 +1353,11 @@ export default function BudgetPage() {
         onSave={handleSaveCurrencyBuffers}
         onRecalculate={handleRecalculateLimits}
         isPending={setCurrencyBuffer.isPending}
+        actualExpensesByCurrency={
+          bufferEditingItem?.categoryId
+            ? expensesByCategoryAndCurrency[bufferEditingItem.categoryId] ?? {}
+            : {}
+        }
       />
 
       {/* Floating Budget Balance */}

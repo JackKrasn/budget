@@ -17,6 +17,7 @@ import CreditsPage from '@/pages/credits/page'
 import CreditDetailsPage from '@/pages/credits/[id]/page'
 import DepositDetailsPage from '@/pages/deposits/[id]/page'
 import CategoriesPage from '@/pages/categories/page'
+import TagsPage from '@/pages/tags/page'
 import AnalyticsPage from '@/pages/analytics/page'
 import TemplatesPage from '@/pages/templates/page'
 import ExchangeRatesPage from '@/pages/exchange-rates/page'
@@ -90,6 +91,10 @@ export const router = createBrowserRouter([
       {
         path: 'categories',
         element: <CategoriesPage />,
+      },
+      {
+        path: 'tags',
+        element: <TagsPage />,
       },
       {
         path: 'assets',

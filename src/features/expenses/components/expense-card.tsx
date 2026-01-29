@@ -22,6 +22,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip'
+import { AccountIcon } from '@/components/ui/account-icon'
 import { getIconByName } from '@/lib/icon-registry'
 import type { ExpenseListRow } from '@/lib/api/types'
 import { CURRENCY_SYMBOLS } from '@/types'
@@ -284,14 +285,23 @@ export function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
   )
 }
 
+// Account info for display
+interface AccountInfo {
+  name: string
+  bankName?: string | null
+  typeCode?: string | null
+  color?: string | null
+}
+
 // Compact row version for list view
 interface ExpenseRowProps {
   expense: ExpenseListRow
+  account?: AccountInfo
   onEdit?: () => void
   onDelete?: () => void
 }
 
-export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
+export function ExpenseRow({ expense, account, onEdit, onDelete }: ExpenseRowProps) {
   const Icon = getIconByName(expense.categoryIcon)
 
   return (
@@ -347,10 +357,19 @@ export function ExpenseRow({ expense, onEdit, onDelete }: ExpenseRowProps) {
         )}
       </div>
 
-      {/* Date */}
-      <span className="text-sm text-muted-foreground shrink-0 w-16 text-right">
-        {formatDate(expense.date)}
-      </span>
+      {/* Account */}
+      {account && (
+        <div className="flex items-center gap-1.5 text-sm text-muted-foreground shrink-0">
+          <AccountIcon
+            bankName={account.bankName}
+            typeCode={account.typeCode}
+            color={account.color}
+            size="sm"
+            showBackground={false}
+          />
+          <span className="truncate max-w-[100px]">{account.name}</span>
+        </div>
+      )}
 
       {/* Amount */}
       <div className="shrink-0 w-32 text-right">

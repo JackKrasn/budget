@@ -112,6 +112,32 @@ export function useExpenses(params?) {
 - Toast notifications: `sonner` library
 - Icons: `lucide-react`
 
+### Reusable UI Components
+
+#### AccountIcon
+
+Use `AccountIcon` from `@/components/ui/account-icon` to display bank account icons with automatic bank logo detection.
+
+```typescript
+import { AccountIcon } from '@/components/ui/account-icon'
+
+// With bank logo (auto-detected from bank name)
+<AccountIcon
+  bankName={account.bank_name}   // e.g. "Тинькофф", "Сбер" - shows bank logo
+  typeCode={account.type_code}   // e.g. "card", "cash" - fallback icon
+  color={account.color}          // icon/background tint color
+  size="sm"                      // "sm" | "md" | "lg"
+  showBackground={false}         // true = with colored bg, false = icon only
+/>
+```
+
+Props:
+- `bankName` - Bank name for logo lookup (uses `@/lib/banks` registry)
+- `typeCode` - Account type for fallback icon: `card`, `cash`, `deposit`, `credit`, `investment`, `crypto_wallet`
+- `color` - Custom color for icon/background
+- `size` - Icon size: `sm` (16px), `md` (20px), `lg` (24px)
+- `showBackground` - Whether to show colored background container
+
 ## Version Management
 
 Update version in both files when releasing:

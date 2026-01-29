@@ -12,6 +12,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  LayoutGrid,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +25,7 @@ import {
   usePlannedExpenses,
   useConfirmPlannedExpenseWithExpense,
   useSkipPlannedExpense,
+  useUnconfirmPlannedExpense,
   useDeletePlannedExpense,
   useGeneratePlannedExpenses,
   useCreatePlannedExpense,
@@ -32,10 +34,12 @@ import {
   useGeneratePlannedIncomes,
   useCreateIncomeAndReceive,
   PlannedExpensesSection,
+  PlannedExpensesByCategory,
   PlannedIncomesSection,
   AddPlannedExpenseDialog,
   ReceiveIncomeDialog,
   PaymentCalendar,
+  PlannedExpensesTotals,
 } from '@/features/budget'
 import { useExpenseCategories } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
@@ -47,7 +51,7 @@ export default function PlannedPaymentsPage() {
   const now = new Date()
   const [year, setYear] = useState(now.getFullYear())
   const [month, setMonth] = useState(now.getMonth() + 1)
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'category' | 'calendar'>('category')
   const [receiveIncomeDialogOpen, setReceiveIncomeDialogOpen] = useState(false)
   const [receivingIncome, setReceivingIncome] = useState<PlannedIncome | null>(null)
 
@@ -72,6 +76,7 @@ export default function PlannedPaymentsPage() {
   const createBudget = useCreateBudget()
   const confirmPlannedWithExpense = useConfirmPlannedExpenseWithExpense()
   const skipPlanned = useSkipPlannedExpense()
+  const unconfirmPlanned = useUnconfirmPlannedExpense()
   const deletePlanned = useDeletePlannedExpense()
   const generatePlanned = useGeneratePlannedExpenses()
   const createPlanned = useCreatePlannedExpense()
@@ -146,8 +151,10 @@ export default function PlannedPaymentsPage() {
     data: {
       actualAmount?: number
       accountId: string
+      categoryId?: string
       date: string
       notes?: string
+      tagIds?: string[]
     }
   ) => {
     try {
@@ -176,6 +183,14 @@ export default function PlannedPaymentsPage() {
     }
   }
 
+  const handleUnconfirmPlanned = async (id: string) => {
+    try {
+      await unconfirmPlanned.mutateAsync({ id, budgetId })
+    } catch {
+      // Ошибка обрабатывается в хуке
+    }
+  }
+
   const handleGeneratePlanned = async () => {
     if (!budgetId) {
       // Создаём бюджет если его нет
@@ -199,6 +214,7 @@ export default function PlannedPaymentsPage() {
   const handleAddPlannedExpense = async (data: {
     budgetId: string
     categoryId: string
+    accountId?: string
     fundId?: string
     fundAssetId?: string
     fundedAmount?: number
@@ -297,6 +313,18 @@ export default function PlannedPaymentsPage() {
             >
               <List className="h-4 w-4" />
               <span className="text-sm hidden sm:inline">Список</span>
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className={cn(
+                'h-8 px-3 gap-1.5',
+                viewMode === 'category' && 'bg-background shadow-sm'
+              )}
+              onClick={() => setViewMode('category')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+              <span className="text-sm hidden sm:inline">Категории</span>
             </Button>
             <Button
               variant="ghost"
@@ -424,6 +452,7 @@ export default function PlannedPaymentsPage() {
             year={year}
             month={month}
             categories={categories}
+            accounts={accounts}
             funds={fundsRaw}
             onAdd={handleAddPlannedExpense}
             isPending={createPlanned.isPending}
@@ -432,7 +461,7 @@ export default function PlannedPaymentsPage() {
       </div>
 
       {/* Основной контент */}
-      {viewMode === 'list' ? (
+      {viewMode === 'list' && (
         <div className="space-y-6">
           {/* Доходы */}
           <Card>
@@ -481,16 +510,79 @@ export default function PlannedPaymentsPage() {
                 onConfirm={handleConfirmPlanned}
                 onSkip={handleSkipPlanned}
                 onDelete={handleDeletePlanned}
+                onUnconfirm={handleUnconfirmPlanned}
                 onGenerate={handleGeneratePlanned}
                 isGenerating={generatePlanned.isPending || createBudget.isPending}
-                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending || unconfirmPlanned.isPending}
                 hideWrapper
                 onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
               />
+              <PlannedExpensesTotals expenses={plannedExpenses} />
             </CardContent>
           </Card>
         </div>
-      ) : (
+      )}
+
+      {viewMode === 'category' && (
+        <div className="space-y-6">
+          {/* Доходы */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Banknote className="h-5 w-5 text-emerald-500" />
+                <CardTitle className="text-base">Запланированные доходы</CardTitle>
+                {stats.pendingIncomesCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {stats.pendingIncomesCount} ожидают
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <PlannedIncomesSection
+                incomes={plannedIncomes}
+                onReceive={handleReceiveIncome}
+                onSkip={handleSkipIncome}
+                isPending={skipPlannedIncome.isPending || createIncomeAndReceive.isPending}
+                onIncomeClick={(incomeId) => navigate(`/incomes/${incomeId}`)}
+                onPlannedIncomeClick={(plannedIncomeId) => navigate(`/planned-incomes/${plannedIncomeId}`)}
+                hideWrapper
+              />
+            </CardContent>
+          </Card>
+
+          {/* Расходы по категориям */}
+          <Card>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-2">
+                <Receipt className="h-5 w-5 text-orange-500" />
+                <CardTitle className="text-base">Расходы по категориям</CardTitle>
+                {stats.pendingExpensesCount > 0 && (
+                  <Badge variant="secondary" className="ml-auto">
+                    {stats.pendingExpensesCount} ожидают
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <PlannedExpensesByCategory
+                expenses={plannedExpenses}
+                accounts={accounts}
+                categories={categories}
+                onConfirm={handleConfirmPlanned}
+                onSkip={handleSkipPlanned}
+                onDelete={handleDeletePlanned}
+                onUnconfirm={handleUnconfirmPlanned}
+                isPending={confirmPlannedWithExpense.isPending || skipPlanned.isPending || deletePlanned.isPending || unconfirmPlanned.isPending}
+                onExpenseClick={(expenseId) => navigate(`/planned-expenses/${expenseId}`)}
+              />
+              <PlannedExpensesTotals expenses={plannedExpenses} />
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      {viewMode === 'calendar' && (
         <Card>
           <CardContent className="p-4">
             <PaymentCalendar
@@ -501,6 +593,7 @@ export default function PlannedPaymentsPage() {
               onExpenseClick={(expense) => navigate(`/planned-expenses/${expense.id}`)}
               onIncomeClick={(income) => navigate(`/planned-incomes/${income.id}`)}
             />
+            <PlannedExpensesTotals expenses={plannedExpenses} />
           </CardContent>
         </Card>
       )}

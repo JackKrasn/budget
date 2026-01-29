@@ -1,10 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
-import { Check, PiggyBank, CalendarIcon } from 'lucide-react'
+import { Check, PiggyBank, CalendarIcon, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -37,9 +37,18 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover'
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from '@/components/ui/command'
 import { Calendar } from '@/components/ui/calendar'
 import { CategoryIcon } from '@/components/common'
 import { AccountIcon } from '@/components/ui/account-icon'
+import { TagSelector, useExpenseCategories } from '@/features/expenses'
 import { cn } from '@/lib/utils'
 import type { PlannedExpenseWithDetails, AccountWithType } from '@/lib/api/types'
 import { CURRENCY_SYMBOLS } from '@/types'
@@ -47,6 +56,7 @@ import { CURRENCY_SYMBOLS } from '@/types'
 const formSchema = z.object({
   actualAmount: z.string().optional(),
   accountId: z.string().min(1, 'Выберите счёт'),
+  categoryId: z.string().min(1, 'Выберите категорию'),
   date: z.string().min(1, 'Выберите дату'),
   notes: z.string().optional(),
 })
@@ -63,6 +73,8 @@ interface ConfirmPlannedExpenseDialogProps {
     accountId: string
     date: string
     notes?: string
+    tagIds?: string[]
+    categoryId?: string
   }) => Promise<void>
   isPending?: boolean
 }
@@ -77,6 +89,14 @@ export function ConfirmPlannedExpenseDialog({
 }: ConfirmPlannedExpenseDialogProps) {
   // Дата по умолчанию — сегодня
   const today = new Date().toISOString().split('T')[0]
+
+  // Состояние для выбранных тегов
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
+  const [categoryPopoverOpen, setCategoryPopoverOpen] = useState(false)
+
+  // Получаем список категорий
+  const { data: categoriesData } = useExpenseCategories()
+  const categories = categoriesData?.data ?? []
 
   // Извлечь число из nullable типа бэкенда (может быть {Float64: number, Valid: boolean} или просто number)
   const getActualAmount = (
@@ -95,20 +115,23 @@ export function ConfirmPlannedExpenseDialog({
     defaultValues: {
       actualAmount: '',
       accountId: '',
+      categoryId: '',
       date: today,
       notes: '',
     },
   })
 
-  // При открытии диалога подставляем счёт по умолчанию из планового расхода
+  // При открытии диалога подставляем счёт и категорию по умолчанию из планового расхода
   useEffect(() => {
     if (expense && open) {
       form.reset({
         actualAmount: '',
         accountId: expense.account_id ?? '',
+        categoryId: expense.category_id ?? '',
         date: today,
         notes: '',
       })
+      setSelectedTagIds([]) // Сбрасываем теги при открытии
     }
   }, [expense, open, form, today])
 
@@ -117,10 +140,13 @@ export function ConfirmPlannedExpenseDialog({
     await onConfirm({
       actualAmount,
       accountId: data.accountId,
+      categoryId: data.categoryId,
       date: data.date,
       notes: data.notes || undefined,
+      tagIds: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     })
     form.reset()
+    setSelectedTagIds([])
     onOpenChange(false)
   }
 
@@ -269,6 +295,79 @@ export function ConfirmPlannedExpenseDialog({
 
             <FormField
               control={form.control}
+              name="categoryId"
+              render={({ field }) => {
+                const selectedCategory = categories.find(c => c.id === field.value)
+                return (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Категория</FormLabel>
+                    <Popover open={categoryPopoverOpen} onOpenChange={setCategoryPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            className={cn(
+                              'w-full justify-between',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {selectedCategory ? (
+                              <div className="flex items-center gap-2">
+                                <CategoryIcon
+                                  code={selectedCategory.code}
+                                  iconName={selectedCategory.icon}
+                                  color={selectedCategory.color}
+                                  size="sm"
+                                />
+                                <span>{selectedCategory.name}</span>
+                              </div>
+                            ) : (
+                              'Выберите категорию'
+                            )}
+                            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[300px] p-0" align="start">
+                        <Command>
+                          <CommandInput placeholder="Поиск категории..." />
+                          <CommandList>
+                            <CommandEmpty>Категория не найдена</CommandEmpty>
+                            <CommandGroup>
+                              {categories.map((category) => (
+                                <CommandItem
+                                  key={category.id}
+                                  value={category.name}
+                                  onSelect={() => {
+                                    field.onChange(category.id)
+                                    setCategoryPopoverOpen(false)
+                                  }}
+                                >
+                                  <div className="flex items-center gap-2">
+                                    <CategoryIcon
+                                      code={category.code}
+                                      iconName={category.icon}
+                                      color={category.color}
+                                      size="sm"
+                                    />
+                                    <span>{category.name}</span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )
+              }}
+            />
+
+            <FormField
+              control={form.control}
               name="date"
               render={({ field }) => {
                 const selectedDate = field.value ? new Date(field.value) : undefined
@@ -325,6 +424,11 @@ export function ConfirmPlannedExpenseDialog({
                   </FormItem>
                 )
               }}
+            />
+
+            <TagSelector
+              selectedTagIds={selectedTagIds}
+              onTagsChange={setSelectedTagIds}
             />
 
             <FormField
