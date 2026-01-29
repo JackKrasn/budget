@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { accountsApi, accountTypesApi } from '@/lib/api'
-import type { CreateAccountRequest, UpdateAccountRequest } from '@/lib/api'
+import type { CreateAccountRequest, UpdateAccountRequest, ApplyReservesRequest, RepayRequest } from '@/lib/api'
 import { toast } from 'sonner'
 
 // === Query Keys ===
@@ -11,6 +11,7 @@ export const accountKeys = {
   list: () => [...accountKeys.lists()] as const,
   details: () => [...accountKeys.all, 'detail'] as const,
   detail: (id: string) => [...accountKeys.details(), id] as const,
+  reserves: (id: string) => [...accountKeys.all, 'reserves', id] as const,
 }
 
 export const accountTypeKeys = {
@@ -94,6 +95,68 @@ export function useDeleteAccount() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
       toast.success('Счёт удалён')
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+// === Credit Card Reserves Hooks ===
+
+/**
+ * Получить pending резервы кредитной карты
+ */
+export function useCreditCardReserves(creditCardId: string) {
+  return useQuery({
+    queryKey: accountKeys.reserves(creditCardId),
+    queryFn: () => accountsApi.getReserves(creditCardId),
+    enabled: !!creditCardId,
+  })
+}
+
+/**
+ * Применить резервы (учётная операция)
+ */
+export function useApplyReserves() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ creditCardId, data }: { creditCardId: string; data: ApplyReservesRequest }) =>
+      accountsApi.applyReserves(creditCardId, data),
+    onSuccess: (result, variables) => {
+      queryClient.invalidateQueries({ queryKey: accountKeys.reserves(variables.creditCardId) })
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      toast.success(`Применено резервов: ${result.appliedCount} на сумму ${result.appliedAmount.toLocaleString('ru-RU')} ₽`)
+    },
+    onError: (error) => {
+      toast.error(`Ошибка: ${error.message}`)
+    },
+  })
+}
+
+/**
+ * Погасить кредитную карту с авто-применением резервов
+ */
+export function useRepayCredit() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: ({ creditCardId, data }: { creditCardId: string; data: RepayRequest }) =>
+      accountsApi.repay(creditCardId, data),
+    onSuccess: (result, variables) => {
+      // Инвалидируем резервы кредитной карты
+      queryClient.invalidateQueries({ queryKey: accountKeys.reserves(variables.creditCardId) })
+      // Инвалидируем список счетов (для обновления балансов в списке)
+      queryClient.invalidateQueries({ queryKey: accountKeys.lists() })
+      // Инвалидируем детальную страницу кредитной карты
+      queryClient.invalidateQueries({ queryKey: accountKeys.detail(variables.creditCardId) })
+      // Инвалидируем детальную страницу счёта-источника
+      queryClient.invalidateQueries({ queryKey: accountKeys.detail(variables.data.fromAccountId) })
+      const reservesInfo = result.appliedReserves > 0
+        ? ` (применено резервов: ${result.reservedAmount.toLocaleString('ru-RU')} ₽)`
+        : ''
+      toast.success(`Кредитная карта погашена${reservesInfo}`)
     },
     onError: (error) => {
       toast.error(`Ошибка: ${error.message}`)

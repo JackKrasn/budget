@@ -109,11 +109,8 @@ export function useCreateCredit() {
         const year = now.getFullYear()
         const month = now.getMonth() + 1
 
-        console.log('[CREDIT] Looking for budgets:', { year, month })
         // Ищем любые бюджеты (включая черновики)
         const response = await budgetsApi.list({ year })
-        console.log('[CREDIT] API response:', response)
-        console.log('[CREDIT] Available budgets:', response.data)
 
         // Сначала пробуем найти бюджет для текущего месяца
         let targetBudget = response.data.find((b: Budget) => b.month === month)
@@ -121,25 +118,18 @@ export function useCreateCredit() {
         // Если нет бюджета для текущего месяца, берём первый доступный бюджет
         if (!targetBudget && response.data.length > 0) {
           targetBudget = response.data[0]
-          console.log('[CREDIT] No budget for current month, using first available:', targetBudget)
         }
 
-        console.log('[CREDIT] Target budget:', targetBudget)
-
         if (targetBudget?.id) {
-          console.log('[CREDIT] Calling generateCreditPayments for budget:', targetBudget.id)
           const result = await budgetsApi.generateCreditPayments(targetBudget.id)
-          console.log('[CREDIT] Generated payments result:', result)
           queryClient.invalidateQueries({ queryKey: plannedExpenseKeys.lists() })
 
           const budgetMonth = new Date(year, targetBudget.month - 1).toLocaleDateString('ru-RU', { month: 'long', year: 'numeric' })
           toast.success(`Кредит создан. Добавлено ${result.generated} запланированных платежей в бюджет ${budgetMonth}`)
         } else {
-          console.log('[CREDIT] No budgets found')
           toast.success('Кредит успешно создан. Создайте бюджет для генерации запланированных платежей.')
         }
       } catch (error) {
-        console.error('[CREDIT] Error generating credit payments:', error)
         toast.error(`Кредит создан, но не удалось создать запланированные платежи: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`)
       }
     },

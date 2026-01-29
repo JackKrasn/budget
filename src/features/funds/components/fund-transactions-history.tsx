@@ -16,6 +16,7 @@ import {
   Wallet,
   Pencil,
   CalendarDays,
+  CreditCard,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -105,6 +106,7 @@ function getTransactionIcon(type: FundTransactionType) {
     deposit: Plus,
     withdrawal: Receipt,
     contribution: Wallet,
+    reserve: CreditCard,
   }
   return icons[type] || ShoppingCart
 }
@@ -146,6 +148,7 @@ const ALL_TRANSACTION_TYPES: FundTransactionType[] = [
   'transfer_out',
   'deposit',
   'withdrawal',
+  'reserve',
 ]
 
 export function FundTransactionsHistory({ fundId, assetId, assetName, onClearAssetFilter }: FundTransactionsHistoryProps) {
@@ -590,10 +593,10 @@ export function FundTransactionsHistory({ fundId, assetId, assetName, onClearAss
                             {isContribution
                               ? `+${formatMoney(displayAmount)} ${getCurrencySymbol(displayCurrency)}`
                               : item.transaction_type === 'buy' || item.transaction_type === 'sell'
-                                ? `${item.transaction_type === 'buy' ? '+' : '-'}${formatMoney(displayAmount)}`
-                                : item.transaction_type === 'transfer_out' || item.transaction_type === 'withdrawal'
-                                  ? `-${formatMoney(displayAmount)}`
-                                  : `+${formatMoney(displayAmount)}`}{' '}
+                                ? `${item.transaction_type === 'buy' ? '+' : '-'}${formatMoney(Math.abs(displayAmount))}`
+                                : item.transaction_type === 'transfer_out' || item.transaction_type === 'withdrawal' || item.transaction_type === 'reserve'
+                                  ? `-${formatMoney(Math.abs(displayAmount))}`
+                                  : `+${formatMoney(Math.abs(displayAmount))}`}{' '}
                             {!isContribution && displayLabel}
                           </p>
                           {isContribution && (

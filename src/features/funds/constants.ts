@@ -51,6 +51,12 @@ export const TRANSACTION_TYPES: Record<
     color: 'green',
     description: 'Поступление в фонд / начальный остаток',
   },
+  reserve: {
+    label: 'Резерв',
+    icon: 'CreditCard',
+    color: 'orange',
+    description: 'Резервирование для кредитной карты',
+  },
 }
 
 export const ERROR_MESSAGES = {

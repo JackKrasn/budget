@@ -6,6 +6,7 @@ import FundsPage from '@/pages/funds/page'
 import FundDetailsPage from '@/pages/funds/[id]/page'
 import AssetsPage from '@/pages/assets/page'
 import AccountsPage from '@/pages/accounts/page'
+import AccountDetailsPage from '@/pages/accounts/[id]/page'
 import ExpensesPage from '@/pages/expenses/page'
 import OperationsPage from '@/pages/operations/page'
 import IncomesPage from '@/pages/incomes/page'
@@ -103,6 +104,10 @@ export const router = createBrowserRouter([
       {
         path: 'accounts',
         element: <AccountsPage />,
+      },
+      {
+        path: 'accounts/:id',
+        element: <AccountDetailsPage />,
       },
       {
         path: 'analytics',

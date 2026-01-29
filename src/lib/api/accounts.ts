@@ -5,6 +5,11 @@ import type {
   AccountsListResponse,
   CreateAccountRequest,
   UpdateAccountRequest,
+  CreditCardReservesResponse,
+  ApplyReservesRequest,
+  ApplyReservesResponse,
+  RepayRequest,
+  RepayResponse,
 } from './types'
 
 const ENDPOINT = '/accounts'
@@ -35,4 +40,22 @@ export const accountsApi = {
    * Удалить счёт
    */
   delete: (id: string) => apiClient.delete<void>(`${ENDPOINT}/${id}`),
+
+  /**
+   * Получить pending резервы кредитной карты
+   */
+  getReserves: (creditCardId: string) =>
+    apiClient.get<CreditCardReservesResponse>(`${ENDPOINT}/${creditCardId}/reserves`),
+
+  /**
+   * Применить резервы (учётная операция)
+   */
+  applyReserves: (creditCardId: string, data: ApplyReservesRequest) =>
+    apiClient.post<ApplyReservesResponse>(`${ENDPOINT}/${creditCardId}/apply-reserves`, data),
+
+  /**
+   * Погасить кредитную карту с авто-применением резервов
+   */
+  repay: (creditCardId: string, data: RepayRequest) =>
+    apiClient.post<RepayResponse>(`${ENDPOINT}/${creditCardId}/repay`, data),
 }

@@ -9,6 +9,7 @@ import {
   Receipt,
   CreditCard,
   AlertTriangle,
+  Info,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -40,6 +41,7 @@ interface AccountCardProps {
   onArchive?: () => void
   onDelete?: () => void
   onSyncBalance?: () => void
+  onRepay?: () => void
 }
 
 export function AccountCard({
@@ -48,6 +50,7 @@ export function AccountCard({
   onArchive,
   onDelete,
   onSyncBalance,
+  onRepay,
 }: AccountCardProps) {
   const navigate = useNavigate()
   const currencySymbol = CURRENCY_SYMBOLS[account.currency] || account.currency
@@ -134,10 +137,20 @@ export function AccountCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate(`/accounts/${account.id}`)}>
+                    <Info className="mr-2 h-4 w-4" />
+                    Подробнее
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleCardClick}>
                     <Receipt className="mr-2 h-4 w-4" />
                     Операции
                   </DropdownMenuItem>
+                  {account.is_credit && account.current_balance < 0 && (
+                    <DropdownMenuItem onClick={onRepay}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Погасить
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={onSyncBalance}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Синхронизировать баланс
