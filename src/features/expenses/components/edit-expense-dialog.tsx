@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/popover'
 import { format } from 'date-fns'
 import { ru } from 'date-fns/locale'
+import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
 
 // Форматирует дату в YYYY-MM-DD без смещения часового пояса
 function formatDateToString(date: Date): string {
@@ -53,11 +55,31 @@ import {
 } from '@/components/ui/select'
 import { useUpdateExpense, useExpenseCategories } from '../hooks'
 import { useAccounts } from '@/features/accounts'
+import { useFunds } from '@/features/funds'
 import { TagSelector } from './tag-selector'
-import { CalendarIcon } from 'lucide-react'
+import {
+  Wallet,
+  Plus,
+  X,
+  CalendarIcon,
+  Sparkles,
+  ChevronRight,
+} from 'lucide-react'
 import { getIconByName } from '@/lib/icon-registry'
 import { AccountIcon } from '@/components/ui/account-icon'
 import type { ExpenseListRow } from '@/lib/api/types'
+
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  RUB: '₽',
+  USD: '$',
+  EUR: '€',
+  GEL: '₾',
+  TRY: '₺',
+}
+
+function getCurrencySymbol(currency: string): string {
+  return CURRENCY_SYMBOLS[currency] ?? currency
+}
 
 const formSchema = z.object({
   categoryId: z.string().min(1, 'Выберите категорию'),
@@ -67,9 +89,20 @@ const formSchema = z.object({
   date: z.string().min(1, 'Введите дату'),
   description: z.string().optional(),
   tagIds: z.array(z.string()).optional(),
+  useFundAllocation: z.boolean(),
 })
 
 type FormValues = z.infer<typeof formSchema>
+
+interface FundAllocation {
+  fundId: string
+  fundName: string
+  fundColor: string
+  assetId: string
+  assetName: string
+  amount: number
+  maxAmount: number
+}
 
 interface EditExpenseDialogProps {
   expense: ExpenseListRow | null
@@ -82,12 +115,20 @@ export function EditExpenseDialog({
   open,
   onOpenChange,
 }: EditExpenseDialogProps) {
+  const [fundAllocations, setFundAllocations] = useState<FundAllocation[]>([])
+  const [selectedFundId, setSelectedFundId] = useState<string>('')
+  const [selectedAssetId, setSelectedAssetId] = useState<string>('')
+  const [fundAmount, setFundAmount] = useState<string>('')
+  const [initialAllocationsLoaded, setInitialAllocationsLoaded] = useState(false)
+
   const updateExpense = useUpdateExpense()
   const { data: categoriesData } = useExpenseCategories()
   const { data: accountsData } = useAccounts()
+  const { data: fundsData } = useFunds()
 
   const categories = categoriesData?.data ?? []
   const accounts = accountsData?.data ?? []
+  const funds = useMemo(() => fundsData?.data ?? [], [fundsData?.data])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -99,15 +140,52 @@ export function EditExpenseDialog({
       date: new Date().toISOString().split('T')[0],
       description: '',
       tagIds: [],
+      useFundAllocation: false,
     },
   })
 
+  const watchedAmount = form.watch('amount')
+  const watchedCurrency = form.watch('currency')
+  const totalAmount = parseFloat(watchedAmount || '0')
+  const totalFromFunds = fundAllocations.reduce((sum, a) => sum + a.amount, 0)
+  const remainingAmount = Math.max(0, totalAmount - totalFromFunds)
   const selectedAccountId = form.watch('accountId')
   const selectedAccount = accounts.find((acc) => acc.id === selectedAccountId)
+  const currencySymbol = getCurrencySymbol(watchedCurrency)
+
+  // Available funds with currency assets
+  const availableFunds = useMemo(() => {
+    return funds.filter((f) => {
+      if (f.fund.status !== 'active') return false
+      if (fundAllocations.some((a) => a.fundId === f.fund.id)) return false
+      return f.assets.some(
+        (a) =>
+          a.asset.typeCode === 'currency' &&
+          a.asset.currency === watchedCurrency &&
+          a.amount > 0
+      )
+    })
+  }, [funds, fundAllocations, watchedCurrency])
+
+  // Selected fund data
+  const selectedFund = useMemo(() => {
+    return funds.find((f) => f.fund.id === selectedFundId)
+  }, [funds, selectedFundId])
+
+  // Available assets for selected fund
+  const availableAssets = useMemo(() => {
+    if (!selectedFund) return []
+    return selectedFund.assets.filter(
+      (a) =>
+        a.asset.typeCode === 'currency' &&
+        a.asset.currency === watchedCurrency &&
+        a.amount > 0
+    )
+  }, [selectedFund, watchedCurrency])
 
   // Load expense data into form
   useEffect(() => {
-    if (expense) {
+    if (expense && open) {
       form.reset({
         categoryId: expense.categoryId,
         accountId: expense.accountId,
@@ -116,9 +194,39 @@ export function EditExpenseDialog({
         date: expense.date.split('T')[0],
         description: expense.description || '',
         tagIds: expense.tags?.map((tag) => tag.id) || [],
+        useFundAllocation: (expense.fundAllocations?.length ?? 0) > 0,
       })
+
+      // Load existing fund allocations
+      if (expense.fundAllocations && expense.fundAllocations.length > 0 && funds.length > 0 && !initialAllocationsLoaded) {
+        const loadedAllocations: FundAllocation[] = []
+
+        for (const allocation of expense.fundAllocations) {
+          const fund = funds.find((f) => f.fund.id === allocation.fundId)
+          if (fund) {
+            // Find currency asset for this fund
+            const currencyAsset = fund.assets.find(
+              (a) => a.asset.typeCode === 'currency' && a.asset.currency === expense.currency
+            )
+            if (currencyAsset) {
+              loadedAllocations.push({
+                fundId: allocation.fundId,
+                fundName: allocation.fundName,
+                fundColor: allocation.fundColor,
+                assetId: currencyAsset.asset.id,
+                assetName: currencyAsset.asset.name,
+                amount: allocation.amount,
+                maxAmount: currencyAsset.amount + allocation.amount, // Add back the allocated amount
+              })
+            }
+          }
+        }
+
+        setFundAllocations(loadedAllocations)
+        setInitialAllocationsLoaded(true)
+      }
     }
-  }, [expense, form])
+  }, [expense, open, form, funds, initialAllocationsLoaded])
 
   // Автоматически устанавливаем валюту при смене счёта
   useEffect(() => {
@@ -127,8 +235,104 @@ export function EditExpenseDialog({
     }
   }, [selectedAccount, expense?.accountId, form])
 
+  // Auto-select single asset when fund is selected
+  useEffect(() => {
+    if (availableAssets.length === 1 && !selectedAssetId) {
+      setSelectedAssetId(availableAssets[0].asset.id)
+    }
+  }, [availableAssets, selectedAssetId])
+
+  // Reset fund allocations when currency changes (only if not loading initial data)
+  useEffect(() => {
+    if (initialAllocationsLoaded && fundAllocations.length > 0) {
+      // Check if currency changed from expense currency
+      if (expense && watchedCurrency !== expense.currency) {
+        setFundAllocations([])
+      }
+    }
+    setSelectedFundId('')
+    setSelectedAssetId('')
+    setFundAmount('')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watchedCurrency])
+
+  // Reset state when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setFundAllocations([])
+      setSelectedFundId('')
+      setSelectedAssetId('')
+      setFundAmount('')
+      setInitialAllocationsLoaded(false)
+    }
+  }, [open])
+
+  const addFundAllocation = () => {
+    if (!selectedFundId || !selectedAssetId || !fundAmount) return
+
+    const fund = funds.find((f) => f.fund.id === selectedFundId)
+    if (!fund) return
+
+    const asset = fund.assets.find((a) => a.asset.id === selectedAssetId)
+    if (!asset) return
+
+    const amount = parseFloat(fundAmount)
+    if (isNaN(amount) || amount <= 0) return
+
+    if (fundAllocations.some((a) => a.fundId === selectedFundId)) {
+      return
+    }
+
+    setFundAllocations([
+      ...fundAllocations,
+      {
+        fundId: selectedFundId,
+        fundName: fund.fund.name,
+        fundColor: fund.fund.color,
+        assetId: selectedAssetId,
+        assetName: asset.asset.name,
+        amount,
+        maxAmount: asset.amount,
+      },
+    ])
+    setSelectedFundId('')
+    setSelectedAssetId('')
+    setFundAmount('')
+  }
+
+  const removeFundAllocation = (fundId: string) => {
+    setFundAllocations(fundAllocations.filter((a) => a.fundId !== fundId))
+  }
+
+  const setMaxAmount = () => {
+    const asset = availableAssets.find((a) => a.asset.id === selectedAssetId)
+    if (asset) {
+      const maxAvailable = Math.min(asset.amount, remainingAmount || totalAmount || asset.amount)
+      setFundAmount(maxAvailable.toString())
+    }
+  }
+
   async function onSubmit(values: FormValues) {
     if (!expense) return
+
+    // Determine fund allocations to send
+    // If user has allocations - send them, if empty array - send empty to clear
+    // If switch is off and there were original allocations - send empty to clear
+    const hasOriginalAllocations = (expense.fundAllocations?.length ?? 0) > 0
+    let allocationsToSend: { fundId: string; assetId: string; amount: number }[] | undefined
+
+    if (fundAllocations.length > 0) {
+      // Send new allocations
+      allocationsToSend = fundAllocations.map((a) => ({
+        fundId: a.fundId,
+        assetId: a.assetId,
+        amount: a.amount,
+      }))
+    } else if (hasOriginalAllocations && !values.useFundAllocation) {
+      // Clear all allocations
+      allocationsToSend = []
+    }
+    // If undefined - allocations won't change
 
     try {
       await updateExpense.mutateAsync({
@@ -141,6 +345,7 @@ export function EditExpenseDialog({
           date: values.date,
           description: values.description || undefined,
           tagIds: values.tagIds || [],
+          fundAllocations: allocationsToSend,
         },
       })
 
@@ -150,69 +355,196 @@ export function EditExpenseDialog({
     }
   }
 
+  const hasFundsWithCurrency = availableFunds.length > 0 || fundAllocations.length > 0
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px]">
-        <DialogHeader>
+      <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-[500px] p-0 gap-0 bg-background">
+        <DialogHeader className="px-5 pt-4 pb-3 border-b border-border/40">
           <DialogTitle>Редактировать расход</DialogTitle>
           <DialogDescription>Измените информацию о расходе</DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Account */}
-            <FormField
-              control={form.control}
-              name="accountId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Счёт</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите счёт" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {accounts.map((acc) => (
-                        <SelectItem key={acc.id} value={acc.id}>
-                          <div className="flex items-center justify-between gap-3 w-full">
-                            <div className="flex items-center gap-2">
-                              <AccountIcon
-                                bankName={acc.bank_name}
-                                typeCode={acc.type_code}
-                                color={acc.color}
-                                size="sm"
-                                showBackground={false}
-                              />
-                              <span>{acc.name}</span>
-                            </div>
-                            <span className="text-muted-foreground text-sm tabular-nums">
-                              {(acc.current_balance ?? 0).toLocaleString('ru-RU')} {acc.currency === 'RUB' ? '₽' : acc.currency}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Amount and Currency */}
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col">
+            <div className="px-5 py-4 space-y-4">
+              {/* Account */}
               <FormField
                 control={form.control}
-                name="amount"
+                name="accountId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Сумма</FormLabel>
+                    <FormLabel>Счёт</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите счёт" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {accounts.map((acc) => (
+                          <SelectItem key={acc.id} value={acc.id}>
+                            <div className="flex items-center justify-between gap-3 w-full">
+                              <div className="flex items-center gap-2">
+                                <AccountIcon
+                                  bankName={acc.bank_name}
+                                  typeCode={acc.type_code}
+                                  color={acc.color}
+                                  size="sm"
+                                  showBackground={false}
+                                />
+                                <span>{acc.name}</span>
+                              </div>
+                              <span className="text-muted-foreground text-sm tabular-nums">
+                                {(acc.current_balance ?? 0).toLocaleString('ru-RU')} {getCurrencySymbol(acc.currency)}
+                              </span>
+                            </div>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Amount and Currency */}
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="amount"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Сумма</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="0.00"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="currency"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Валюта</FormLabel>
+                      <FormControl>
+                        <div className="flex h-10 items-center rounded-md border border-input bg-muted/50 px-3 text-sm">
+                          {currencySymbol} {field.value}
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {/* Category */}
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Категория</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Выберите категорию" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {categories.map((cat) => {
+                          const Icon = getIconByName(cat.icon)
+                          return (
+                            <SelectItem key={cat.id} value={cat.id}>
+                              <div className="flex items-center gap-2">
+                                <div
+                                  className="flex h-6 w-6 items-center justify-center rounded-md"
+                                  style={{ backgroundColor: `${cat.color}20` }}
+                                >
+                                  <Icon
+                                    className="h-3.5 w-3.5"
+                                    style={{ color: cat.color }}
+                                  />
+                                </div>
+                                {cat.name}
+                              </div>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Date */}
+              <FormField
+                control={form.control}
+                name="date"
+                render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Дата</FormLabel>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant="outline"
+                            className={cn(
+                              'w-full pl-3 text-left font-normal',
+                              !field.value && 'text-muted-foreground'
+                            )}
+                          >
+                            {field.value ? (
+                              format(parseDateString(field.value), 'PPP', { locale: ru })
+                            ) : (
+                              <span>Выберите дату</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ? parseDateString(field.value) : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              field.onChange(formatDateToString(date))
+                            }
+                          }}
+                          disabled={(date) =>
+                            date > new Date() || date < new Date(2020, 0, 1)
+                          }
+                          locale={ru}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Description */}
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Описание</FormLabel>
                     <FormControl>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        placeholder="0.00"
+                      <Textarea
+                        placeholder="Необязательное описание..."
+                        className="resize-none"
                         {...field}
                       />
                     </FormControl>
@@ -221,16 +553,17 @@ export function EditExpenseDialog({
                 )}
               />
 
+              {/* Tags */}
               <FormField
                 control={form.control}
-                name="currency"
+                name="tagIds"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Валюта</FormLabel>
                     <FormControl>
-                      <div className="flex h-10 items-center rounded-md border border-input bg-muted/50 px-3 text-sm">
-                        {field.value === 'RUB' ? '₽ RUB' : field.value === 'USD' ? '$ USD' : field.value === 'EUR' ? '€ EUR' : field.value === 'GEL' ? '₾ GEL' : field.value === 'TRY' ? '₺ TRY' : field.value}
-                      </div>
+                      <TagSelector
+                        selectedTagIds={field.value || []}
+                        onTagsChange={field.onChange}
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -238,131 +571,270 @@ export function EditExpenseDialog({
               />
             </div>
 
-            {/* Category */}
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Категория</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Выберите категорию" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {categories.map((cat) => {
-                        const Icon = getIconByName(cat.icon)
-                        return (
-                          <SelectItem key={cat.id} value={cat.id}>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="flex h-6 w-6 items-center justify-center rounded-md"
-                                style={{ backgroundColor: `${cat.color}20` }}
-                              >
-                                <Icon
-                                  className="h-3.5 w-3.5"
-                                  style={{ color: cat.color }}
-                                />
-                              </div>
-                              {cat.name}
-                            </div>
-                          </SelectItem>
-                        )
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {/* Date */}
-            <FormField
-              control={form.control}
-              name="date"
-              render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel>Дата</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant="outline"
-                          className={cn(
-                            'w-full pl-3 text-left font-normal',
-                            !field.value && 'text-muted-foreground'
-                          )}
+            {/* Fund Allocation Section */}
+            {hasFundsWithCurrency && (
+              <div className="border-t border-border/40">
+                <div className="px-5 py-3">
+                  <FormField
+                    control={form.control}
+                    name="useFundAllocation"
+                    render={({ field }) => (
+                      <div
+                        className={cn(
+                          'rounded-xl border-2 transition-all duration-200',
+                          field.value
+                            ? 'border-emerald-500/50 bg-gradient-to-br from-emerald-500/5 to-teal-500/5'
+                            : 'border-border/40 bg-muted/50 hover:border-border/60'
+                        )}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => field.onChange(!field.value)}
+                          className="w-full p-3 flex items-center justify-between"
                         >
-                          {field.value ? (
-                            format(parseDateString(field.value), 'PPP', { locale: ru })
-                          ) : (
-                            <span>Выберите дату</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ? parseDateString(field.value) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            field.onChange(formatDateToString(date))
-                          }
-                        }}
-                        disabled={(date) =>
-                          date > new Date() || date < new Date(2020, 0, 1)
-                        }
-                        locale={ru}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                          <div className="flex items-center gap-2.5">
+                            <div
+                              className={cn(
+                                'flex h-8 w-8 items-center justify-center rounded-lg transition-colors',
+                                field.value
+                                  ? 'bg-emerald-500/20 text-emerald-600'
+                                  : 'bg-muted text-muted-foreground'
+                              )}
+                            >
+                              <Wallet className="h-4 w-4" />
+                            </div>
+                            <div className="text-left">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium text-sm">
+                                  Из фонда
+                                </span>
+                                {field.value && fundAllocations.length > 0 && (
+                                  <Badge
+                                    variant="secondary"
+                                    className="bg-emerald-500/20 text-emerald-700 border-0 text-xs px-1.5 py-0"
+                                  >
+                                    <Sparkles className="h-3 w-3 mr-0.5" />
+                                    {fundAllocations.length}
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                        </button>
 
-            {/* Description */}
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Описание</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Необязательное описание..."
-                      className="resize-none"
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                        {/* Expanded Fund Allocation Panel */}
+                        {field.value && (
+                          <div className="px-4 pb-4 space-y-3">
+                            {/* Allocations List */}
+                            {fundAllocations.length > 0 && (
+                              <div className="space-y-2">
+                                {fundAllocations.map((allocation) => (
+                                  <div
+                                    key={allocation.fundId}
+                                    className="flex items-center justify-between p-3 rounded-lg bg-background border border-border/40"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div
+                                        className="h-3 w-3 rounded-full"
+                                        style={{
+                                          backgroundColor: allocation.fundColor,
+                                        }}
+                                      />
+                                      <div>
+                                        <p className="font-medium text-sm">
+                                          {allocation.fundName}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                          {allocation.assetName}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Badge
+                                        variant="secondary"
+                                        className="font-semibold tabular-nums"
+                                      >
+                                        -{allocation.amount.toLocaleString('ru-RU')}{' '}
+                                        {currencySymbol}
+                                      </Badge>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                        onClick={() =>
+                                          removeFundAllocation(allocation.fundId)
+                                        }
+                                      >
+                                        <X className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
 
-            {/* Tags */}
-            <FormField
-              control={form.control}
-              name="tagIds"
-              render={({ field }) => (
-                <FormItem>
-                  <FormControl>
-                    <TagSelector
-                      selectedTagIds={field.value || []}
-                      onTagsChange={field.onChange}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                                {/* Summary */}
+                                <div className="flex items-center justify-between pt-2 px-1 text-sm">
+                                  <span className="text-muted-foreground">
+                                    Собственные средства:
+                                  </span>
+                                  <span
+                                    className={cn(
+                                      'font-semibold tabular-nums',
+                                      remainingAmount === 0
+                                        ? 'text-emerald-600'
+                                        : ''
+                                    )}
+                                  >
+                                    {remainingAmount.toLocaleString('ru-RU')}{' '}
+                                    {currencySymbol}
+                                  </span>
+                                </div>
+                              </div>
+                            )}
 
-            <div className="flex gap-3 pt-4">
+                            {/* Add New Allocation */}
+                            {availableFunds.length > 0 && (
+                              <div className="space-y-2 pt-2">
+                                {/* Fund Selector */}
+                                <Select
+                                  value={selectedFundId}
+                                  onValueChange={(value) => {
+                                    setSelectedFundId(value)
+                                    setSelectedAssetId('')
+                                    setFundAmount('')
+                                  }}
+                                >
+                                  <SelectTrigger className="bg-background border-border/60">
+                                    <SelectValue placeholder="Выбрать фонд..." />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {availableFunds.map((fund) => {
+                                      const currencyAsset = fund.assets.find(
+                                        (a) =>
+                                          a.asset.typeCode === 'currency' &&
+                                          a.asset.currency === watchedCurrency
+                                      )
+                                      return (
+                                        <SelectItem
+                                          key={fund.fund.id}
+                                          value={fund.fund.id}
+                                        >
+                                          <div className="flex items-center gap-3 w-full">
+                                            <div
+                                              className="h-3 w-3 rounded-full"
+                                              style={{
+                                                backgroundColor: fund.fund.color,
+                                              }}
+                                            />
+                                            <span className="font-medium">
+                                              {fund.fund.name}
+                                            </span>
+                                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-muted-foreground tabular-nums">
+                                              {currencyAsset?.amount.toLocaleString(
+                                                'ru-RU'
+                                              ) ?? 0}{' '}
+                                              {currencySymbol}
+                                            </span>
+                                          </div>
+                                        </SelectItem>
+                                      )
+                                    })}
+                                  </SelectContent>
+                                </Select>
+
+                                {/* Asset Selector (if multiple) */}
+                                {selectedFundId && availableAssets.length > 1 && (
+                                  <Select
+                                    value={selectedAssetId}
+                                    onValueChange={setSelectedAssetId}
+                                  >
+                                    <SelectTrigger className="bg-background border-border/60">
+                                      <SelectValue placeholder="Выбрать счёт фонда..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {availableAssets.map((asset) => (
+                                        <SelectItem
+                                          key={asset.asset.id}
+                                          value={asset.asset.id}
+                                        >
+                                          <div className="flex items-center justify-between gap-3 w-full">
+                                            <span>{asset.asset.name}</span>
+                                            <span className="text-muted-foreground tabular-nums">
+                                              {asset.amount.toLocaleString(
+                                                'ru-RU'
+                                              )}{' '}
+                                              {currencySymbol}
+                                            </span>
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+
+                                {/* Amount Input */}
+                                {selectedFundId && selectedAssetId && (
+                                  <div className="flex gap-2">
+                                    <div className="relative flex-1">
+                                      <Input
+                                        type="number"
+                                        step="0.01"
+                                        placeholder="Сумма из фонда"
+                                        value={fundAmount}
+                                        onChange={(e) =>
+                                          setFundAmount(e.target.value)
+                                        }
+                                        className="pr-16 bg-background border-border/60 tabular-nums"
+                                      />
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="absolute right-1 top-1/2 -translate-y-1/2 h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+                                        onClick={setMaxAmount}
+                                      >
+                                        MAX
+                                      </Button>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="secondary"
+                                      size="icon"
+                                      onClick={addFundAllocation}
+                                      disabled={!fundAmount || parseFloat(fundAmount) <= 0}
+                                      className="shrink-0"
+                                    >
+                                      <Plus className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* No funds available message */}
+                            {availableFunds.length === 0 &&
+                              fundAllocations.length === 0 && (
+                                <p className="text-sm text-muted-foreground text-center py-2">
+                                  Нет фондов с активами в {currencySymbol}
+                                </p>
+                              )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="px-5 py-3 border-t border-border/40 flex gap-2">
               <Button
                 type="button"
                 variant="outline"

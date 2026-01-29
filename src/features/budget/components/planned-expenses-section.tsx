@@ -31,6 +31,7 @@ import { CategoryIcon } from '@/components/common'
 import { cn } from '@/lib/utils'
 import type { PlannedExpenseWithDetails, PlannedExpenseStatus, AccountWithType, ExpenseCategoryWithTags } from '@/lib/api/types'
 import { ConfirmPlannedExpenseDialog } from './confirm-planned-expense-dialog'
+import { UnconfirmPlannedExpenseDialog } from './unconfirm-planned-expense-dialog'
 import { CURRENCY_SYMBOLS } from '@/types'
 
 interface PlannedExpensesSectionProps {
@@ -89,6 +90,7 @@ export function PlannedExpensesSection({
 }: PlannedExpensesSectionProps) {
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
+  const [unconfirmDialogOpen, setUnconfirmDialogOpen] = useState(false)
   const [selectedExpense, setSelectedExpense] = useState<PlannedExpenseWithDetails | null>(null)
 
   // Создаём Map для быстрого поиска категорий по id
@@ -192,15 +194,22 @@ export function PlannedExpensesSection({
     }
   }
 
-  const handleUnconfirm = async (id: string) => {
+  const handleUnconfirmClick = (expense: PlannedExpenseWithDetails) => {
     if (!onUnconfirm) return
-    if (!confirm('Отменить подтверждение? Деньги будут возвращены на счёт, связанный расход удалён.')) return
+    setSelectedExpense(expense)
+    setUnconfirmDialogOpen(true)
+  }
 
-    setProcessingId(id)
+  const handleUnconfirmConfirm = async () => {
+    if (!onUnconfirm || !selectedExpense) return
+
+    setProcessingId(selectedExpense.id)
     try {
-      await onUnconfirm(id)
+      await onUnconfirm(selectedExpense.id)
     } finally {
       setProcessingId(null)
+      setUnconfirmDialogOpen(false)
+      setSelectedExpense(null)
     }
   }
 
@@ -495,7 +504,7 @@ export function PlannedExpensesSection({
                           className="h-7 w-7"
                           onClick={(e) => {
                             e.stopPropagation()
-                            handleUnconfirm(expense.id)
+                            handleUnconfirmClick(expense)
                           }}
                           disabled={isPending || isProcessing}
                           title="Отменить подтверждение"
@@ -557,6 +566,14 @@ export function PlannedExpensesSection({
         onOpenChange={setConfirmDialogOpen}
         onConfirm={handleConfirm}
         isPending={isPending}
+      />
+
+      <UnconfirmPlannedExpenseDialog
+        expense={selectedExpense}
+        open={unconfirmDialogOpen}
+        onOpenChange={setUnconfirmDialogOpen}
+        onConfirm={handleUnconfirmConfirm}
+        isPending={processingId === selectedExpense?.id}
       />
     </>
   )

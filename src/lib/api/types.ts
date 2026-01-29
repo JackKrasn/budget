@@ -51,6 +51,8 @@ export interface Account {
   icon?: string
   color?: string
   is_archived: boolean
+  is_credit: boolean
+  linked_fund_id?: UUID  // Фонд для авто-резервирования (только для кредитных карт)
   created_at: ISODate
   updated_at: ISODate
 }
@@ -68,6 +70,8 @@ export interface CreateAccountRequest {
   icon?: string
   color?: string
   initialBalance?: number
+  isCredit?: boolean
+  linkedFundId?: string  // Фонд для авто-резервирования (только для кредитных карт)
 }
 
 export interface UpdateAccountRequest {
@@ -79,6 +83,8 @@ export interface UpdateAccountRequest {
   color?: string
   isArchived?: boolean
   currentBalance?: number
+  isCredit?: boolean
+  linkedFundId?: string | null  // Фонд для авто-резервирования (null для удаления привязки)
 }
 
 export interface AccountsListResponse {
@@ -581,6 +587,7 @@ export interface UpdateExpenseRequest {
   date?: string
   description?: string
   tagIds?: string[]
+  fundAllocations?: FundAllocationRequest[]  // null/undefined = не менять, [] = удалить все, [...] = заменить
 }
 
 export interface ExpensesSummary {
@@ -1425,6 +1432,7 @@ export type FundTransactionType =
   | 'deposit'
   | 'withdrawal'
   | 'contribution'
+  | 'reserve'  // Резервирование для кредитной карты
 
 export interface BuyAssetRequest {
   assetId: string
@@ -1615,4 +1623,60 @@ export interface AssetByFundParams {
 export interface AssetByFundResponse {
   data: AssetGrouped[]
   total: number
+}
+
+// === Credit Card Reserves (Резервы по кредитным картам) ===
+
+export type ReserveStatus = 'pending' | 'used' | 'cancelled'
+
+// Go nullable time type
+export interface NullableTime {
+  Time: string
+  Valid: boolean
+}
+
+export interface CreditCardReserve {
+  id: UUID
+  fundId: UUID
+  fundName?: string  // Может быть null если фонд не найден
+  expenseId: UUID
+  expenseDate: ISODate  // Дата расхода
+  expenseDescription?: string | null
+  amount: number           // Полная сумма резерва
+  appliedAmount: number    // Уже погашено
+  remaining: number        // Осталось погасить
+  currency: string
+  status: ReserveStatus
+  createdAt: ISODate
+}
+
+export interface CreditCardReservesResponse {
+  data: CreditCardReserve[]
+  totalPending: number
+}
+
+// Ручное применение резервов (учётная операция)
+export interface ApplyReservesRequest {
+  reserveIds: string[]
+}
+
+export interface ApplyReservesResponse {
+  appliedCount: number
+  appliedAmount: number
+}
+
+// Погашение кредитной карты с авто-применением резервов
+export interface RepayRequest {
+  fromAccountId: string
+  amount: number
+  applyReserves?: boolean  // По умолчанию true
+  date?: ISODate
+  description?: string
+}
+
+export interface RepayResponse {
+  transferId: UUID
+  amount: number
+  appliedReserves: number      // Количество применённых резервов
+  reservedAmount: number       // Сумма применённых резервов
 }

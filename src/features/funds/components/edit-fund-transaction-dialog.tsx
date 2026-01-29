@@ -21,7 +21,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
-import { Pencil, Loader2, ShoppingCart, DollarSign, ArrowDownLeft, ArrowUpRight, Plus, Receipt } from 'lucide-react'
+import { Pencil, Loader2, ShoppingCart, DollarSign, ArrowDownLeft, ArrowUpRight, Plus, Receipt, CreditCard } from 'lucide-react'
 import { useUpdateFundTransaction } from '../hooks'
 import type { FundTransaction, FundTransactionType } from '@/lib/api/types'
 import { TRANSACTION_TYPES } from '../constants'
@@ -45,6 +45,7 @@ function getTransactionIcon(type: FundTransactionType) {
     deposit: Plus,
     withdrawal: Receipt,
     contribution: Plus,
+    reserve: CreditCard,
   }
   return icons[type] || ShoppingCart
 }

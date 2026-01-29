@@ -7,6 +7,9 @@ import {
   Trash2,
   RefreshCw,
   Receipt,
+  CreditCard,
+  AlertTriangle,
+  Info,
 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -22,6 +25,7 @@ import { AccountIcon } from '@/components/ui/account-icon'
 import type { AccountWithType } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import { getBankByName } from '@/lib/banks'
+import { useFunds } from '@/features/funds/hooks/use-funds'
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
   RUB: '₽',
@@ -37,6 +41,7 @@ interface AccountCardProps {
   onArchive?: () => void
   onDelete?: () => void
   onSyncBalance?: () => void
+  onRepay?: () => void
 }
 
 export function AccountCard({
@@ -45,11 +50,18 @@ export function AccountCard({
   onArchive,
   onDelete,
   onSyncBalance,
+  onRepay,
 }: AccountCardProps) {
   const navigate = useNavigate()
   const currencySymbol = CURRENCY_SYMBOLS[account.currency] || account.currency
   const typeName = account.type_name || 'Загрузка...'
   const bank = account.bank_name ? getBankByName(account.bank_name) : undefined
+
+  // Получаем данные о фондах для отображения названия привязанного фонда
+  const { data: fundsData } = useFunds({ status: 'active' })
+  const linkedFund = account.linked_fund_id
+    ? fundsData?.data.find((fb) => fb.fund.id === account.linked_fund_id)?.fund
+    : undefined
 
   const handleCardClick = () => {
     navigate(`/operations?accountId=${account.id}`)
@@ -94,10 +106,16 @@ export function AccountCard({
               />
               <div>
                 <h3 className="font-semibold">{account.name}</h3>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="secondary" className="text-xs">
                     {typeName}
                   </Badge>
+                  {account.is_credit && (
+                    <Badge variant="outline" className="text-xs border-amber-500/50 text-amber-600 bg-amber-500/10">
+                      <CreditCard className="h-3 w-3 mr-1" />
+                      Кредитная
+                    </Badge>
+                  )}
                   {account.is_archived && (
                     <Badge variant="outline" className="text-xs">
                       В архиве
@@ -119,10 +137,20 @@ export function AccountCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => navigate(`/accounts/${account.id}`)}>
+                    <Info className="mr-2 h-4 w-4" />
+                    Подробнее
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleCardClick}>
                     <Receipt className="mr-2 h-4 w-4" />
                     Операции
                   </DropdownMenuItem>
+                  {account.is_credit && account.current_balance < 0 && (
+                    <DropdownMenuItem onClick={onRepay}>
+                      <CreditCard className="mr-2 h-4 w-4" />
+                      Погасить
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={onSyncBalance}>
                     <RefreshCw className="mr-2 h-4 w-4" />
                     Синхронизировать баланс
@@ -184,6 +212,26 @@ export function AccountCard({
                   )}
                   <span className="font-medium">{account.bank_name}</span>
                 </div>
+              </div>
+            )}
+            {/* Credit Card Info */}
+            {account.is_credit && (
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">Фонд для резервов</span>
+                {linkedFund ? (
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: linkedFund.color }}
+                    />
+                    <span className="font-medium text-sm">{linkedFund.name}</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-amber-600">
+                    <AlertTriangle className="h-3.5 w-3.5" />
+                    <span className="text-xs font-medium">Не настроен</span>
+                  </div>
+                )}
               </div>
             )}
             <div className="flex items-center justify-between">

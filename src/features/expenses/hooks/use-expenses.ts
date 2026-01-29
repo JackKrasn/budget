@@ -62,7 +62,15 @@ export function useCreateExpense() {
       toast.success('Расход создан')
     },
     onError: (error) => {
-      toast.error(`Ошибка: ${error.message}`)
+      // Проверяем ошибку linked_fund_id для кредитных карт
+      if (error.message.includes('linked_fund_id')) {
+        toast.error('Для кредитной карты необходимо настроить фонд для резервирования', {
+          description: 'Перейдите в настройки счёта и укажите фонд',
+          duration: 5000,
+        })
+      } else {
+        toast.error(`Ошибка: ${error.message}`)
+      }
     },
   })
 }

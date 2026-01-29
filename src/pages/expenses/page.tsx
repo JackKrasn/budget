@@ -399,6 +399,23 @@ export default function ExpensesPage() {
     return `${fromStr} - ${toStr}`
   }, [dateRange])
 
+  // Calculate today's expenses total
+  const todayTotal = useMemo(() => {
+    const today = new Date().toISOString().split('T')[0]
+    const todayExpenses = expenses.filter((e) => e.date.split('T')[0] === today)
+
+    const totals: Record<string, number> = {}
+    let totalInBase = 0
+
+    todayExpenses.forEach((expense) => {
+      const currency = expense.currency || 'RUB'
+      totals[currency] = (totals[currency] || 0) + expense.amount
+      totalInBase += expense.amountBase ?? expense.amount
+    })
+
+    return { totals, totalInBase, count: todayExpenses.length }
+  }, [expenses])
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -443,12 +460,40 @@ export default function ExpensesPage() {
             </p>
           </div>
         </div>
-        <TransferDialog>
-          <Button variant="outline" size="sm">
-            <ArrowLeftRight className="mr-2 h-4 w-4" />
-            Перевод
-          </Button>
-        </TransferDialog>
+        <div className="flex items-center gap-4">
+          {/* Today's total */}
+          {todayTotal.count > 0 && (
+            <div className="text-right">
+              <p className="text-xs text-muted-foreground">Сегодня</p>
+              <div className="flex items-baseline gap-1">
+                {Object.keys(todayTotal.totals).length > 1 ? (
+                  <div className="flex flex-col items-end">
+                    {Object.entries(todayTotal.totals)
+                      .sort(([a], [b]) => (a === 'RUB' ? -1 : b === 'RUB' ? 1 : a.localeCompare(b)))
+                      .map(([currency, amount]) => {
+                        const symbol = CURRENCY_SYMBOLS[currency as keyof typeof CURRENCY_SYMBOLS] || currency
+                        return (
+                          <span key={currency} className="text-sm font-semibold tabular-nums">
+                            {formatMoney(amount)} {symbol}
+                          </span>
+                        )
+                      })}
+                  </div>
+                ) : (
+                  <span className="text-lg font-semibold tabular-nums text-destructive">
+                    {formatMoney(todayTotal.totalInBase)} ₽
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          <TransferDialog>
+            <Button variant="outline" size="sm">
+              <ArrowLeftRight className="mr-2 h-4 w-4" />
+              Перевод
+            </Button>
+          </TransferDialog>
+        </div>
       </motion.div>
 
       {/* Summary Stats */}

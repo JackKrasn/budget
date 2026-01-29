@@ -1169,7 +1169,8 @@ export default function FundDetailsPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {isEditingRule || !activeRule ? (
+                  {/* Show form only when editing */}
+                  {isEditingRule ? (
                     <Form {...ruleForm}>
                       <form
                         onSubmit={ruleForm.handleSubmit(onRuleSubmit)}
@@ -1259,20 +1260,18 @@ export default function FundDetailsPage() {
                             </Button>
                           )}
                           <div className="flex flex-1 gap-3">
-                            {(isEditingRule || activeRule) && (
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="flex-1 h-10"
-                                onClick={() => {
-                                  ruleForm.reset()
-                                  setIsEditingRule(false)
-                                }}
-                              >
-                                Отмена
-                              </Button>
-                            )}
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="flex-1 h-10"
+                              onClick={() => {
+                                ruleForm.reset()
+                                setIsEditingRule(false)
+                              }}
+                            >
+                              Отмена
+                            </Button>
                             <Button
                               type="submit"
                               size="sm"
@@ -1289,7 +1288,8 @@ export default function FundDetailsPage() {
                         </div>
                       </form>
                     </Form>
-                  ) : (
+                  ) : activeRule ? (
+                    /* Show rule details when rule exists and not editing */
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
                         <span className="text-muted-foreground">Тип</span>
@@ -1312,16 +1312,24 @@ export default function FundDetailsPage() {
                         </Badge>
                       </div>
                     </div>
-                  )}
-
-                  {!activeRule && !isEditingRule && (
-                    <Button
-                      variant="outline"
-                      className="w-full h-11 border-dashed mt-4"
-                      onClick={() => setIsEditingRule(true)}
-                    >
-                      Добавить правило
-                    </Button>
+                  ) : (
+                    /* Show empty state with button when no rule exists */
+                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                      <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-muted/50">
+                        <TrendingUp className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Правило распределения не настроено
+                      </p>
+                      <Button
+                        variant="outline"
+                        className="h-11 border-dashed"
+                        onClick={() => setIsEditingRule(true)}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Создать правило распределения
+                      </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
