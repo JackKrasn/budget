@@ -91,39 +91,27 @@ function TagSection({
       <CollapsibleTrigger asChild>
         <div
           className={cn(
-            "flex items-center justify-between rounded-lg px-4 py-3 cursor-pointer transition-all",
-            "hover:bg-muted/60",
-            isOpen && "bg-muted/40"
+            "flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer transition-colors",
+            "hover:bg-muted/50",
+            isOpen && "bg-muted/30"
           )}
         >
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center">
-              {isOpen ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
-            <Badge
-              variant="outline"
-              className="gap-1.5 px-2.5 py-1"
-              style={{
-                borderColor: color,
-                backgroundColor: `${color}15`,
-              }}
+            <div
+              className="flex h-8 w-8 items-center justify-center rounded-md shrink-0"
+              style={{ backgroundColor: `${color}20` }}
             >
-              <span
-                className="h-2 w-2 rounded-full"
-                style={{ backgroundColor: color }}
-              />
-              {tagName}
-            </Badge>
-            <span className="text-sm text-muted-foreground">
-              {count} {count === 1 ? "расход" : count < 5 ? "расхода" : "расходов"}
-            </span>
+              <Tag className="h-4 w-4" style={{ color }} />
+            </div>
+            <div>
+              <span className="font-medium text-sm">{tagName}</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                ({count})
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-base font-semibold tabular-nums">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold tabular-nums text-sm">
               {formatMoney(amount)} ₽
             </span>
             {onTagClick && (
@@ -136,33 +124,38 @@ function TagSection({
                   onTagClick(tagId)
                 }}
               >
-                Показать
+                Подробнее
               </Button>
+            )}
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             )}
           </div>
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="pl-10 pr-4 pb-2">
+        <div className="pl-11 pr-3 pb-2 pt-1">
           {isLoading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : expenses.length > 0 ? (
-            <div className="space-y-1 mt-2">
+            <div className="space-y-1">
               {expenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 text-sm"
+                  className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/20 hover:bg-muted/40 transition-colors text-sm"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     <CategoryIcon
                       code={expense.categoryCode}
                       color={expense.categoryColor}
                       size="sm"
                     />
                     <div>
-                      <p className="font-medium">{expense.description || expense.categoryName}</p>
+                      <p className="font-medium text-sm">{expense.description || expense.categoryName}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(expense.date).toLocaleDateString("ru-RU", {
                           day: "numeric",
@@ -171,14 +164,14 @@ function TagSection({
                       </p>
                     </div>
                   </div>
-                  <span className="font-medium tabular-nums">
+                  <span className="font-medium tabular-nums text-sm">
                     {formatMoney(expense.amount)} {expense.currency === "RUB" ? "₽" : expense.currency}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground py-2">Нет расходов</p>
+            <p className="text-xs text-muted-foreground py-2">Нет расходов</p>
           )}
         </div>
       </CollapsibleContent>
@@ -234,21 +227,14 @@ function CategorySection({
       <CollapsibleTrigger asChild>
         <div
           className={cn(
-            "flex items-center justify-between rounded-lg px-4 py-3 cursor-pointer transition-all",
-            "hover:bg-muted/60",
-            isOpen && "bg-muted/40"
+            "flex items-center justify-between rounded-lg px-3 py-2 cursor-pointer transition-colors",
+            "hover:bg-muted/50",
+            isOpen && "bg-muted/30"
           )}
         >
           <div className="flex items-center gap-3">
-            <div className="flex items-center justify-center">
-              {isOpen ? (
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
-              ) : (
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-              )}
-            </div>
             <div
-              className="flex h-8 w-8 items-center justify-center rounded-lg"
+              className="flex h-8 w-8 items-center justify-center rounded-md shrink-0"
               style={{ backgroundColor: `${color}20` }}
             >
               <CategoryIcon
@@ -258,13 +244,15 @@ function CategorySection({
                 size="sm"
               />
             </div>
-            <span className="font-medium">{categoryName}</span>
-            <span className="text-sm text-muted-foreground">
-              {count} {count === 1 ? "расход" : count < 5 ? "расхода" : "расходов"}
-            </span>
+            <div>
+              <span className="font-medium text-sm">{categoryName}</span>
+              <span className="text-xs text-muted-foreground ml-2">
+                ({count})
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <span className="text-base font-semibold tabular-nums">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold tabular-nums text-sm">
               {formatMoney(amount)} ₽
             </span>
             {onCategoryClick && (
@@ -277,27 +265,32 @@ function CategorySection({
                   onCategoryClick(categoryId)
                 }}
               >
-                Показать
+                Подробнее
               </Button>
+            )}
+            {isOpen ? (
+              <ChevronDown className="h-4 w-4 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-4 w-4 text-muted-foreground" />
             )}
           </div>
         </div>
       </CollapsibleTrigger>
       <CollapsibleContent>
-        <div className="pl-10 pr-4 pb-2">
+        <div className="pl-11 pr-3 pb-2 pt-1">
           {isLoading ? (
             <div className="flex items-center justify-center py-4">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : expenses.length > 0 ? (
-            <div className="space-y-1 mt-2">
+            <div className="space-y-1">
               {expenses.map((expense) => (
                 <div
                   key={expense.id}
-                  className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 text-sm"
+                  className="flex items-center justify-between py-2 px-3 rounded-md bg-muted/20 hover:bg-muted/40 transition-colors text-sm"
                 >
                   <div>
-                    <p className="font-medium">{expense.description || categoryName}</p>
+                    <p className="font-medium text-sm">{expense.description || categoryName}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(expense.date).toLocaleDateString("ru-RU", {
                         day: "numeric",
@@ -305,14 +298,14 @@ function CategorySection({
                       })}
                     </p>
                   </div>
-                  <span className="font-medium tabular-nums">
+                  <span className="font-medium tabular-nums text-sm">
                     {formatMoney(expense.amount)} {expense.currency === "RUB" ? "₽" : expense.currency}
                   </span>
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground py-2">Нет расходов</p>
+            <p className="text-xs text-muted-foreground py-2">Нет расходов</p>
           )}
         </div>
       </CollapsibleContent>

@@ -463,7 +463,6 @@ export default function AnalyticsPage() {
                   data={categoryChartData}
                   title="Расходы по категориям"
                   description={`Распределение расходов за ${currentMonthLabel}`}
-                  className="max-w-3xl mx-auto"
                 />
               </div>
             </div>
@@ -487,7 +486,6 @@ export default function AnalyticsPage() {
                       setSelectedTagId(id)
                       setShowTagStatistics(false)
                     }}
-                    className="max-w-3xl mx-auto"
                   />
                   <div className="flex justify-center">
                     <Button
@@ -501,7 +499,7 @@ export default function AnalyticsPage() {
               ) : selectedTagId && selectedTag ? (
                 /* Режим списка расходов с тегом */
                 <div className="lg:col-span-2">
-                  <Card className="border-border/50 bg-card/50 backdrop-blur-sm max-w-3xl mx-auto">
+                  <Card className="border-border/50 bg-card/50 backdrop-blur-sm">
                     <CardHeader className="pb-4">
                       <div className="flex items-center gap-3">
                         <Button
@@ -626,7 +624,6 @@ export default function AnalyticsPage() {
                     data={tagChartData}
                     title="Расходы по меткам"
                     description={`Распределение расходов с метками за ${currentMonthLabel}. Нажмите на метку для детализации.`}
-                    className="max-w-3xl mx-auto"
                     onTagClick={(id) => {
                       setSelectedTagId(id)
                       setShowTagStatistics(false)
