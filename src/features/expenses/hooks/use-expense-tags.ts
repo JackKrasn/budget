@@ -1,6 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { expenseTagsApi } from '@/lib/api'
-import type { CreateExpenseTagRequest, UpdateExpenseTagRequest } from '@/lib/api'
+import type {
+  CreateExpenseTagRequest,
+  UpdateExpenseTagRequest,
+  TagStatisticsParams,
+} from '@/lib/api'
 import { toast } from 'sonner'
 
 // === Query Keys ===
@@ -8,6 +12,8 @@ import { toast } from 'sonner'
 export const expenseTagKeys = {
   all: ['expense-tags'] as const,
   lists: () => [...expenseTagKeys.all, 'list'] as const,
+  statistics: (id: string, params?: TagStatisticsParams) =>
+    [...expenseTagKeys.all, 'statistics', id, params] as const,
 }
 
 // === Hooks ===
@@ -19,6 +25,20 @@ export function useExpenseTags() {
   return useQuery({
     queryKey: expenseTagKeys.lists(),
     queryFn: () => expenseTagsApi.list(),
+  })
+}
+
+/**
+ * Получить статистику по тегу (группировка по другим тегам и категориям)
+ */
+export function useExpenseTagStatistics(
+  id: string | null,
+  params?: TagStatisticsParams
+) {
+  return useQuery({
+    queryKey: expenseTagKeys.statistics(id ?? '', params),
+    queryFn: () => expenseTagsApi.getStatistics(id!, params),
+    enabled: !!id,
   })
 }
 

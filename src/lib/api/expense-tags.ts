@@ -4,6 +4,8 @@ import type {
   ExpenseTagsListResponse,
   CreateExpenseTagRequest,
   UpdateExpenseTagRequest,
+  TagStatisticsParams,
+  TagStatisticsResponse,
 } from './types'
 
 const ENDPOINT = '/expense-tags'
@@ -30,4 +32,17 @@ export const expenseTagsApi = {
    * Удалить тег
    */
   delete: (id: string) => apiClient.delete<void>(`${ENDPOINT}/${id}`),
+
+  /**
+   * Получить статистику по тегу (группировка по другим тегам и категориям)
+   */
+  getStatistics: (id: string, params?: TagStatisticsParams) => {
+    const searchParams = new URLSearchParams()
+    if (params?.from) searchParams.set('from', params.from)
+    if (params?.to) searchParams.set('to', params.to)
+    const query = searchParams.toString()
+    return apiClient.get<TagStatisticsResponse>(
+      `${ENDPOINT}/${id}/statistics${query ? `?${query}` : ''}`
+    )
+  },
 }

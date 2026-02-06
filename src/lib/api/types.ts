@@ -452,6 +452,40 @@ export interface ExpenseTagsListResponse {
   total: number
 }
 
+export interface TagStatisticsParams {
+  from?: string
+  to?: string
+}
+
+export interface TagStatisticsResponse {
+  tag: {
+    id: string
+    name: string
+    color: string | null
+    created_at: string
+  }
+  total: {
+    expenses_count: number
+    total_amount: number
+  }
+  by_tags: Array<{
+    tag_id: string
+    tag_name: string
+    tag_color: string | null
+    expenses_count: number
+    total_amount: number
+  }>
+  by_categories: Array<{
+    category_id: string
+    category_code: string
+    category_name: string
+    category_icon: string | null
+    category_color: string | null
+    expenses_count: number
+    total_amount: number
+  }>
+}
+
 // === Expense Categories ===
 
 export interface ExpenseCategory {
@@ -607,8 +641,9 @@ export interface ExpensesListParams {
   categoryId?: string
   accountId?: string
   tagId?: string
+  tagIds?: string[] // фильтр по нескольким тегам (AND логика)
   fundId?: string // фильтр по фонду (расходы, профинансированные из этого фонда)
-  [key: string]: string | number | boolean | undefined
+  [key: string]: string | number | boolean | string[] | undefined
 }
 
 // === Budgets ===

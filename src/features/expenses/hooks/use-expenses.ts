@@ -24,10 +24,11 @@ export const expenseKeys = {
 /**
  * Получить список расходов с фильтрацией
  */
-export function useExpenses(params?: ExpensesListParams) {
+export function useExpenses(params?: ExpensesListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: expenseKeys.list(params),
     queryFn: () => expensesApi.list(params),
+    enabled: options?.enabled ?? true,
   })
 }
 

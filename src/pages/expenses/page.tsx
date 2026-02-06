@@ -12,6 +12,7 @@ import {
   Target,
   ArrowLeftRight,
   Tag as TagIcon,
+  PieChart,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,7 +31,7 @@ import {
   type TagSummary,
 } from '@/features/expenses'
 import { useFunds } from '@/features/funds'
-import { ExpenseCategoryChart, ExpenseTagChart } from '@/features/analytics'
+import { ExpenseCategoryChart, ExpenseTagChart, TagStatisticsView } from '@/features/analytics'
 import type { ExpenseListRow, BudgetItemWithCategory } from '@/lib/api/types'
 import { useBudgetByMonth } from '@/features/budget'
 import {
@@ -66,6 +67,8 @@ export default function ExpensesPage() {
     categoryFromUrl
   )
   const [selectedTagId, setSelectedTagId] = useState<string | null>(tagFromUrl)
+  // Дополнительный тег для фильтрации (при клике из статистики по тегу)
+  const [secondaryTagId, setSecondaryTagId] = useState<string | null>(null)
   const [selectedFundId, setSelectedFundId] = useState<string | null>(fundFromUrl)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(() => {
     // Load from localStorage on mount
@@ -74,6 +77,7 @@ export default function ExpensesPage() {
   })
   const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [showTagStatistics, setShowTagStatistics] = useState(false)
 
   // Синхронизация URL с фильтрами
   useEffect(() => {
@@ -114,14 +118,35 @@ export default function ExpensesPage() {
     setDateRange({ from, to })
   }
 
-  const { data: expensesData, isLoading, error } = useExpenses({
-    from: dateRange.from.toISOString().split('T')[0],
-    to: dateRange.to.toISOString().split('T')[0],
-    categoryId: selectedCategoryId || undefined,
-    accountId: selectedAccountId || undefined,
-    tagId: selectedTagId || undefined,
-    fundId: selectedFundId || undefined,
-  })
+  // Формируем параметры запроса с учетом нескольких тегов
+  const expenseParams = useMemo(() => {
+    const params: {
+      from: string
+      to: string
+      categoryId?: string
+      accountId?: string
+      tagId?: string
+      tagIds?: string[]
+      fundId?: string
+    } = {
+      from: dateRange.from.toISOString().split('T')[0],
+      to: dateRange.to.toISOString().split('T')[0],
+    }
+    if (selectedCategoryId) params.categoryId = selectedCategoryId
+    if (selectedAccountId) params.accountId = selectedAccountId
+    if (selectedFundId) params.fundId = selectedFundId
+
+    // Если есть два тега - используем tagIds, иначе tagId
+    if (selectedTagId && secondaryTagId) {
+      params.tagIds = [selectedTagId, secondaryTagId]
+    } else if (selectedTagId) {
+      params.tagId = selectedTagId
+    }
+
+    return params
+  }, [dateRange, selectedCategoryId, selectedAccountId, selectedTagId, secondaryTagId, selectedFundId])
+
+  const { data: expensesData, isLoading, error } = useExpenses(expenseParams)
   const { data: categoriesData } = useExpenseCategories()
   const { data: tagsData } = useExpenseTags()
   const { data: accountsData } = useAccounts()
@@ -296,6 +321,8 @@ export default function ExpensesPage() {
   const handleTagClick = (tagId: string) => {
     setSelectedTagId(tagId)
     setSelectedCategoryId(null)
+    setSecondaryTagId(null)
+    setShowTagStatistics(false)
     setViewMode('list')
   }
 
@@ -307,8 +334,31 @@ export default function ExpensesPage() {
 
   const handleBackToTags = () => {
     setSelectedTagId(null)
+    setSecondaryTagId(null)
     setSelectedCategoryId(null)
+    setShowTagStatistics(false)
     setViewMode('tags')
+  }
+
+  // При клике на тег в статистике - добавляем его как второй фильтр и показываем список
+  const handleTagStatisticsTagClick = (tagId: string) => {
+    setSecondaryTagId(tagId)
+    setShowTagStatistics(false)
+    setViewMode('list')
+  }
+
+  const handleTagStatisticsCategoryClick = (categoryId: string) => {
+    setSelectedCategoryId(categoryId)
+    // Оставляем selectedTagId как есть, чтобы фильтровать по категории + тегу
+    setSecondaryTagId(null)
+    setShowTagStatistics(false)
+    setViewMode('list')
+  }
+
+  const handleShowExpensesList = () => {
+    setSecondaryTagId(null)
+    setShowTagStatistics(false)
+    setViewMode('list')
   }
 
   // Получить название выбранной категории/тега для заголовка
@@ -317,6 +367,9 @@ export default function ExpensesPage() {
     : null
   const selectedTag = selectedTagId
     ? tags.find((t) => t.id === selectedTagId)
+    : null
+  const secondaryTag = secondaryTagId
+    ? tags.find((t) => t.id === secondaryTagId)
     : null
 
   // Calculate total planned and progress
@@ -431,7 +484,11 @@ export default function ExpensesPage() {
               variant="ghost"
               size="icon"
               onClick={() => {
-                if (selectedTagId) {
+                // Если есть второй тег - возвращаемся к статистике первого тега
+                if (secondaryTagId) {
+                  setSecondaryTagId(null)
+                  setShowTagStatistics(true)
+                } else if (selectedTagId) {
                   handleBackToTags()
                 } else if (selectedFundId) {
                   setSelectedFundId(null)
@@ -449,11 +506,13 @@ export default function ExpensesPage() {
             <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
               {selectedCategory
                 ? selectedCategory.name
-                : selectedTag
-                  ? selectedTag.name
-                  : selectedFund
-                    ? `Из фонда: ${selectedFund.fund.name}`
-                    : 'Расходы'}
+                : selectedTag && secondaryTag
+                  ? `${selectedTag.name} + ${secondaryTag.name}`
+                  : selectedTag
+                    ? selectedTag.name
+                    : selectedFund
+                      ? `Из фонда: ${selectedFund.fund.name}`
+                      : 'Расходы'}
             </h1>
             <p className="mt-1 text-muted-foreground capitalize">
               {currentMonthName}
@@ -688,6 +747,8 @@ export default function ExpensesPage() {
             if (mode === 'categories' || mode === 'tags') {
               setSelectedCategoryId(null)
               setSelectedTagId(null)
+              setSecondaryTagId(null)
+              setShowTagStatistics(false)
             }
           }}
           categories={categories}
@@ -701,13 +762,17 @@ export default function ExpensesPage() {
           onCategoryChange={(id) => {
             setSelectedCategoryId(id)
             setSelectedTagId(null)
+            setSecondaryTagId(null)
+            setShowTagStatistics(false)
             if (id) {
               setViewMode('list')
             }
           }}
           onTagChange={(id) => {
             setSelectedTagId(id)
+            setSecondaryTagId(null)
             setSelectedCategoryId(null)
+            setShowTagStatistics(false)
             if (id) {
               setViewMode('list')
             }
@@ -715,6 +780,8 @@ export default function ExpensesPage() {
           onAccountChange={setSelectedAccountId}
           onFundChange={(id) => {
             setSelectedFundId(id)
+            setSecondaryTagId(null)
+            setShowTagStatistics(false)
             if (id) {
               setViewMode('list')
             }
@@ -844,6 +911,32 @@ export default function ExpensesPage() {
                 </div>
               )}
             </motion.div>
+          ) : selectedTagId && showTagStatistics ? (
+            <motion.div
+              key="tag-statistics"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="space-y-6"
+            >
+              <TagStatisticsView
+                tagId={selectedTagId}
+                tagName={selectedTag?.name ?? ''}
+                tagColor={selectedTag?.color ?? '#666'}
+                from={dateRange.from.toISOString().split('T')[0]}
+                to={dateRange.to.toISOString().split('T')[0]}
+                onBack={handleBackToTags}
+                onTagClick={handleTagStatisticsTagClick}
+                onCategoryClick={handleTagStatisticsCategoryClick}
+              />
+
+              {/* Button to show expenses list */}
+              <div className="flex justify-center">
+                <Button variant="outline" onClick={handleShowExpensesList}>
+                  Показать все расходы с этой меткой
+                </Button>
+              </div>
+            </motion.div>
           ) : viewMode === 'list' ? (
             <motion.div
               key="list"
@@ -852,6 +945,20 @@ export default function ExpensesPage() {
               exit={{ opacity: 0 }}
               className="space-y-6"
             >
+              {/* Button to group by tag when tag is selected (but not when two tags are selected) */}
+              {selectedTagId && selectedTag && !secondaryTagId && expensesByDate.length > 0 && (
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowTagStatistics(true)}
+                    className="gap-2"
+                  >
+                    <PieChart className="h-4 w-4" />
+                    Группировать по метке «{selectedTag.name}»
+                  </Button>
+                </div>
+              )}
+
               {expensesByDate.length > 0 ? (
                 expensesByDate.map(([date, dateExpenses]) => {
                   const expensesByCurrency = groupExpensesByCurrency(dateExpenses)

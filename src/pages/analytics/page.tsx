@@ -10,20 +10,25 @@ import {
   TrendingDown,
   ChevronLeft,
   ChevronRight,
+  PieChart,
+  Tag,
 } from "lucide-react"
 import { format, startOfMonth, endOfMonth, subMonths, addMonths } from "date-fns"
 import { ru } from "date-fns/locale"
 
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useExpenses } from "@/features/expenses"
+import { useExpenses, useExpenseTags } from "@/features/expenses"
+import { CategoryIcon } from "@/components/common"
 import { useCurrentBudget } from "@/features/budget"
 import {
   ExpenseCategoryChart,
   ExpenseTagChart,
   ExpenseTrendChart,
   ExpenseOverviewChart,
+  TagStatisticsView,
 } from "@/features/analytics"
 
 function formatMoney(amount: number): string {
@@ -52,6 +57,8 @@ type ViewMode = "overview" | "categories" | "tags" | "trends"
 
 export default function AnalyticsPage() {
   const [viewMode, setViewMode] = useState<ViewMode>("overview")
+  const [selectedTagId, setSelectedTagId] = useState<string | null>(null)
+  const [showTagStatistics, setShowTagStatistics] = useState(false)
 
   // Current month for main charts
   const [currentDate, setCurrentDate] = useState(() => new Date())
@@ -87,11 +94,40 @@ export default function AnalyticsPage() {
   })
 
   const { data: currentBudget } = useCurrentBudget()
+  const { data: tagsData } = useExpenseTags()
+  const tags = tagsData?.data ?? []
+  const selectedTag = selectedTagId ? tags.find((t) => t.id === selectedTagId) : null
 
   const expenses = expensesData?.data ?? []
   const trendExpenses = trendExpensesData?.data ?? []
   const totalPlanned = currentBudget?.total_planned ?? 0
   const totalActual = expensesData?.summary?.totalAmount ?? 0
+
+  // Расходы с выбранным тегом
+  const filteredExpenses = useMemo(() => {
+    if (!selectedTagId) return []
+    return expenses.filter((expense) =>
+      expense.tags?.some((tag) => tag.id === selectedTagId)
+    )
+  }, [expenses, selectedTagId])
+
+  // Группировка отфильтрованных расходов по дате
+  const expensesByDate = useMemo(() => {
+    const groups: Record<string, typeof filteredExpenses> = {}
+    filteredExpenses.forEach((expense) => {
+      const dateKey = expense.date.split("T")[0]
+      if (!groups[dateKey]) {
+        groups[dateKey] = []
+      }
+      groups[dateKey].push(expense)
+    })
+    return Object.entries(groups).sort(([a], [b]) => b.localeCompare(a))
+  }, [filteredExpenses])
+
+  // Общая сумма отфильтрованных расходов
+  const filteredTotal = useMemo(() => {
+    return filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0)
+  }, [filteredExpenses])
 
   // Prepare category chart data
   const categoryChartData = useMemo(() => {
@@ -346,7 +382,11 @@ export default function AnalyticsPage() {
       >
         <Tabs
           value={viewMode}
-          onValueChange={(v) => setViewMode(v as ViewMode)}
+          onValueChange={(v) => {
+            setViewMode(v as ViewMode)
+            setSelectedTagId(null)
+            setShowTagStatistics(false)
+          }}
         >
           <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:inline-grid">
             <TabsTrigger value="overview">Обзор</TabsTrigger>
@@ -431,14 +471,169 @@ export default function AnalyticsPage() {
 
           {viewMode === "tags" && (
             <div className="grid gap-6 lg:grid-cols-2">
-              <div className="lg:col-span-2">
-                <ExpenseTagChart
-                  data={tagChartData}
-                  title="Расходы по меткам"
-                  description={`Распределение расходов с метками за ${currentMonthLabel}`}
-                  className="max-w-3xl mx-auto"
-                />
-              </div>
+              {selectedTagId && selectedTag && showTagStatistics ? (
+                /* Режим статистики по тегу */
+                <div className="lg:col-span-2 space-y-4">
+                  <TagStatisticsView
+                    tagId={selectedTagId}
+                    tagName={selectedTag.name}
+                    tagColor={selectedTag.color}
+                    from={format(dateRange.from, "yyyy-MM-dd")}
+                    to={format(dateRange.to, "yyyy-MM-dd")}
+                    onBack={() => {
+                      setShowTagStatistics(false)
+                    }}
+                    onTagClick={(id) => {
+                      setSelectedTagId(id)
+                      setShowTagStatistics(false)
+                    }}
+                    className="max-w-3xl mx-auto"
+                  />
+                  <div className="flex justify-center">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowTagStatistics(false)}
+                    >
+                      Показать все расходы с этой меткой
+                    </Button>
+                  </div>
+                </div>
+              ) : selectedTagId && selectedTag ? (
+                /* Режим списка расходов с тегом */
+                <div className="lg:col-span-2">
+                  <Card className="border-border/50 bg-card/50 backdrop-blur-sm max-w-3xl mx-auto">
+                    <CardHeader className="pb-4">
+                      <div className="flex items-center gap-3">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            setSelectedTagId(null)
+                            setShowTagStatistics(false)
+                          }}
+                          className="shrink-0"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <div className="flex-1">
+                          <CardTitle className="flex items-center gap-2 text-lg">
+                            <Badge
+                              variant="outline"
+                              className="gap-1.5 px-2.5 py-1"
+                              style={{
+                                borderColor: selectedTag.color,
+                                backgroundColor: `${selectedTag.color}15`,
+                              }}
+                            >
+                              <span
+                                className="h-2.5 w-2.5 rounded-full"
+                                style={{ backgroundColor: selectedTag.color }}
+                              />
+                              {selectedTag.name}
+                            </Badge>
+                          </CardTitle>
+                          <CardDescription className="mt-1">
+                            {filteredExpenses.length} операций на сумму {formatMoney(filteredTotal)} ₽
+                          </CardDescription>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      {/* Кнопка группировки */}
+                      {filteredExpenses.length > 0 && (
+                        <div className="flex justify-center mb-4">
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowTagStatistics(true)}
+                            className="gap-2"
+                          >
+                            <PieChart className="h-4 w-4" />
+                            Группировать по метке «{selectedTag.name}»
+                          </Button>
+                        </div>
+                      )}
+
+                      {/* Список расходов */}
+                      {expensesByDate.length > 0 ? (
+                        <div className="space-y-4">
+                          {expensesByDate.map(([date, dateExpenses]) => (
+                            <div key={date}>
+                              <div className="text-sm font-medium text-muted-foreground mb-2">
+                                {new Date(date).toLocaleDateString("ru-RU", {
+                                  weekday: "short",
+                                  day: "numeric",
+                                  month: "long",
+                                })}
+                              </div>
+                              <div className="space-y-1">
+                                {dateExpenses.map((expense) => (
+                                  <div
+                                    key={expense.id}
+                                    className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/30 text-sm"
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <CategoryIcon
+                                        code={expense.categoryCode}
+                                        color={expense.categoryColor}
+                                        size="sm"
+                                      />
+                                      <div>
+                                        <p className="font-medium">
+                                          {expense.description || expense.categoryName}
+                                        </p>
+                                        {expense.tags && expense.tags.length > 1 && (
+                                          <div className="flex gap-1 mt-0.5">
+                                            {expense.tags
+                                              .filter((t) => t.id !== selectedTagId)
+                                              .map((tag) => (
+                                                <Badge
+                                                  key={tag.id}
+                                                  variant="outline"
+                                                  className="text-[10px] px-1.5 py-0"
+                                                  style={{
+                                                    borderColor: tag.color,
+                                                    color: tag.color,
+                                                  }}
+                                                >
+                                                  {tag.name}
+                                                </Badge>
+                                              ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                    <span className="font-medium tabular-nums">
+                                      {formatMoney(expense.amount)} ₽
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Tag className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                          <p>Нет расходов с этой меткой</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+              ) : (
+                <div className="lg:col-span-2">
+                  <ExpenseTagChart
+                    data={tagChartData}
+                    title="Расходы по меткам"
+                    description={`Распределение расходов с метками за ${currentMonthLabel}. Нажмите на метку для детализации.`}
+                    className="max-w-3xl mx-auto"
+                    onTagClick={(id) => {
+                      setSelectedTagId(id)
+                      setShowTagStatistics(false)
+                    }}
+                  />
+                </div>
+              )}
             </div>
           )}
 

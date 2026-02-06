@@ -1,4 +1,17 @@
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8100/api/v1'
+// Используем тот же хост, с которого открыто приложение (для доступа по IP)
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL
+  }
+  // В браузере используем текущий хост с портом API
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname
+    return `http://${host}:8100/api/v1`
+  }
+  return 'http://localhost:8100/api/v1'
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 // === Error Types ===
 
@@ -43,10 +56,12 @@ export class ApiError extends Error {
 
 type RequestMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 
+type ParamValue = string | number | boolean | string[] | undefined
+
 interface RequestOptions {
   method?: RequestMethod
   body?: unknown
-  params?: Record<string, string | number | boolean | undefined>
+  params?: Record<string, ParamValue>
 }
 
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<T> {
@@ -59,7 +74,12 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
     const searchParams = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined) {
-        searchParams.append(key, String(value))
+        // Поддержка массивов - добавляем несколько значений с одним ключом
+        if (Array.isArray(value)) {
+          value.forEach((v) => searchParams.append(key, v))
+        } else {
+          searchParams.append(key, String(value))
+        }
       }
     })
     const queryString = searchParams.toString()
@@ -96,7 +116,7 @@ async function request<T>(endpoint: string, options: RequestOptions = {}): Promi
 }
 
 export const apiClient = {
-  get: <T>(endpoint: string, params?: Record<string, string | number | boolean | undefined>) =>
+  get: <T>(endpoint: string, params?: Record<string, ParamValue>) =>
     request<T>(endpoint, { method: 'GET', params }),
 
   post: <T>(endpoint: string, body?: unknown) =>
