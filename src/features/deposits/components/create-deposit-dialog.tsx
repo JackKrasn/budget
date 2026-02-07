@@ -74,6 +74,8 @@ const CURRENCIES = [
   { value: 'EUR', label: 'Евро', symbol: '€' },
   { value: 'GEL', label: 'Лари', symbol: '₾' },
   { value: 'TRY', label: 'Лира', symbol: '₺' },
+  { value: 'CNY', label: 'Юань', symbol: '¥' },
+  { value: 'AED', label: 'Дирхам', symbol: 'د.إ' },
 ]
 
 const ACCRUAL_PERIODS = [
@@ -89,6 +91,8 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   EUR: '€',
   GEL: '₾',
   TRY: '₺',
+  CNY: '¥',
+  AED: 'د.إ',
 }
 
 const FUND_ICONS: Record<string, React.ElementType> = {

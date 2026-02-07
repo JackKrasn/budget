@@ -70,6 +70,8 @@ const CURRENCIES = [
   { value: 'EUR', label: 'Евро (€)' },
   { value: 'GEL', label: 'Лари (₾)' },
   { value: 'TRY', label: 'Лира (₺)' },
+  { value: 'CNY', label: 'Юань (¥)' },
+  { value: 'AED', label: 'Дирхам (د.إ)' },
 ]
 
 const formSchema = z.object({

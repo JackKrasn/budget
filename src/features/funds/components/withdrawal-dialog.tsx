@@ -37,6 +37,10 @@ const CURRENCIES = [
   { value: 'RUB', label: '₽', name: 'Рубль' },
   { value: 'USD', label: '$', name: 'Доллар' },
   { value: 'EUR', label: '€', name: 'Евро' },
+  { value: 'GEL', label: '₾', name: 'Лари' },
+  { value: 'TRY', label: '₺', name: 'Лира' },
+  { value: 'CNY', label: '¥', name: 'Юань' },
+  { value: 'AED', label: 'د.إ', name: 'Дирхам' },
 ]
 
 const allocationSchema = z.object({
