@@ -63,7 +63,7 @@ export default function AccountDetailsPage() {
 
   // Загружаем последние расходы по счёту
   const { data: expensesData, isLoading: expensesLoading } = useExpenses({
-    accountId: id,
+    account_id: id,
   })
 
   const handleArchive = () => {

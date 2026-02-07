@@ -83,7 +83,7 @@ export default function IncomesPage() {
     from: dateRange.from,
     to: dateRange.to,
     source: selectedSource || undefined,
-    accountId: selectedAccountId || undefined,
+    account_id: selectedAccountId || undefined,
   })
   const { data: accountsData } = useAccounts()
   const deleteIncome = useDeleteIncome()

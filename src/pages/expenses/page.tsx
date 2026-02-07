@@ -127,32 +127,32 @@ export default function ExpensesPage() {
   }
 
   // Формируем параметры запроса с учетом нескольких тегов
+  // Backend ожидает snake_case для query params
+  // Примечание: фильтрация по fund_id выполняется на клиенте (см. expenses выше)
   const expenseParams = useMemo(() => {
     const params: {
       from: string
       to: string
-      categoryId?: string
-      accountId?: string
-      tagId?: string
-      tagIds?: string[]
-      fundId?: string
+      category_id?: string
+      account_id?: string
+      tag_id?: string
+      tag_ids?: string[]
     } = {
       from: formatDateLocal(dateRange.from),
       to: formatDateLocal(dateRange.to),
     }
-    if (selectedCategoryId) params.categoryId = selectedCategoryId
-    if (selectedAccountId) params.accountId = selectedAccountId
-    if (selectedFundId) params.fundId = selectedFundId
+    if (selectedCategoryId) params.category_id = selectedCategoryId
+    if (selectedAccountId) params.account_id = selectedAccountId
 
-    // Если есть два тега - используем tagIds, иначе tagId
+    // Если есть два тега - используем tag_ids, иначе tag_id
     if (selectedTagId && secondaryTagId) {
-      params.tagIds = [selectedTagId, secondaryTagId]
+      params.tag_ids = [selectedTagId, secondaryTagId]
     } else if (selectedTagId) {
-      params.tagId = selectedTagId
+      params.tag_id = selectedTagId
     }
 
     return params
-  }, [dateRange, selectedCategoryId, selectedAccountId, selectedTagId, secondaryTagId, selectedFundId])
+  }, [dateRange, selectedCategoryId, selectedAccountId, selectedTagId, secondaryTagId])
 
   const { data: expensesData, isLoading, error } = useExpenses(expenseParams)
   const { data: categoriesData } = useExpenseCategories()
@@ -165,7 +165,15 @@ export default function ExpensesPage() {
   const { data: currentBudget, isLoading: isBudgetLoading } = useBudgetByMonth(budgetYear, budgetMonth)
   const deleteExpense = useDeleteExpense()
 
-  const expenses = expensesData?.data ?? []
+  // Apply client-side fund filtering since backend may not support fund_id filter
+  const rawExpenses = expensesData?.data ?? []
+  const expenses = selectedFundId
+    ? rawExpenses.filter(
+        (expense) =>
+          expense.fundAllocations &&
+          expense.fundAllocations.some((alloc) => alloc.fundId === selectedFundId)
+      )
+    : rawExpenses
   const summary = expensesData?.summary
   const categories = categoriesData?.data ?? []
   const tags = tagsData?.data ?? []

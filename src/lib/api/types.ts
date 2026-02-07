@@ -637,11 +637,11 @@ export interface ExpensesListResponse {
 export interface ExpensesListParams {
   from?: string
   to?: string
-  categoryId?: string
-  accountId?: string
-  tagId?: string
-  tagIds?: string[] // фильтр по нескольким тегам (AND логика)
-  fundId?: string // фильтр по фонду (расходы, профинансированные из этого фонда)
+  category_id?: string
+  account_id?: string
+  tag_id?: string
+  tag_ids?: string[] // фильтр по нескольким тегам (AND логика)
+  fund_id?: string // фильтр по фонду (расходы, профинансированные из этого фонда)
   [key: string]: string | number | boolean | string[] | undefined
 }
 
@@ -1174,7 +1174,7 @@ export interface IncomesListParams {
   from?: string
   to?: string
   source?: string
-  accountId?: string
+  account_id?: string
   [key: string]: string | number | boolean | undefined
 }
 
