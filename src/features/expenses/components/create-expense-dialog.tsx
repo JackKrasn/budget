@@ -280,11 +280,33 @@ export function CreateExpenseDialog({
   }
 
   async function onSubmit(values: FormValues) {
-    // Если есть allocations - отправляем их (независимо от чекбокса)
-    // Backend ожидает только fundId и amount, assetId не нужен
+    // Собираем все allocations включая незавершённый ввод
+    const allAllocations = [...fundAllocations]
+
+    // Если пользователь выбрал фонд и ввёл сумму, но не нажал "+", добавляем автоматически
+    if (selectedFundId && selectedAssetId && fundAmount) {
+      const amount = parseFloat(fundAmount)
+      if (!isNaN(amount) && amount > 0 && !allAllocations.some((a) => a.fundId === selectedFundId)) {
+        const fund = funds.find((f) => f.fund.id === selectedFundId)
+        const asset = fund?.assets.find((a) => a.asset.id === selectedAssetId)
+        if (fund && asset) {
+          allAllocations.push({
+            fundId: selectedFundId,
+            fundName: fund.fund.name,
+            fundColor: fund.fund.color,
+            assetId: selectedAssetId,
+            assetName: asset.asset.name,
+            amount,
+            maxAmount: asset.amount,
+          })
+        }
+      }
+    }
+
+    // Backend ожидает только fundId и amount
     const allocationsToSend =
-      fundAllocations.length > 0
-        ? fundAllocations.map((a) => ({
+      allAllocations.length > 0
+        ? allAllocations.map((a) => ({
             fundId: a.fundId,
             amount: a.amount,
           }))

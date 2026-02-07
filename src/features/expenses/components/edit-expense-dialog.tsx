@@ -315,6 +315,29 @@ export function EditExpenseDialog({
   async function onSubmit(values: FormValues) {
     if (!expense) return
 
+    // Собираем все allocations включая незавершённый ввод
+    const allAllocations = [...fundAllocations]
+
+    // Если пользователь выбрал фонд и ввёл сумму, но не нажал "+", добавляем автоматически
+    if (selectedFundId && selectedAssetId && fundAmount) {
+      const amount = parseFloat(fundAmount)
+      if (!isNaN(amount) && amount > 0 && !allAllocations.some((a) => a.fundId === selectedFundId)) {
+        const fund = funds.find((f) => f.fund.id === selectedFundId)
+        const asset = fund?.assets.find((a) => a.asset.id === selectedAssetId)
+        if (fund && asset) {
+          allAllocations.push({
+            fundId: selectedFundId,
+            fundName: fund.fund.name,
+            fundColor: fund.fund.color,
+            assetId: selectedAssetId,
+            assetName: asset.asset.name,
+            amount,
+            maxAmount: asset.amount,
+          })
+        }
+      }
+    }
+
     // Determine fund allocations to send
     // If user has allocations - send them, if empty array - send empty to clear
     // If switch is off and there were original allocations - send empty to clear
@@ -322,9 +345,9 @@ export function EditExpenseDialog({
     // Backend ожидает только fundId и amount
     let allocationsToSend: { fundId: string; amount: number }[] | undefined
 
-    if (fundAllocations.length > 0) {
+    if (allAllocations.length > 0) {
       // Send new allocations
-      allocationsToSend = fundAllocations.map((a) => ({
+      allocationsToSend = allAllocations.map((a) => ({
         fundId: a.fundId,
         amount: a.amount,
       }))
