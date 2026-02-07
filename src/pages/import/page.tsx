@@ -34,6 +34,14 @@ type ImportState =
   | 'imported'
   | 'error'
 
+// Helper to format date as YYYY-MM-DD in local timezone
+function formatDateLocal(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
 export default function ImportPage() {
   const navigate = useNavigate()
 
@@ -127,8 +135,8 @@ export default function ImportPage() {
       fromDate = analysisResult.fullPeriod.from.split('T')[0]
       toDate = analysisResult.fullPeriod.to.split('T')[0]
     } else if (periodMode === 'custom' && dateFrom && dateTo) {
-      fromDate = dateFrom.toISOString().split('T')[0]
-      toDate = dateTo.toISOString().split('T')[0]
+      fromDate = formatDateLocal(dateFrom)
+      toDate = formatDateLocal(dateTo)
     } else if (periodMode === 'days' && selectedDays.length > 0) {
       const sorted = [...selectedDays].sort()
       fromDate = sorted[0]

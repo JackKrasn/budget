@@ -94,6 +94,14 @@ export default function OperationsPage() {
     return { from, to }
   })
 
+  // Helper to format date as YYYY-MM-DD in local timezone
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   const [editingExpense, setEditingExpense] = useState<ExpenseListRow | null>(null)
   const [editDialogOpen, setEditDialogOpen] = useState(false)
   const [editingDeposit, setEditingDeposit] = useState<FundDeposit | null>(null)
@@ -133,23 +141,23 @@ export default function OperationsPage() {
 
   // Data fetching
   const { data: expensesData, isLoading: isExpensesLoading, error: expensesError } = useExpenses({
-    from: dateRange.from.toISOString().split('T')[0],
-    to: dateRange.to.toISOString().split('T')[0],
+    from: formatDateLocal(dateRange.from),
+    to: formatDateLocal(dateRange.to),
   })
 
   const { data: transfersData, isLoading: isTransfersLoading } = useTransfers({
-    from: dateRange.from.toISOString().split('T')[0],
-    to: dateRange.to.toISOString().split('T')[0],
+    from: formatDateLocal(dateRange.from),
+    to: formatDateLocal(dateRange.to),
   })
 
   const { data: adjustmentsData, isLoading: isAdjustmentsLoading } = useBalanceAdjustments({
-    from: dateRange.from.toISOString().split('T')[0],
-    to: dateRange.to.toISOString().split('T')[0],
+    from: formatDateLocal(dateRange.from),
+    to: formatDateLocal(dateRange.to),
   })
 
   const { data: fundDepositsData, isLoading: isFundDepositsLoading } = useFundDeposits({
-    from_date: dateRange.from.toISOString().split('T')[0],
-    to_date: dateRange.to.toISOString().split('T')[0],
+    from_date: formatDateLocal(dateRange.from),
+    to_date: formatDateLocal(dateRange.to),
   })
 
   const deleteExpense = useDeleteExpense()

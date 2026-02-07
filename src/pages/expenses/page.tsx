@@ -118,6 +118,14 @@ export default function ExpensesPage() {
     setDateRange({ from, to })
   }
 
+  // Helper to format date as YYYY-MM-DD in local timezone
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // Формируем параметры запроса с учетом нескольких тегов
   const expenseParams = useMemo(() => {
     const params: {
@@ -129,8 +137,8 @@ export default function ExpensesPage() {
       tagIds?: string[]
       fundId?: string
     } = {
-      from: dateRange.from.toISOString().split('T')[0],
-      to: dateRange.to.toISOString().split('T')[0],
+      from: formatDateLocal(dateRange.from),
+      to: formatDateLocal(dateRange.to),
     }
     if (selectedCategoryId) params.categoryId = selectedCategoryId
     if (selectedAccountId) params.accountId = selectedAccountId
@@ -454,7 +462,7 @@ export default function ExpensesPage() {
 
   // Calculate today's expenses total
   const todayTotal = useMemo(() => {
-    const today = new Date().toISOString().split('T')[0]
+    const today = formatDateLocal(new Date())
     const todayExpenses = expenses.filter((e) => e.date.split('T')[0] === today)
 
     const totals: Record<string, number> = {}
@@ -923,8 +931,8 @@ export default function ExpensesPage() {
                 tagId={selectedTagId}
                 tagName={selectedTag?.name ?? ''}
                 tagColor={selectedTag?.color ?? '#666'}
-                from={dateRange.from.toISOString().split('T')[0]}
-                to={dateRange.to.toISOString().split('T')[0]}
+                from={formatDateLocal(dateRange.from)}
+                to={formatDateLocal(dateRange.to)}
                 onBack={handleBackToTags}
                 onTagClick={handleTagStatisticsTagClick}
                 onCategoryClick={handleTagStatisticsCategoryClick}

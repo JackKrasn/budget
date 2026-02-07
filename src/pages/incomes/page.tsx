@@ -60,14 +60,22 @@ export default function IncomesPage() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null)
 
+  // Helper to format date as YYYY-MM-DD in local timezone
+  const formatDateLocal = (date: Date): string => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   // Get current month date range
   const dateRange = useMemo(() => {
     const now = new Date()
     const firstDay = new Date(now.getFullYear(), now.getMonth(), 1)
     const lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0)
     return {
-      from: firstDay.toISOString().split('T')[0],
-      to: lastDay.toISOString().split('T')[0],
+      from: formatDateLocal(firstDay),
+      to: formatDateLocal(lastDay),
     }
   }, [])
 
@@ -149,15 +157,15 @@ export default function IncomesPage() {
   }
 
   const formatDateHeader = (dateStr: string) => {
-    const date = new Date(dateStr)
+    const date = new Date(dateStr + 'T00:00:00') // Parse as local time
     const today = new Date()
     const yesterday = new Date(today)
     yesterday.setDate(yesterday.getDate() - 1)
 
-    if (dateStr === today.toISOString().split('T')[0]) {
+    if (dateStr === formatDateLocal(today)) {
       return 'Сегодня'
     }
-    if (dateStr === yesterday.toISOString().split('T')[0]) {
+    if (dateStr === formatDateLocal(yesterday)) {
       return 'Вчера'
     }
     return date.toLocaleDateString('ru-RU', {
