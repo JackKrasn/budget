@@ -281,11 +281,11 @@ export function CreateExpenseDialog({
 
   async function onSubmit(values: FormValues) {
     // Если есть allocations - отправляем их (независимо от чекбокса)
+    // Backend ожидает только fundId и amount, assetId не нужен
     const allocationsToSend =
       fundAllocations.length > 0
         ? fundAllocations.map((a) => ({
             fundId: a.fundId,
-            assetId: a.assetId,
             amount: a.amount,
           }))
         : undefined

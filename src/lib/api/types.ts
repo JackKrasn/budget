@@ -598,7 +598,6 @@ export interface ExpenseWithCategory {
 
 export interface FundAllocationRequest {
   fundId: string
-  assetId: string // ID валютного актива фонда для списания
   amount: number
 }
 

@@ -319,13 +319,13 @@ export function EditExpenseDialog({
     // If user has allocations - send them, if empty array - send empty to clear
     // If switch is off and there were original allocations - send empty to clear
     const hasOriginalAllocations = (expense.fundAllocations?.length ?? 0) > 0
-    let allocationsToSend: { fundId: string; assetId: string; amount: number }[] | undefined
+    // Backend ожидает только fundId и amount
+    let allocationsToSend: { fundId: string; amount: number }[] | undefined
 
     if (fundAllocations.length > 0) {
       // Send new allocations
       allocationsToSend = fundAllocations.map((a) => ({
         fundId: a.fundId,
-        assetId: a.assetId,
         amount: a.amount,
       }))
     } else if (hasOriginalAllocations && !values.useFundAllocation) {
