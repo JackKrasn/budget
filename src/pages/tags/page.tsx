@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import {
   Plus,
@@ -73,17 +73,16 @@ interface TagDialogProps {
 }
 
 function TagDialog({ open, onOpenChange, tag, onSubmit, isPending }: TagDialogProps) {
-  const [name, setName] = useState(tag?.name ?? '')
-  const [color, setColor] = useState(tag?.color ?? TAG_COLORS[10].value)
+  const [name, setName] = useState('')
+  const [color, setColor] = useState(TAG_COLORS[10].value)
 
-  // Reset form when dialog opens/closes or tag changes
-  const handleOpenChange = (newOpen: boolean) => {
-    if (newOpen) {
+  // Reset form when dialog opens with new tag
+  React.useEffect(() => {
+    if (open) {
       setName(tag?.name ?? '')
       setColor(tag?.color ?? TAG_COLORS[10].value)
     }
-    onOpenChange(newOpen)
-  }
+  }, [open, tag])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -93,7 +92,7 @@ function TagDialog({ open, onOpenChange, tag, onSubmit, isPending }: TagDialogPr
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>
