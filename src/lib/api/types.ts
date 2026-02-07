@@ -1715,3 +1715,230 @@ export interface RepayResponse {
   appliedReserves: number      // Количество применённых резервов
   reservedAmount: number       // Сумма применённых резервов
 }
+
+// === Import (Импорт данных из внешних источников) ===
+
+export type ImportSource = 'coinkeeper'
+
+export type UnmappedItemType = 'account' | 'category' | 'tag'
+
+export interface ImportDateRange {
+  from: ISODate
+  to: ISODate
+}
+
+export interface ImportOperationSummary {
+  count: number
+  dateRange: ImportDateRange
+  total: number
+}
+
+export interface ImportDuplicate {
+  date: ISODate
+  amount: number
+  currency: string
+  account: string
+  category?: string
+  existingId: UUID
+  reason: 'exact_match' | 'similar_match'
+  type: 'expense' | 'transfer' | 'income'
+}
+
+export interface ImportWarning {
+  date: ISODate
+  amount: number
+  currency: string
+  account: string
+  reason: 'unmapped_account' | 'unmapped_category' | 'unmapped_tag' | 'invalid_format'
+  details: string
+  type: 'expense' | 'transfer' | 'income'
+  lineNumber: number
+}
+
+export interface UnmappedItem {
+  externalName: string
+  count: number
+  type: UnmappedItemType
+}
+
+export interface ImportByDateSummary {
+  date: string // YYYY-MM-DD
+  expenses: number
+  transfers: number
+  incomes: number
+  corrections: number
+}
+
+export interface ImportCorrection {
+  date: ISODate
+  amount: number
+  currency: string
+  account: string
+  description?: string
+  lineNumber: number
+}
+
+export interface ImportRow {
+  line_number: number
+  date: ISODate
+  type: 'expense' | 'transfer' | 'income' | 'correction'
+  from_account: string
+  to_account: string
+  amount: number
+  currency: string
+  tags?: string[]
+  note?: string
+  is_duplicate: boolean
+  has_mapping: boolean
+}
+
+export interface AnalyzeImportRequest {
+  source: ImportSource
+  csvData: string // base64 encoded
+  fileName: string
+}
+
+export interface AnalyzeImportResponse {
+  fullPeriod: ImportDateRange
+  expenses: ImportOperationSummary
+  transfers: ImportOperationSummary
+  incomes: ImportOperationSummary
+  corrections: ImportOperationSummary
+  correctionsList: ImportCorrection[] // Детализация корректировок
+  readyToImport: {
+    expenses: number
+    transfers: number
+    incomes: number
+  }
+  duplicates: ImportDuplicate[]
+  warnings: ImportWarning[]
+  unmappedItems: UnmappedItem[]
+  parsedRows: number
+  byDate: Record<string, ImportByDateSummary>
+  accounts: string[] // Список уникальных счетов из CSV
+  rows: ImportRow[] // Все распарсенные строки
+}
+
+export type ImportOperationType = 'expense' | 'transfer' | 'income'
+
+export interface ExecuteImportRequest {
+  source: ImportSource
+  csvData: string // base64 encoded
+  fileName: string
+  dateFrom: string // YYYY-MM-DD
+  dateTo: string // YYYY-MM-DD
+  skipDuplicates: boolean
+  createTags: boolean
+  dryRun: boolean
+  types?: ImportOperationType[] // Фильтр по типам операций
+  accounts?: string[] // Фильтр по названиям счетов из CSV
+}
+
+export interface ImportedOperation {
+  id: UUID
+  type: 'expense' | 'transfer' | 'income'
+  date: ISODate
+  amount: number
+  currency: string
+}
+
+export interface SkippedOperation {
+  type: 'expense' | 'transfer' | 'income'
+  date: ISODate
+  amount: number
+  reason: 'duplicate' | 'unmapped'
+  lineNumber: number
+}
+
+export interface ImportError {
+  type: 'expense' | 'transfer' | 'income'
+  date: ISODate
+  amount: number
+  error: string
+  lineNumber: number
+}
+
+export interface ExecuteImportResponse {
+  sessionId: UUID
+  imported: {
+    expenses: ImportedOperation[]
+    transfers: ImportedOperation[]
+    incomes: ImportedOperation[]
+  }
+  skipped: SkippedOperation[]
+  errors: ImportError[]
+  summary: {
+    expensesImported: number
+    transfersImported: number
+    incomesImported: number
+    duplicatesSkipped: number
+    errorsCount: number
+  }
+}
+
+// === Import Mappings (Маппинги для импорта) ===
+
+export interface ImportAccountMapping {
+  id: UUID
+  source: ImportSource
+  externalName: string
+  accountId: UUID
+  accountName?: string
+  createdAt: ISODate
+}
+
+export interface ImportCategoryMapping {
+  id: UUID
+  source: ImportSource
+  externalName: string
+  categoryId: UUID
+  categoryName?: string
+  createdAt: ISODate
+}
+
+export interface ImportTagMapping {
+  id: UUID
+  source: ImportSource
+  externalName: string
+  tagId: UUID
+  tagName?: string
+  createdAt: ISODate
+}
+
+export interface CreateAccountMappingRequest {
+  source: ImportSource
+  externalName: string
+  accountId: string
+}
+
+export interface CreateCategoryMappingRequest {
+  source: ImportSource
+  externalName: string
+  categoryId: string
+}
+
+export interface CreateTagMappingRequest {
+  source: ImportSource
+  externalName: string
+  tagId: string
+}
+
+export interface AccountMappingsListResponse {
+  data: ImportAccountMapping[]
+  total: number
+}
+
+export interface CategoryMappingsListResponse {
+  data: ImportCategoryMapping[]
+  total: number
+}
+
+export interface TagMappingsListResponse {
+  data: ImportTagMapping[]
+  total: number
+}
+
+export interface ImportMappingsListParams {
+  source?: ImportSource
+  [key: string]: string | number | boolean | undefined
+}

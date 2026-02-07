@@ -21,6 +21,7 @@ import {
   Repeat,
   SlidersHorizontal,
   Tag,
+  Upload,
 } from 'lucide-react'
 import { ThemeToggle } from '@/components/theme/theme-toggle'
 import { HeaderRates } from '@/components/layout/header-rates'
@@ -92,6 +93,7 @@ const navGroups = [
       { title: 'Метки', icon: Tag, href: '/tags' },
       { title: 'Шаблоны', icon: Repeat, href: '/templates' },
       { title: 'Курсы валют', icon: TrendingDown, href: '/exchange-rates' },
+      { title: 'Импорт', icon: Upload, href: '/import' },
     ],
   },
 ]

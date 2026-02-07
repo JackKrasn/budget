@@ -2,6 +2,7 @@
 
 import * as React from "react"
 import { motion } from "framer-motion"
+import { parseISO } from "date-fns"
 import { Tag, Loader2, ArrowLeft, ChevronDown, ChevronRight } from "lucide-react"
 
 import {
@@ -157,7 +158,7 @@ function TagSection({
                     <div>
                       <p className="font-medium text-sm">{expense.description || expense.categoryName}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(expense.date).toLocaleDateString("ru-RU", {
+                        {parseISO(expense.date).toLocaleDateString("ru-RU", {
                           day: "numeric",
                           month: "short",
                         })}
@@ -292,7 +293,7 @@ function CategorySection({
                   <div>
                     <p className="font-medium text-sm">{expense.description || categoryName}</p>
                     <p className="text-xs text-muted-foreground">
-                      {new Date(expense.date).toLocaleDateString("ru-RU", {
+                      {parseISO(expense.date).toLocaleDateString("ru-RU", {
                         day: "numeric",
                         month: "short",
                       })}

@@ -1,4 +1,5 @@
 import { Plus } from 'lucide-react'
+import { parseISO } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -21,15 +22,20 @@ export function getCurrencySymbol(currency: string): string {
 }
 
 export function formatDateHeader(date: string): string {
-  const d = new Date(date)
+  // Use parseISO to correctly parse date string without timezone shift
+  const d = parseISO(date)
   const today = new Date()
+  today.setHours(0, 0, 0, 0)
   const yesterday = new Date(today)
   yesterday.setDate(yesterday.getDate() - 1)
 
-  if (d.toDateString() === today.toDateString()) {
+  // Compare only date parts
+  const dateOnly = new Date(d.getFullYear(), d.getMonth(), d.getDate())
+
+  if (dateOnly.getTime() === today.getTime()) {
     return 'Сегодня'
   }
-  if (d.toDateString() === yesterday.toDateString()) {
+  if (dateOnly.getTime() === yesterday.getTime()) {
     return 'Вчера'
   }
 

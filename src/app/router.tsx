@@ -23,6 +23,8 @@ import AnalyticsPage from '@/pages/analytics/page'
 import TemplatesPage from '@/pages/templates/page'
 import ExchangeRatesPage from '@/pages/exchange-rates/page'
 import SettingsPage from '@/pages/settings/page'
+import ImportPage from '@/pages/import/page'
+import ImportMappingsPage from '@/pages/import/mappings/page'
 
 export const router = createBrowserRouter([
   {
@@ -124,6 +126,14 @@ export const router = createBrowserRouter([
       {
         path: 'settings',
         element: <SettingsPage />,
+      },
+      {
+        path: 'import',
+        element: <ImportPage />,
+      },
+      {
+        path: 'import/mappings',
+        element: <ImportMappingsPage />,
       },
     ],
   },

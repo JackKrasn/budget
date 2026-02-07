@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
+import { parseISO } from 'date-fns'
 import {
   MoreHorizontal,
   Trash2,
@@ -50,7 +51,7 @@ function formatExpenseAmount(expense: ExpenseListRow): { main: string; secondary
 }
 
 function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('ru-RU', {
+  return parseISO(date).toLocaleDateString('ru-RU', {
     day: 'numeric',
     month: 'short',
   })

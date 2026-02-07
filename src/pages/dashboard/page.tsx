@@ -1,7 +1,7 @@
 import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
-import { format, startOfMonth, endOfMonth, isWithinInterval, addDays } from 'date-fns'
+import { format, startOfMonth, endOfMonth, isWithinInterval, addDays, parseISO } from 'date-fns'
 import { ru } from 'date-fns/locale'
 import {
   TrendingUp,
@@ -372,7 +372,8 @@ export default function DashboardPage() {
     const monthEndDate = endOfMonth(now)
 
     const monthlyIncomes = incomes.filter((inc) => {
-      const incomeDate = new Date(inc.date || inc.created_at)
+      const dateStr = inc.date || inc.created_at
+      const incomeDate = dateStr ? parseISO(dateStr) : new Date()
       return isWithinInterval(incomeDate, { start: monthStartDate, end: monthEndDate })
     })
     const totalMonthlyIncome = monthlyIncomes.reduce(
