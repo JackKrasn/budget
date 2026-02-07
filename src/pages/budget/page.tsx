@@ -232,7 +232,7 @@ export default function BudgetPage() {
     const variance = totalPlanned - totalActual
 
     // Use currencySummary from API if available, otherwise aggregate from items
-    let currencyTotals: Record<string, { totalLimit: number; actualAmount: number; remaining: number; plannedAmount: number; bufferAmount: number }> = {}
+    const currencyTotals: Record<string, { totalLimit: number; actualAmount: number; remaining: number; plannedAmount: number; bufferAmount: number }> = {}
 
     if (budget?.currencySummary && budget.currencySummary.length > 0) {
       // Use API data
